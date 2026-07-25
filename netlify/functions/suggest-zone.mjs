@@ -29,7 +29,7 @@ const OUT_OF_TOWN_ZONES = [
   { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:20 },
   { code:'PRI',  name:'Priddis',           lat:50.8800, lng:-114.3500, radiusKm:6  },
   { code:'BRG',  name:'Bragg Creek',       lat:50.9500, lng:-114.5700, radiusKm:7  },
-  { code:'MIL',  name:'Millarville',       lat:50.6933, lng:-114.5167, radiusKm:8  },
+  { code:'MIL',  name:'Millarville',       lat:50.7567, lng:-114.3194, radiusKm:8  },
   { code:'DVA',  name:'Diamond Valley',     lat:50.6833, lng:-114.2833, radiusKm:10 },
   // South of city — east of Macleod
   { code:'RVS',  name:'Rocky View County', lat:50.9500, lng:-113.8000, radiusKm:12 },
