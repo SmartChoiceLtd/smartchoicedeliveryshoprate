@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calgary delivery quote tool</title>
+<style>
+  :root{
+    --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
+    --border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;
+    --out1:#C9E4CA;--out2:#88C08A;--out3:#4A90A4;--out4:#2C5F8A;--out5:#1A3A5C;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  [hidden]{display:none !important;}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
+  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;gap:10px;}
+  .topbar h1{font-size:19px;flex-shrink:0;}
+  .topbar span{color:var(--ink-soft);font-size:13px;}
+  .key-gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .key-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:480px;width:100%;}
+  .key-card p{color:var(--ink-soft);font-size:14px;line-height:1.6;}
+  .error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;font-weight:600;}
+  .btn:hover{opacity:0.92;} .btn:disabled{opacity:0.5;cursor:default;}
+  .btn-sm{padding:6px 12px;font-size:13px;}
+  .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+  .layout{flex:1;display:flex;min-height:0;}
+  .sidebar{width:380px;flex-shrink:0;border-right:1px solid var(--border);background:var(--card);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;}
+  .panel{border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+  .panel h2{font-size:14px;}
+  .hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:6px;}
+  .shop-item-wrap{margin-bottom:8px;}
+  .shop-item{width:100%;text-align:left;background:none;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;font-size:13px;}
+  .shop-item.active{border-color:var(--accent);background:var(--accent-soft);}
+  .shop-item .addr{display:block;color:var(--ink-soft);font-size:11px;margin-top:2px;}
+  #addShopForm input,#destinationInput{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;}
+  .pricing-section h3{font-size:12px;color:var(--ink-soft);margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
+  .pricing-section h3:first-child{border-top:none;margin-top:0;}
+  table.pricing{width:100%;border-collapse:collapse;font-size:13px;}
+  table.pricing th,table.pricing td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:left;}
+  .swatch-box{width:13px;height:13px;border-radius:3px;display:inline-block;vertical-align:middle;}
+  table.pricing input[type=number]{width:68px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+  .quote-result{margin-top:10px;font-size:13px;}
+  .quote-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg);}
+  .quote-price{font-size:26px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
+  .quote-meta{color:var(--ink-soft);font-size:12px;line-height:1.7;margin-top:4px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent);margin-right:6px;}
+  .quote-contact{background:#EAF4EA;border:1px solid #A8CFA8;color:#2C5F2C;padding:12px;border-radius:10px;font-size:13px;line-height:1.6;}
+  .quote-actions{display:flex;gap:6px;margin-top:8px;}
+  .map-wrap{flex:1;position:relative;}
+  #map{position:absolute;inset:0;}
+  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
+  .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
+  .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
+  .iw{font-size:13px;min-width:180px;}
+  .iw-title{font-weight:700;margin-bottom:4px;}
+  .iw-row{margin-bottom:6px;color:var(--ink-soft);}
+  .iw-row select{padding:4px;border-radius:6px;border:1px solid var(--border);}
+
+  /* pricing sheet modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:var(--card);border-radius:var(--radius);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;}
+  .modal h2{font-size:18px;margin-bottom:4px;}
+  .modal-sub{color:var(--ink-soft);font-size:13px;margin-bottom:16px;}
+  .modal table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  .modal table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
+  .modal table td{padding:6px 8px;border-bottom:1px solid var(--border);}
+  .modal-actions{display:flex;gap:8px;margin-top:4px;}
+  .modal h3{font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin:16px 0 6px;}
+
+  @media print{.modal-actions{display:none;}.topbar,.sidebar,.map-wrap{display:none;}.modal-bg{position:static;background:none;padding:0;}.modal{max-height:none;box-shadow:none;}}
+  @media(max-width:880px){.layout{flex-direction:column;}.sidebar{width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:50vh;}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Calgary delivery quote tool</h1>
+  <span id="topbarSubtitle">Community-based zone pricing, per shop</span>
+  <span id="diagStatus" style="margin-left:auto;color:var(--accent);font-weight:600;font-size:12px;"></span>
+</div>
+<div class="key-gate" id="keyGate">
+  <div class="key-card">
+    <h2>Loading&hellip;</h2>
+    <p id="loadingMsg" style="color:var(--ink-soft);">Connecting to Google Maps&hellip;</p>
+    <div class="error" id="keyError" hidden></div>
+  </div>
+</div>
+<div id="lookupNotFound" class="key-gate" hidden>
+  <div class="key-card"><h2>Shop not found</h2><p>This link does not match a shop on file. Check the link or ask your administrator for the correct one.</p></div>
+</div>
+<div class="layout" id="mainApp" hidden>
+  <aside class="sidebar">
+    <section class="panel" id="lookupBanner" hidden></section>
+    <section class="panel" id="shopsPanel">
+      <h2>Shops</h2>
+      <div id="shopList"></div>
+      <form id="addShopForm">
+        <input id="newShopName" placeholder="Shop name" required>
+        <input id="newShopAddress" placeholder="Shop address" required>
+        <button class="btn btn-sm" type="submit">Add shop</button>
+      </form>
+    </section>
+    <section class="panel" id="pricingPanel" hidden>
+      <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
+      <div class="pricing-section" id="pricingBody"></div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="width:100%;">View / print pricing sheet</button>
+      </div>
+      <p class="hint">Click any Calgary community on the map to override its zone.</p>
+    </section>
+    <section class="panel">
+      <h2>Get a quote</h2>
+      <input id="destinationInput" placeholder="Destination address">
+      <button class="btn btn-sm" id="quoteBtn">Calculate price</button>
+      <div class="quote-result" id="quoteResult"></div>
+    </section>
+  </aside>
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </main>
+</div>
+
+<!-- Pricing sheet modal -->
+<div class="modal-bg" id="priceSheetModal" hidden>
+  <div class="modal" id="priceSheetContent"></div>
+</div>
+
+<script>
+const CALGARY_ZONES=['C1','C2','C3','C4'];
+const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4','OUT5'];
+const ZONE_LABELS={C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',OUT1:'Immediate surrounds',OUT2:'Rural / acreage',OUT3:'Kananaskis / Canmore',OUT4:'Banff',OUT5:'Lake Louise'};
+const ZONE_COLORS={C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A',OUT5:'#1A3A5C'};
+const NAMED_TOWNS=[
+  {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8},
+  {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8},
+  {name:'Chestermere',zone:'OUT1',lat:51.0487,lng:-113.8225,radiusKm:7},
+  {name:'Okotoks',zone:'OUT1',lat:50.7258,lng:-113.9758,radiusKm:8},
+  {name:'Strathmore',zone:'OUT1',lat:51.0378,lng:-113.4003,radiusKm:8},
+  {name:'High River',zone:'OUT1',lat:50.5808,lng:-113.8747,radiusKm:8},
+  {name:'Kananaskis',zone:'OUT3',lat:50.9311,lng:-115.0986,radiusKm:15},
+  {name:'Canmore',zone:'OUT3',lat:51.0894,lng:-115.3582,radiusKm:8},
+  {name:'Banff',zone:'OUT4',lat:51.1784,lng:-115.5708,radiusKm:10},
+  {name:'Lake Louise',zone:'OUT5',lat:51.4254,lng:-116.1773,radiusKm:12}
+];
+function outerBandForDistance(km){if(km<=40)return'OUT1';if(km<=80)return'OUT2';if(km<=120)return'OUT3';if(km<=160)return'OUT4';return null;}
+const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
+
+const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townCircles:[],infoWindow:null,lastDestination:null};
+function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
+const ROUTE=parseRoute();
+
+/* ---- geometry ---- */
+function getCommunityName(props){const keys=['name','NAME','comm_name','COMM_NAME'];for(const k of keys)if(props&&props[k])return String(props[k]);if(props){const ks=Object.keys(props);if(ks.length)return String(props[ks[0]]);}return'Unknown';}
+function computeCentroid(g){if(!g)return null;const c=[];const col=rings=>rings.forEach(r=>r.forEach(p=>c.push(p)));if(g.type==='Polygon')col(g.coordinates);else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>col(p));if(!c.length)return null;const s=c.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]);return{lng:s[0]/c.length,lat:s[1]/c.length};}
+function pointInRing(pt,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>pt.lat)!==(yj>pt.lat))&&(pt.lng<(xj-xi)*(pt.lat-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function pointInGeometry(pt,g){if(!g)return false;if(g.type==='Polygon')return pointInRing(pt,g.coordinates[0]);if(g.type==='MultiPolygon')return g.coordinates.some(p=>pointInRing(pt,p[0]));return false;}
+function findCommunity(pt){return state.communities.find(c=>c.geometry&&pointInGeometry(pt,c.geometry))||null;}
+function haversineKm(a,b){const R=6371,r=d=>d*Math.PI/180;const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);const x=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function bandForDistance(km){if(km<=10)return'C1';if(km<=15)return'C2';if(km<=20)return'C3';return'C4';}
+function findNamedTown(pt){let best=null,bd=Infinity;for(const t of NAMED_TOWNS){const d=haversineKm(pt,{lat:t.lat,lng:t.lng});if(d<=t.radiusKm&&d<bd){best=t;bd=d;}}return best;}
+
+/* ---- api / config ---- */
+async function fetchMapsKey(){const r=await fetch('/api/config');if(!r.ok)throw new Error('Could not load configuration. Check GOOGLE_MAPS_KEY is set in Netlify.');const d=await r.json();if(d.error)throw new Error(d.error);return d.key;}
+function loadGoogleMaps(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();window.__gmapsReady=()=>res();const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady`;s.onerror=()=>rej(new Error('Could not load Google Maps.'));document.head.appendChild(s);setTimeout(()=>rej(new Error('Timed out loading Google Maps.')),10000);});}
+async function loadCommunities(){const r=await fetch(COMMUNITY_GEOJSON_URL);if(!r.ok)throw new Error('Could not load Calgary community data.');const t=await r.text();let g;try{g=JSON.parse(t);}catch(e){throw new Error('Invalid community GeoJSON.');}if(!g.features||!g.features.length)throw new Error('No community features found.');return g.features.map(f=>{const name=getCommunityName(f.properties);f.properties=f.properties||{};f.properties.quoteToolName=name;return{name,raw:f,geometry:f.geometry,centroid:computeCentroid(f.geometry)};});}
+async function geocodeAddress(address){const r=await fetch('/api/geocode?address='+encodeURIComponent(address+', Alberta, Canada'));const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not find that address.');return d;}
+async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
+
+/* ---- shop model ---- */
+function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95,OUT5:120};}
+function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
+function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
+function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
+
+/* ---- backend ---- */
+async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
+async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
+async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
+async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save changes.');return r.json();}
+
+/* ---- helpers ---- */
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+/* ---- shop list ---- */
+function renderShopList(){
+  const el=document.getElementById('shopList');
+  if(!state.shops.length){el.innerHTML='<p class="hint">No shops yet &mdash; add one below.</p>';return;}
+  el.innerHTML=state.shops.map(s=>`
+    <div class="shop-item-wrap">
+      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
+      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+    </div>`).join('');
+  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+}
+function copyShopLink(shopId,btn){
+  const url=location.origin+'/shop/'+encodeURIComponent(shopId);
+  const r=btn.textContent;
+  const done=()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent=r,1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(done).catch(()=>window.prompt('Copy this link:',url));
+  else window.prompt('Copy this link:',url);
+}
+
+/* ---- pricing table ---- */
+function renderPricingTable(){
+  const shop=getSelectedShop();
+  const panel=document.getElementById('pricingPanel');
+  if(!shop){panel.hidden=true;return;}
+  panel.hidden=false;
+  document.getElementById('pricingShopName').textContent=shop.name;
+  const body=document.getElementById('pricingBody');
+  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
+  const oRows=OUTER_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
+  const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[t.zone]}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
+  body.innerHTML=`<h3>Calgary zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Price</th></tr></thead><tbody>${cRows}</tbody></table><h3>Outer zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Price</th></tr></thead><tbody>${oRows}</tbody></table><h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3><table class="pricing"><thead><tr><th></th><th>Town</th><th>Price</th></tr></thead><tbody>${tRows}</tbody></table>`;
+  body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();updateTownCircles();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
+  body.querySelectorAll('input[data-town]').forEach(i=>{i.addEventListener('change',()=>{if(!shop.townPrices)shop.townPrices={};const t=i.dataset.town,v=parseFloat(i.value);shop.townPrices[t]=isNaN(v)?null:v;apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
+}
+
+/* ---- legend ---- */
+function renderLegend(){
+  const shop=getSelectedShop();
+  const legend=document.getElementById('legend');
+  if(!shop){legend.innerHTML='';return;}
+  const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  legend.innerHTML=`<div class="legend-section">Calgary communities</div>${cH}<div class="legend-section">Outer zones</div>${oH}`;
+}
+
+/* ---- map ---- */
+function initMap(){
+  state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
+  state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
+  const fc={type:'FeatureCollection',features:state.communities.map(c=>c.raw)};
+  state.map.data.addGeoJson(fc);
+  state.map.data.addListener('click',onCommunityClick);
+  drawTownCircles();
+}
+
+function drawTownCircles(){
+  state.townCircles.forEach(c=>c.setMap(null));
+  state.townCircles=[];
+  const shop=getSelectedShop();
+  NAMED_TOWNS.forEach(town=>{
+    const price=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:shop.zonePrices[town.zone]||0):0;
+    const circle=new google.maps.Circle({
+      map:state.map,
+      center:{lat:town.lat,lng:town.lng},
+      radius:town.radiusKm*1000,
+      fillColor:ZONE_COLORS[town.zone],
+      fillOpacity:0.35,
+      strokeColor:ZONE_COLORS[town.zone],
+      strokeWeight:2,
+      strokeOpacity:0.8,
+      zIndex:2,
+      clickable:true
+    });
+    const label=new google.maps.Marker({
+      map:state.map,
+      position:{lat:town.lat,lng:town.lng},
+      icon:{path:google.maps.SymbolPath.CIRCLE,scale:0},
+      label:{text:`${town.name}\n$${price}`,color:'#1A1A1A',fontSize:'11px',fontWeight:'600'},
+      clickable:false,
+      zIndex:3
+    });
+    circle.addListener('click',()=>showTownInfoWindow(town,price,new google.maps.LatLng(town.lat,town.lng)));
+    state.townCircles.push(circle,label);
+  });
+}
+
+function updateTownCircles(){
+  state.townCircles.forEach(c=>c.setMap(null));
+  state.townCircles=[];
+  drawTownCircles();
+}
+
+function showTownInfoWindow(town,price,position){
+  const content=document.createElement('div');
+  content.className='iw';
+  content.innerHTML=`<div class="iw-title">${escapeHtml(town.name)}</div><div class="iw-row">Zone: <strong>${town.zone}</strong> &mdash; ${ZONE_LABELS[town.zone]}</div><div class="iw-row">Delivery price: <strong>$${Number(price).toFixed(2)}</strong></div>`;
+  if(state.infoWindow)state.infoWindow.close();
+  state.infoWindow=new google.maps.InfoWindow({content,position});
+  state.infoWindow.open(state.map);
+}
+
+function styleCommunities(){
+  const shop=getSelectedShop();
+  if(!state.map)return;
+  state.map.data.setStyle(feature=>{
+    const name=feature.getProperty('quoteToolName');
+    let fill='#E4DDD0';
+    if(shop){const code=shop.communityZones[name]||'C4';fill=ZONE_COLORS[code];}
+    return{fillColor:fill,fillOpacity:0.55,strokeWeight:0.6,strokeColor:'#FFFFFF',zIndex:1};
+  });
+}
+
+function onCommunityClick(e){
+  const shop=getSelectedShop();if(!shop)return;
+  const name=e.feature.getProperty('quoteToolName');
+  const current=shop.communityZones[name]||'C4';
+  if(ROUTE.mode!=='admin'){
+    const content=document.createElement('div');
+    content.className='iw';
+    content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone ${current} &mdash; $${shop.zonePrices[current]||0}</div>`;
+    if(state.infoWindow)state.infoWindow.close();
+    state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
+    state.infoWindow.open(state.map);return;
+  }
+  const content=document.createElement('div');
+  content.className='iw';
+  content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone for ${escapeHtml(shop.name)}:<br><select id="iwZoneSelect" style="margin-top:4px;">${CALGARY_ZONES.map(z=>`<option value="${z}" ${z===current?'selected':''}>${z} &mdash; $${shop.zonePrices[z]||0}</option>`).join('')}</select></div><button class="btn btn-sm" id="iwApply" style="margin-top:4px;">Set zone</button>`;
+  if(state.infoWindow)state.infoWindow.close();
+  state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
+  state.infoWindow.open(state.map);
+  google.maps.event.addListenerOnce(state.infoWindow,'domready',()=>{
+    document.getElementById('iwApply').addEventListener('click',()=>{
+      shop.communityZones[name]=document.getElementById('iwZoneSelect').value;
+      styleCommunities();renderLegend();state.infoWindow.close();
+      apiSaveShop(shop).catch(e=>alert('Zone not saved: '+e.message));
+    });
+  });
+}
+
+function placeQuoteMarkers(shop,dest){
+  if(state.markers.shop)state.markers.shop.setMap(null);
+  if(state.markers.dest)state.markers.dest.setMap(null);
+  state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
+  state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
+  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
+}
+
+/* ---- select shop ---- */
+function selectShop(id){
+  state.selectedShopId=id;
+  renderShopList();renderPricingTable();styleCommunities();renderLegend();updateTownCircles();
+}
+function enterLookupView(shop){
+  state.shops=[shop];state.selectedShopId=shop.id;
+  document.getElementById('shopsPanel').hidden=true;
+  document.getElementById('pricingPanel').hidden=true;
+  document.getElementById('diagStatus').hidden=true;
+  document.getElementById('topbarSubtitle').textContent='Quote lookup';
+  const banner=document.getElementById('lookupBanner');
+  banner.hidden=false;
+  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p>`;
+  styleCommunities();renderLegend();updateTownCircles();
+}
+
+/* ---- autocomplete ---- */
+function setupAutocomplete(input){
+  const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'ca'},fields:['formatted_address','geometry']});
+  ac.addListener('place_changed',()=>{const p=ac.getPlace();if(p.geometry)state.lastDestination={address:p.formatted_address,lat:p.geometry.location.lat(),lng:p.geometry.location.lng()};});
+}
+
+/* ---- quote ---- */
+function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
+function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
+
+async function generateQuote(){
+  const shop=getSelectedShop();
+  if(!shop){showQuoteError('Select or add a shop first.');return;}
+  const input=document.getElementById('destinationInput');
+  let dest=state.lastDestination&&state.lastDestination.address===input.value?state.lastDestination:null;
+  setQuoteLoading(true);
+  try{
+    if(!dest){const g=await geocodeAddress(input.value);dest={address:g.formatted,lat:g.lat,lng:g.lng};}
+    // 1. Calgary community?
+    const community=findCommunity(dest);
+    if(community){
+      const zoneCode=shop.communityZones[community.name]||'C4';
+      const price=shop.zonePrices[zoneCode]||0;
+      let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
+      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,price,driveKm});
+      placeQuoteMarkers(shop,dest);return;
+    }
+    // 2. Named town?
+    const town=findNamedTown(dest);
+    if(town){
+      const flat=shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:null;
+      const price=flat!==null?flat:(shop.zonePrices[town.zone]||0);
+      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,price});
+      placeQuoteMarkers(shop,dest);return;
+    }
+    // 3. Distance fallback
+    const driveKm=await drivingDistanceKm(shop,dest);
+    const zoneCode=outerBandForDistance(driveKm);
+    if(!zoneCode){
+      document.getElementById('quoteResult').innerHTML=`
+        <div class="quote-contact">
+          <strong>Outside standard delivery area</strong><br>
+          ${driveKm.toFixed(1)} km driving distance &mdash; beyond our standard zones.<br>
+          Please contact the shop directly for a custom quote.
+        </div>`;
+      placeQuoteMarkers(shop,dest);return;
+    }
+    const price=shop.zonePrices[zoneCode]||0;
+    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,price,driveKm});
+    placeQuoteMarkers(shop,dest);
+  }catch(err){showQuoteError(err.message);}
+  finally{setQuoteLoading(false);}
+}
+
+function renderQuote({shop,dest,label,sublabel,zoneCode,price,driveKm}){
+  const quoteText=`Delivery quote — ${shop.name}\nDestination: ${dest.address}\nZone: ${zoneCode} (${label} — ${sublabel})\nPrice: $${Number(price).toFixed(2)}${driveKm!==undefined?'\nDriving distance: '+driveKm.toFixed(1)+' km':''}\nGenerated: ${new Date().toLocaleString()}`;
+  document.getElementById('quoteResult').innerHTML=`
+    <div class="quote-card">
+      <div class="quote-price">$${Number(price).toFixed(2)}</div>
+      <div class="quote-meta">
+        <span class="badge">${zoneCode}</span>${escapeHtml(label)} <span style="color:var(--ink-soft)">(${escapeHtml(sublabel)})</span><br>
+        ${escapeHtml(dest.address)}<br>
+        ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
+      </div>
+      <div class="quote-actions">
+        <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
+        <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
+      </div>
+    </div>`;
+  document.getElementById('copyQuoteBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copyQuoteBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(quoteText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy quote',1500);}).catch(()=>window.prompt('Copy this quote:',quoteText));
+    else window.prompt('Copy this quote:',quoteText);
+  });
+  document.getElementById('printQuoteBtn').addEventListener('click',()=>{
+    const w=window.open('','_blank','width=500,height=400');
+    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;}p{margin:4px 0;font-size:14px;}.price{font-size:28px;font-weight:700;color:#B8472B;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(price).toFixed(2)}</div><p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
+    w.document.close();
+  });
+}
+
+/* ---- pricing sheet ---- */
+function showPricingSheet(){
+  const shop=getSelectedShop();if(!shop)return;
+  const modal=document.getElementById('priceSheetModal');
+  const content=document.getElementById('priceSheetContent');
+  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+
+  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td><strong>$${shop.zonePrices[z]||0}</strong></td></tr>`).join('');
+  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td><strong>$${shop.zonePrices[z]||0}</strong></td></tr>`).join('');
+  const tRows=NAMED_TOWNS.map(t=>{
+    const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;
+    const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);
+    const note=flat!==null?'flat rate':'zone rate';
+    return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[t.zone]};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} &mdash; ${escapeHtml(note)}</td><td><strong>$${Number(price).toFixed(2)}</strong></td></tr>`;
+  }).join('');
+
+  content.innerHTML=`
+    <h2>Delivery pricing &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">${escapeHtml(shop.address)} &bull; As of ${date}</p>
+    <h3>Calgary zones</h3>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Price</th></tr></thead><tbody>${cRows}</tbody></table>
+    <h3>Outer zones (distance-based for rural addresses)</h3>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Price</th></tr></thead><tbody>${oRows}</tbody></table>
+    <h3>Named town rates</h3>
+    <table><thead><tr><th>Town</th><th>Zone / type</th><th>Price</th></tr></thead><tbody>${tRows}</tbody></table>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Calgary community pricing varies by zone assigned to each community. Click any community on the map to see its zone. Addresses beyond standard zones require a custom quote.</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="window.print()">Print</button>
+      <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
+    </div>`;
+
+  // plain text version for copy
+  const plainText=[
+    `DELIVERY PRICING — ${shop.name}`,
+    `${shop.address}`,
+    `As of ${date}`,
+    '',
+    'CALGARY ZONES',
+    ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
+    '',
+    'OUTER ZONES',
+    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
+    '',
+    'NAMED TOWN RATES',
+    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);return`  ${t.name} (${t.zone}${flat!==null?' flat rate':' zone rate'}): $${Number(price).toFixed(2)}`;})
+  ].join('\n');
+
+  document.getElementById('copySheetBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copySheetBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy pricing:',plainText));
+    else window.prompt('Copy pricing:',plainText);
+  });
+
+  modal.hidden=false;
+}
+
+document.getElementById('priceSheetModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
+
+/* ---- boot ---- */
+async function boot(){
+  const errEl=document.getElementById('keyError');
+  const loadingMsg=document.getElementById('loadingMsg');
+  try{
+    loadingMsg.textContent='Fetching configuration...';
+    const key=await fetchMapsKey();
+    loadingMsg.textContent='Loading map...';
+    await loadGoogleMaps(key);
+    loadingMsg.textContent='Loading Calgary communities...';
+    state.communities=await loadCommunities();
+    initMap();
+    document.getElementById('keyGate').hidden=true;
+    document.getElementById('mainApp').hidden=false;
+    setupAutocomplete(document.getElementById('destinationInput'));
+    if(ROUTE.mode==='lookup'){
+      const shop=await apiGetShop(ROUTE.shopId);
+      if(!shop){document.getElementById('mainApp').hidden=true;document.getElementById('lookupNotFound').hidden=false;return;}
+      enterLookupView(shop);
+    }else{
+      state.shops=await apiListShops();
+      state.shops.forEach(seedCommunityZones);
+      renderShopList();
+      if(state.shops.length)selectShop(state.shops[0].id);
+    }
+  }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
+}
+
+document.getElementById('addShopForm').addEventListener('submit',async(ev)=>{
+  ev.preventDefault();
+  const name=document.getElementById('newShopName').value.trim();
+  const address=document.getElementById('newShopAddress').value.trim();
+  if(!name||!address)return;
+  const btn=ev.target.querySelector('button');
+  btn.disabled=true;btn.textContent='Locating...';
+  try{
+    const loc=await geocodeAddress(address);
+    const payload={name,address:loc.formatted,lat:loc.lat,lng:loc.lng,zonePrices:defaultPrices(),communityZones:{},townPrices:defaultTownPrices()};
+    seedCommunityZones(payload);
+    const shop=await apiCreateShop(payload);
+    state.shops.push(shop);renderShopList();selectShop(shop.id);ev.target.reset();
+  }catch(err){alert('Could not add that shop: '+err.message);}
+  finally{btn.disabled=false;btn.textContent='Add shop';}
+});
+
+document.getElementById('quoteBtn').addEventListener('click',generateQuote);
+document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
+
+boot();
+</script>
+</body>
+</html>
