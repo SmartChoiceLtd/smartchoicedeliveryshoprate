@@ -1,0 +1,54 @@
+functionsDirectory = "C:\\Users\\kevin\\Downloads\\flower-tool_out\\flower-tool\\netlify\\functions"
+functionsDirectoryOrigin = "config-v1"
+redirectsOrigin = "config"
+plugins = []
+headers = []
+
+[build]
+publish = "C:\\Users\\kevin\\Downloads\\flower-tool_out\\flower-tool"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm install"
+functions = "C:\\Users\\kevin\\Downloads\\flower-tool_out\\flower-tool\\netlify\\functions"
+
+  [build.environment]
+
+  [build.processing]
+
+    [build.processing.css]
+
+    [build.processing.html]
+
+    [build.processing.images]
+
+    [build.processing.js]
+
+  [build.services]
+
+[functions]
+
+  [functions."*"]
+
+[[redirects]]
+from = "/shop/*"
+to = "/index.html"
+status = 200
+force = false
+
+  [redirects.query]
+
+  [redirects.conditions]
+
+  [redirects.headers]
+
+[[redirects]]
+from = "/orders"
+to = "/orders.html"
+status = 200
+force = false
+
+  [redirects.query]
+
+  [redirects.conditions]
+
+  [redirects.headers]
