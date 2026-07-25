@@ -173,7 +173,7 @@ export default async (req) => {
         formatted_address: formatted
       });
     }
-  } }
+   }
   }
 
   // Secondary TSU check — west of Tsuut'ina Trail, north of Hwy 22X
