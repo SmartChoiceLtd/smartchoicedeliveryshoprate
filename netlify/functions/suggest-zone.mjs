@@ -61,7 +61,7 @@ const SHOP_FALLBACK_LNG = -114.0719;
 
 // Calgary city boundary approximate bounding box (tight)
 function isLikelyInCalgary(lat, lng) {
-  return lat > 50.845 && lat < 51.215 && lng > -114.315 && lng < -113.860;
+  return lat > 50.845 && lat < 51.215 && lng > -114.215 && lng < -113.860;
 }
 
 // Map driving distance (km from shop) to city zone code
