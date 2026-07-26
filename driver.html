@@ -258,7 +258,13 @@ async function init() {
 
     // Pieces change updates pay
     document.getElementById('fPieces').addEventListener('change', updatePay);
-
+    // Manual address fallback
+    document.getElementById('fAddress').addEventListener('blur', function(){
+    if(this.value.trim() && !selectedZone){
+    lookupZone(this.value.trim());
+  }
+});
+    
     document.getElementById('fZoneOverride').addEventListener('change', function(){
       if(this.value){ setZone(this.value, 'Manual selection', true); }
     });
