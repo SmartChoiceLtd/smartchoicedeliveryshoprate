@@ -370,7 +370,9 @@ function placeQuoteMarkers(shop,dest){
   if(state.markers.dest)state.markers.dest.setMap(null);
   state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
   state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
-  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
+  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);state.map.fitBounds(b,80);
+  if(window.innerWidth<768){var lb=document.getElementById('legendBody');if(lb)lb.hidden=true;}
+}
 }
 
 function selectShop(id){
