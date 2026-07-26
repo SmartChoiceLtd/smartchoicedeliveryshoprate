@@ -24,8 +24,8 @@ const OUT_OF_TOWN_ZONES = [
   { code:'ERV',  name:'Elbow River Estates', lat:50.9800, lng:-114.2800, radiusKm:5 },
   { code:'EVA',  name:'Elbow Valley',      lat:51.0000, lng:-114.4000, radiusKm:6  },
   // South of city — west of Macleod
-  { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:8  },
-  { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:5  },
+  { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:6  },
+  { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:4  },
   { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'PRI',  name:'Priddis',           lat:50.8800, lng:-114.3500, radiusKm:6  },
   { code:'BRG',  name:'Bragg Creek',       lat:50.9500, lng:-114.5700, radiusKm:7  },
@@ -61,7 +61,7 @@ const SHOP_FALLBACK_LNG = -114.0719;
 
 // Calgary city boundary approximate bounding box (tight)
 function isLikelyInCalgary(lat, lng) {
-  return lat > 50.845 && lat < 51.215 && lng > -114.215 && lng < -113.860;
+return lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800;;
 }
 
 // Map driving distance (km from shop) to city zone code
