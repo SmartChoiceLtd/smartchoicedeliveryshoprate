@@ -300,13 +300,12 @@ function loadMapsForAutocomplete(key){
   document.head.appendChild(s);
 }
 
-function lookupZone(address){
+  function lookupZone(address){
   document.getElementById('zoneResult').hidden = true;
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
   selectedZone = '';
-  document.getElementById('fAddress').dataset.formatted = address; // store formatted address
-  
+  document.getElementById('fAddress').dataset.formatted = address;
 
   // Get shop location for distance calculation
   var shopId = document.getElementById('fShop').value;
@@ -332,7 +331,27 @@ function lookupZone(address){
       document.getElementById('zoneManual').hidden = false;
     });
 }
+function buildZoneButtons(suggested){
+  var common = suggested 
+    ? getNeighbourZones(suggested)
+    : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
+  var container = document.getElementById('zoneButtons');
+  container.innerHTML = common.map(function(z){
+    var r = rates[z];
+    var label = z + (r ? ' $'+r.drate : '');
+    return '<button onclick="setZone(\''+z+'\',\'Manual\',true)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;">'+label+'</button>';
+  }).join('');
+}
 
+function getNeighbourZones(code){
+  var cityZones = ['C1','C2','C3','C4','C5'];
+  var idx = cityZones.indexOf(code);
+  if(idx >= 0){
+    var neighbours = cityZones.slice(Math.max(0,idx-1), Math.min(cityZones.length,idx+2));
+    return neighbours.concat(['WPU','TSU']);
+  }
+  return [code,'C4','C5','DEW','RVS','MDF'];
+}
 function setZone(code, desc, manual){
   selectedZone = code;
   document.getElementById('zoneCode').textContent = code;
