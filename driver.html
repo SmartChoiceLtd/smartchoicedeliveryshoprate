@@ -263,9 +263,10 @@ async function init() {
     document.getElementById('app').hidden = false;
 
   } catch(e) {
+    console.error('init error:', e.message, e.stack);
     showNotFound();
   }
-}
+    
 
 function showNotFound(){
   document.getElementById('loadingScreen').hidden = true;
