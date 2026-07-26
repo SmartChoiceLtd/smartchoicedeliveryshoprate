@@ -300,6 +300,7 @@ function lookupZone(address){
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
   selectedZone = '';
+  
 
   // Get shop location for distance calculation
   var shopId = document.getElementById('fShop').value;
@@ -317,6 +318,7 @@ function lookupZone(address){
         // No match — show manual selector
         document.getElementById('zoneManual').hidden = false;
         document.getElementById('zoneResult').hidden = true;
+        document.getElementById('fZoneOverride').focus();
       }
     })
     .catch(function(){
