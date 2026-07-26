@@ -1,9 +1,9 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Smart Choice Delivery — Driver</title>
+<title>Smart Choice Delivery</title>
 <style>
 :root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
 *{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
@@ -28,20 +28,21 @@
 .pay-preview{background:var(--green-soft);border:1px solid #A8CFA8;border-radius:10px;padding:12px 14px;margin-top:10px;}
 .pay-amount{font-size:22px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
 .pay-breakdown{font-size:12px;color:var(--green);margin-top:2px;}
+.zone-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.zone-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;}
+.zone-btn:hover{border-color:var(--accent);color:var(--accent);}
 .status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.status-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;transition:all 0.15s;}
+.status-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;}
 .status-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
-.btn{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;font-family:Georgia,serif;letter-spacing:0.02em;}
+.btn{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;}
 .btn:disabled{opacity:0.5;cursor:default;}
-.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);margin-top:8px;}
+.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);}
 .error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
 .success{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:16px;border-radius:10px;text-align:center;}
 .success h3{font-family:Georgia,serif;font-size:18px;margin:0 0 6px;}
-.success p{font-size:13px;margin:0;color:var(--green);}
 .loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.photo-preview{width:100%;border-radius:8px;margin-top:8px;display:none;}
 </style>
 </head>
 <body>
@@ -62,11 +63,8 @@
     <h1>Smart Choice Delivery</h1>
     <span class="driver-badge" id="driverBadge"></span>
   </div>
-
   <div class="container">
     <div id="errorMsg" class="error" hidden></div>
-
-    <!-- Delivery details -->
     <div class="card">
       <h2>Delivery Details</h2>
       <div class="field-row">
@@ -85,9 +83,7 @@
       </div>
       <div class="field">
         <label>Shop</label>
-        <select id="fShop">
-          <option value="">Select shop...</option>
-        </select>
+        <select id="fShop"><option value="">Select shop...</option></select>
       </div>
       <div class="field">
         <label>Delivery Address</label>
@@ -95,7 +91,7 @@
         <div id="zoneResult" hidden>
           <div class="zone-result">
             <div>
-              <div class="zone-code" id="zoneCode">—</div>
+              <div class="zone-code" id="zoneCode">-</div>
               <div class="zone-desc" id="zoneDesc"></div>
             </div>
             <button onclick="overrideZone()" style="font-size:12px;color:var(--ink-soft);background:none;border:none;cursor:pointer;text-decoration:underline;">Change</button>
@@ -106,9 +102,9 @@
           </div>
         </div>
         <div id="zoneLoading" class="zone-loading" hidden>Looking up zone...</div>
-        <div id="zoneManual" hidden style="margin-top:8px;">
-        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;">Select zone:</p>
-        <div id="zoneButtons" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div id="zoneManual" hidden>
+          <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 6px;">Select zone:</p>
+          <div class="zone-buttons" id="zoneButtons"></div>
         </div>
       </div>
       <div class="field-row">
@@ -122,8 +118,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Delivery status -->
     <div class="card">
       <h2>Delivery Status</h2>
       <div class="status-grid" id="statusGrid">
@@ -132,7 +126,7 @@
         <button class="status-btn" data-status="Concierge/Reception">Concierge</button>
         <button class="status-btn" data-status="Loading Dock">Loading Dock</button>
         <button class="status-btn" data-status="Mailroom">Mailroom</button>
-        <button class="status-btn" data-status="Doorstep (With permission only)">Doorstep</button>
+        <button class="status-btn" data-status="Doorstep">Doorstep</button>
         <button class="status-btn" data-status="Redirect">Redirect</button>
         <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
       </div>
@@ -145,10 +139,8 @@
         <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
       </div>
     </div>
-
-    <!-- Comments & photo -->
     <div class="card">
-      <h2>Notes & Photo</h2>
+      <h2>Notes &amp; Photo</h2>
       <div class="field">
         <label>Comments</label>
         <textarea id="fComments" placeholder="Additional details..."></textarea>
@@ -156,24 +148,21 @@
       <div class="field">
         <label>Photo (optional)</label>
         <input type="file" id="fPhoto" accept="image/*" capture="environment">
-        <img id="photoPreview" class="photo-preview">
       </div>
     </div>
-
-    <button class="btn" id="submitBtn" onclick="submitDelivery()">Submit Delivery</button>
-    <button class="btn btn-secondary" onclick="viewSummary()">View Today's Summary</button>
+    <button class="btn" id="submitBtn">Submit Delivery</button>
+    <button class="btn btn-secondary" id="summaryBtn">View Today's Summary</button>
   </div>
 </div>
 
-<!-- Success screen -->
 <div id="successScreen" hidden>
   <div class="container" style="padding-top:40px;">
     <div class="success">
-      <h3>Delivery Submitted ✓</h3>
+      <h3>Delivery Submitted</h3>
       <p id="successDetail"></p>
     </div>
-    <button class="btn" style="margin-top:16px;" onclick="resetForm()">Next Delivery</button>
-    <button class="btn btn-secondary" onclick="viewSummary()">View Today's Summary</button>
+    <button class="btn" style="margin-top:16px;" id="nextBtn">Next Delivery</button>
+    <button class="btn btn-secondary" id="summaryBtn2">View Today's Summary</button>
   </div>
 </div>
 
@@ -184,131 +173,41 @@ var rates = {};
 var shops = [];
 var selectedZone = '';
 var selectedStatuses = [];
-var zoneTimeout = null;
-var autocomplete = null;
+var formattedAddress = '';
 
-// Get driver code from URL path /driver/ke
 var pathParts = location.pathname.split('/').filter(Boolean);
 var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
 
-async function init() {
-  try {
-    // Load driver
-    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
-    if (!res.ok) { showNotFound(); return; }
-    var driver = await res.json();
-    driverCode = driver.code;
-    driverName = driver.name;
-    document.getElementById('driverBadge').textContent = driver.name;
-    document.title = 'Smart Choice - ' + driver.name;
-
-    // Load rates
-
-
-    // Photo preview
-    document.getElementById('fPhoto').addEventListener('change', function(){
-      var file = this.files[0];
-      if(file){ var r=new FileReader(); r.onload=function(e){var p=document.getElementById('photoPreview');p.src=e.target.result;p.style.display='block';};r.readAsDataURL(file);}
-    });
-
-    // Pieces change updates pay
-    document.getElementById('fPieces').addEventListener('change', updatePay);
-    // Manual address fallback
-    document.getElementById('fAddress').addEventListener('blur', function(){
-    if(this.value.trim() && !selectedZone){
-    lookupZone(this.value.trim());
-  }
-});
-    
-
-    document.getElementById('loadingScreen').hidden = true;
-    document.getElementById('app').hidden = false;
-
-  } catch(e) {
-    console.error('init error:', e.message, e.stack);
-    showNotFound();
-  }
-    
-
-function showNotFound(){
+function showNotFound() {
   document.getElementById('loadingScreen').hidden = true;
   document.getElementById('notFound').hidden = false;
 }
 
-function loadMapsForAutocomplete(key){
-  window.__mapsReady = function(){
-    var input = document.getElementById('fAddress');
-    autocomplete = new google.maps.places.Autocomplete(input, {
-      componentRestrictions:{country:'ca'},
-      fields:['formatted_address','geometry']
-    });
-   autocomplete.addListener('place_changed', function(){
-  var place = autocomplete.getPlace();
-  if(place.geometry){
-    document.getElementById('fAddress').dataset.formatted = place.formatted_address;
-    lookupZone(place.formatted_address);
-  }
-});
-  
-  };
-  var s = document.createElement('script');
-  s.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&callback=__mapsReady';
-  document.head.appendChild(s);
-}
-
-  function lookupZone(address){
-  document.getElementById('zoneResult').hidden = true;
-  document.getElementById('zoneLoading').hidden = false;
-  document.getElementById('zoneManual').hidden = true;
-  selectedZone = '';
-  document.getElementById('fAddress').dataset.formatted = address;
-
-  // Get shop location for distance calculation
-  var shopId = document.getElementById('fShop').value;
-  var shop = shops.find(function(s){return s.id===shopId;});
-  var params = 'address=' + encodeURIComponent(address);
-  if(shop){ params += '&shop_lat='+shop.lat+'&shop_lng='+shop.lng; }
-
-  fetch('/api/suggest-zone?' + params)
-    .then(function(r){return r.json();})
-    .then(function(data){
-      document.getElementById('zoneLoading').hidden = true;
-      if(data.suggested){
-        setZone(data.suggested, data.message, false);
-      } else {
-        // No match — show manual selector
-        document.getElementById('zoneManual').hidden = false;
-        document.getElementById('zoneResult').hidden = true;
-        document.getElementById('fZoneOverride').focus();
-      }
-    })
-    .catch(function(){
-      document.getElementById('zoneLoading').hidden = true;
-      document.getElementById('zoneManual').hidden = false;
-    });
-}
-function buildZoneButtons(suggested){
-  var common = suggested 
-    ? getNeighbourZones(suggested)
-    : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
-  var container = document.getElementById('zoneButtons');
-  container.innerHTML = common.map(function(z){
-    var r = rates[z];
-    var label = z + (r ? ' $'+r.drate : '');
-    return '<button onclick="setZone(\''+z+'\',\'Manual\',true)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;">'+label+'</button>';
-  }).join('');
-}
-
-function getNeighbourZones(code){
-  var cityZones = ['C1','C2','C3','C4','C5'];
-  var idx = cityZones.indexOf(code);
-  if(idx >= 0){
-    var neighbours = cityZones.slice(Math.max(0,idx-1), Math.min(cityZones.length,idx+2));
-    return neighbours.concat(['WPU','TSU']);
+function getNeighbourZones(code) {
+  var city = ['C1','C2','C3','C4','C5'];
+  var idx = city.indexOf(code);
+  if (idx >= 0) {
+    var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
+    return n.concat(['WPU','TSU']);
   }
   return [code,'C4','C5','DEW','RVS','MDF'];
 }
-function setZone(code, desc, manual){
+
+function buildZoneButtons(suggested) {
+  var list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
+  var container = document.getElementById('zoneButtons');
+  container.innerHTML = '';
+  list.forEach(function(z) {
+    var r = rates[z];
+    var btn = document.createElement('button');
+    btn.className = 'zone-btn';
+    btn.textContent = z + (r ? ' $'+r.drate : '');
+    btn.onclick = function() { setZone(z, 'Manual selection', true); };
+    container.appendChild(btn);
+  });
+}
+
+function setZone(code, desc, manual) {
   selectedZone = code;
   document.getElementById('zoneCode').textContent = code;
   document.getElementById('zoneDesc').textContent = desc || '';
@@ -317,54 +216,97 @@ function setZone(code, desc, manual){
   updatePay();
 }
 
-function overrideZone(){
+function overrideZone() {
   document.getElementById('zoneManual').hidden = false;
   buildZoneButtons(selectedZone);
 }
 
-function updatePay(){
-  if(!selectedZone || !rates[selectedZone]) return;
+function updatePay() {
+  if (!selectedZone || !rates[selectedZone]) return;
   var r = rates[selectedZone];
   var pieces = parseInt(document.getElementById('fPieces').value) || 1;
   var base = r.drate || 0;
-  var extra = (pieces-1) * (r.dratex || 0);
+  var extra = (pieces - 1) * (r.dratex || 0);
   var gdpi = r.gdpi || 0;
   var total = base + extra + gdpi;
   document.getElementById('payAmount').textContent = '$' + total.toFixed(2);
-  document.getElementById('payBreakdown').textContent =
-    'Base $'+base.toFixed(2) +
-    (extra>0 ? ' + '+pieces-1+' extra × $'+r.dratex.toFixed(2) : '') +
-    ' + fuel $'+gdpi.toFixed(2);
+  document.getElementById('payBreakdown').textContent = 'Base $' + base.toFixed(2) + (extra > 0 ? ' + ' + (pieces-1) + ' extra x $' + r.dratex.toFixed(2) : '') + ' + fuel $' + gdpi.toFixed(2);
   document.getElementById('payPreview').hidden = false;
 }
 
-async function submitDelivery(){
+function lookupZone(address) {
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneLoading').hidden = false;
+  document.getElementById('zoneManual').hidden = true;
+  selectedZone = '';
+  var shopId = document.getElementById('fShop').value;
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var params = 'address=' + encodeURIComponent(address);
+  if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
+  fetch('/api/suggest-zone?' + params)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('zoneLoading').hidden = true;
+      if (data.suggested) {
+        setZone(data.suggested, data.message, false);
+      } else {
+        document.getElementById('zoneManual').hidden = false;
+        buildZoneButtons(null);
+      }
+    })
+    .catch(function() {
+      document.getElementById('zoneLoading').hidden = true;
+      document.getElementById('zoneManual').hidden = false;
+      buildZoneButtons(null);
+    });
+}
+
+function resetForm() {
+  selectedZone = '';
+  selectedStatuses = [];
+  formattedAddress = '';
+  document.getElementById('fOrderId').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fAddress').value = '';
+  document.getElementById('fPieces').value = '1';
+  document.getElementById('fComments').value = '';
+  document.getElementById('fAcceptedBy').value = '';
+  document.getElementById('fNeighbouredTo').value = '';
+  document.getElementById('fPhoto').value = '';
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneManual').hidden = true;
+  document.getElementById('payPreview').hidden = true;
+  document.getElementById('errorMsg').hidden = true;
+  document.querySelectorAll('.status-btn').forEach(function(b) { b.classList.remove('selected'); });
+  document.getElementById('neighbouredToField').hidden = true;
+  var now = new Date();
+  document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('successScreen').hidden = true;
+  document.getElementById('app').hidden = false;
+}
+
+async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
   errEl.hidden = true;
-
-  // Validate
-  var address = document.getElementById('fAddress').value.trim();
+  var address = formattedAddress || document.getElementById('fAddress').value.trim();
   var shopId = document.getElementById('fShop').value;
-  if(!address){ errEl.textContent='Enter a delivery address.'; errEl.hidden=false; return; }
-  if(!shopId){ errEl.textContent='Select a shop.'; errEl.hidden=false; return; }
-  if(!selectedZone){ errEl.textContent='Zone could not be determined. Please select manually.'; errEl.hidden=false; return; }
-  if(!selectedStatuses.length){ errEl.textContent='Select a delivery status.'; errEl.hidden=false; return; }
-
+  if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; return; }
+  if (!shopId) { errEl.textContent = 'Select a shop.'; errEl.hidden = false; return; }
+  if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
+  if (!selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
   btn.disabled = true; btn.textContent = 'Submitting...';
-
-  var shop = shops.find(function(s){return s.id===shopId;});
+  var shop = shops.find(function(s) { return s.id === shopId; });
   var r = rates[selectedZone] || {};
   var pieces = parseInt(document.getElementById('fPieces').value) || 1;
-  var driverPay = (r.drate||0) + ((pieces-1)*(r.dratex||0)) + (r.gdpi||0);
-
+  var driverPay = (r.drate || 0) + ((pieces - 1) * (r.dratex || 0)) + (r.gdpi || 0);
   var payload = {
     date: document.getElementById('fDate').value,
     order_id: document.getElementById('fOrderId').value.trim() || '1',
     name: document.getElementById('fName').value.trim(),
-    address: document.getElementById('fAddress').dataset.formatted || address,
+    address: address,
     shop: shop ? shop.name : shopId,
-    shop_code: shop ? (shop.name.split(' ')[0]) : '',
+    shop_code: shop ? shop.name.split(' ')[0] : '',
     driver: driverCode,
     driver_name: driverName,
     total_pieces: pieces,
@@ -377,22 +319,17 @@ async function submitDelivery(){
     driver_pay: driverPay,
     source: 'driver_form'
   };
-
   try {
     var res = await fetch('/api/orders', {
       method: 'POST',
-      headers: {'content-type':'application/json'},
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if(!res.ok) throw new Error('Status '+res.status);
-    var result = await res.json();
-
-    document.getElementById('successDetail').textContent =
-      selectedZone + ' — ' + (shop ? shop.name : '') + ' — $' + driverPay.toFixed(2) + ' driver pay';
+    if (!res.ok) throw new Error('Status ' + res.status);
+    document.getElementById('successDetail').textContent = selectedZone + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
     document.getElementById('app').hidden = true;
     document.getElementById('successScreen').hidden = false;
-
-  } catch(e){
+  } catch(e) {
     errEl.textContent = 'Could not submit: ' + e.message;
     errEl.hidden = false;
   } finally {
@@ -401,32 +338,91 @@ async function submitDelivery(){
   }
 }
 
-function resetForm(){
-  selectedZone = '';
-  selectedStatuses = [];
-  document.getElementById('fOrderId').value = '';
-  document.getElementById('fName').value = '';
-  document.getElementById('fAddress').value = '';
-  document.getElementById('fPieces').value = '1';
-  document.getElementById('fComments').value = '';
-  document.getElementById('fAcceptedBy').value = '';
-  document.getElementById('fNeighbouredTo').value = '';
-  document.getElementById('fPhoto').value = '';
-  document.getElementById('photoPreview').style.display = 'none';
-  document.getElementById('zoneResult').hidden = true;
-  document.getElementById('zoneManual').hidden = true;
-  document.getElementById('payPreview').hidden = true;
-  document.getElementById('errorMsg').hidden = true;
-  document.querySelectorAll('.status-btn').forEach(function(b){b.classList.remove('selected');});
-  document.getElementById('neighbouredToField').hidden = true;
-  var now = new Date();
-  document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-  document.getElementById('successScreen').hidden = true;
-  document.getElementById('app').hidden = false;
+async function init() {
+  try {
+    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
+    if (!res.ok) { showNotFound(); return; }
+    var driver = await res.json();
+    driverCode = driver.code;
+    driverName = driver.name;
+    document.getElementById('driverBadge').textContent = driver.name;
+    document.title = 'Smart Choice - ' + driver.name;
+
+    var rRes = await fetch('/api/rates');
+    rates = await rRes.json();
+
+    var sRes = await fetch('/api/shops');
+    shops = await sRes.json();
+    var shopSel = document.getElementById('fShop');
+    shops.sort(function(a,b) { return a.name.localeCompare(b.name); }).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      shopSel.appendChild(opt);
+    });
+
+    var now = new Date();
+    document.getElementById('fDate').value = now.toISOString().slice(0,10);
+    document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+    var cfgRes = await fetch('/api/config');
+    var cfg = await cfgRes.json();
+    loadMaps(cfg.key);
+
+    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var status = this.dataset.status;
+        var idx = selectedStatuses.indexOf(status);
+        if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
+        else { selectedStatuses.push(status); this.classList.add('selected'); }
+        document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+      });
+    });
+
+    document.getElementById('fPieces').addEventListener('change', updatePay);
+
+    document.getElementById('fAddress').addEventListener('blur', function() {
+      if (this.value.trim() && !selectedZone) {
+        lookupZone(this.value.trim());
+      }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', submitDelivery);
+    document.getElementById('summaryBtn').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+    document.getElementById('nextBtn').addEventListener('click', resetForm);
+    document.getElementById('summaryBtn2').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+
+    document.getElementById('loadingScreen').hidden = true;
+    document.getElementById('app').hidden = false;
+
+  } catch(e) {
+    console.error('init error:', e.message, e.stack);
+    showNotFound();
+  }
 }
 
-function viewSummary(){
-  window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+function loadMaps(key) {
+  window.__mapsReady = function() {
+    var input = document.getElementById('fAddress');
+    var ac = new google.maps.places.Autocomplete(input, {
+      componentRestrictions: { country: 'ca' },
+      fields: ['formatted_address', 'geometry']
+    });
+    ac.addListener('place_changed', function() {
+      var place = ac.getPlace();
+      if (place.geometry) {
+        formattedAddress = place.formatted_address;
+        lookupZone(place.formatted_address);
+      }
+    });
+  };
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&libraries=places&callback=__mapsReady';
+  document.head.appendChild(s);
 }
 
 init();
