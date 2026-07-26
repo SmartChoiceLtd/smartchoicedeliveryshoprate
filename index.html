@@ -274,9 +274,8 @@ function renderLegend(){
   if(!shop){legend.innerHTML='';return;}
   const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
   const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
+  legend.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11px;font-weight:700;color:var(--ink-soft);">PRICING</span><button onclick="document.getElementById('legendBody').hidden=!document.getElementById('legendBody').hidden" style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;color:var(--ink-soft);">⊟</button></div><div id="legendBody"><div class="legend-section">Calgary</div>${cH}<div class="legend-section">Outer zones</div>${oH}</div>`;
 }
-
 /* map */
   function toggleLegend(){
   var legend=document.getElementById('legend');
