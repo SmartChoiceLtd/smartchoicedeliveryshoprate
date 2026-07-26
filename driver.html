@@ -217,15 +217,6 @@ async function init() {
       shopSel.appendChild(opt);
     });
 
-    // Populate zone override dropdown
-    var zoneSel = document.getElementById('fZoneOverride');
-    Object.keys(rates).sort().forEach(function(z){
-      var opt = document.createElement('option');
-      opt.value = z;
-      opt.textContent = z + (rates[z] ? ' — $' + rates[z].drate : '');
-      zoneSel.appendChild(opt);
-    });
-
     // Set today's date
     document.getElementById('fDate').value = new Date().toISOString().slice(0,10);
 
