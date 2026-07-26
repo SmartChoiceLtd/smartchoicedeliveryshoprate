@@ -300,6 +300,7 @@ function lookupZone(address){
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
   selectedZone = '';
+  document.getElementById('fAddress').dataset.formatted = address; // store formatted address
   
 
   // Get shop location for distance calculation
@@ -381,7 +382,7 @@ async function submitDelivery(){
     date: document.getElementById('fDate').value,
     order_id: document.getElementById('fOrderId').value.trim() || '1',
     name: document.getElementById('fName').value.trim(),
-    address: address,
+    address: document.getElementById('fAddress').dataset.formatted || address,
     shop: shop ? shop.name : shopId,
     shop_code: shop ? (shop.name.split(' ')[0]) : '',
     driver: driverCode,
