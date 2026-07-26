@@ -203,42 +203,7 @@ async function init() {
     document.title = 'Smart Choice - ' + driver.name;
 
     // Load rates
-    var rRes = await fetch('/api/rates');
-    rates = await rRes.json();
 
-    // Load shops
-    var sRes = await fetch('/api/shops');
-    shops = await sRes.json();
-    var shopSel = document.getElementById('fShop');
-    shops.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(s){
-      var opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.name;
-      shopSel.appendChild(opt);
-    });
-
-    // Set today's date
-    document.getElementById('fDate').value = new Date().toISOString().slice(0,10);
-
-    // Set current time
-    var now = new Date();
-    document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
-    // Load Google Maps for autocomplete
-    var cfgRes = await fetch('/api/config');
-    var cfg = await cfgRes.json();
-    loadMapsForAutocomplete(cfg.key);
-
-    // Status buttons
-    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var status = this.dataset.status;
-        var idx = selectedStatuses.indexOf(status);
-        if(idx >= 0){ selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
-        else { selectedStatuses.push(status); this.classList.add('selected'); }
-        document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
-      });
-    });
 
     // Photo preview
     document.getElementById('fPhoto').addEventListener('change', function(){
@@ -255,9 +220,6 @@ async function init() {
   }
 });
     
-    document.getElementById('fZoneOverride').addEventListener('change', function(){
-      if(this.value){ setZone(this.value, 'Manual selection', true); }
-    });
 
     document.getElementById('loadingScreen').hidden = true;
     document.getElementById('app').hidden = false;
@@ -280,12 +242,14 @@ function loadMapsForAutocomplete(key){
       componentRestrictions:{country:'ca'},
       fields:['formatted_address','geometry']
     });
-    autocomplete.addListener('place_changed', function(){
-      var place = autocomplete.getPlace();
-      if(place.geometry){
-        lookupZone(place.formatted_address);
-      }
-    });
+   autocomplete.addListener('place_changed', function(){
+  var place = autocomplete.getPlace();
+  if(place.geometry){
+    document.getElementById('fAddress').dataset.formatted = place.formatted_address;
+    lookupZone(place.formatted_address);
+  }
+});
+  
   };
   var s = document.createElement('script');
   s.src = 'https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&callback=__mapsReady';
