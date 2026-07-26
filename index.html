@@ -61,7 +61,8 @@
   .quote-actions{display:flex;gap:6px;margin-top:8px;}
   .map-wrap{flex:1;position:relative;}
   #map{position:absolute;inset:0;}
-  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
+  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:40vh;overflow-y:auto;max-width:220px;}
+@media(max-width:768px){.legend{max-height:30vh;font-size:11px;padding:8px 10px;max-width:180px;}}
   .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
   .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
   .iw{font-size:13px;min-width:180px;}
@@ -134,7 +135,10 @@
   </aside>
   <main class="map-wrap">
     <div id="map"></div>
-    <div class="legend" id="legend"></div>
+    <div class="legend" id="legend">
+  <button id="legendToggle" onclick="toggleLegend()" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--ink-soft);">✕</button>
+</div>
+<button id="legendShow" hidden onclick="toggleLegend()" style="position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08);">Legend</button><div class="legend" id="legend"></div>
   </main>
 </div>
 <div class="modal-bg" id="priceSheetModal" hidden>
@@ -274,6 +278,13 @@ function renderLegend(){
 }
 
 /* map */
+  function toggleLegend(){
+  var legend=document.getElementById('legend');
+  var show=document.getElementById('legendShow');
+  var hidden=legend.style.display==='none';
+  legend.style.display=hidden?'':'none';
+  show.hidden=!hidden;
+}
 function initMap(){
   state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
   state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
