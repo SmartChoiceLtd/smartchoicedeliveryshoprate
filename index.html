@@ -370,8 +370,9 @@ function placeQuoteMarkers(shop,dest){
   if(state.markers.dest)state.markers.dest.setMap(null);
   state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
   state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
-  var midLat=(shop.lat+dest.lat)/2;
-var midLng=(shop.lng+dest.lng)/2;
+ // Offset centre toward destination to account for sidebar/legend coverage
+var midLat=(shop.lat+dest.lat*1.6)/2.6;
+var midLng=(shop.lng+dest.lng*1.6)/2.6;
 var distKm=haversineKm({lat:shop.lat,lng:shop.lng},{lat:dest.lat,lng:dest.lng});
 var zoom=distKm<5?14:distKm<15?12:distKm<30?11:distKm<60?10:distKm<120?9:8;
 state.map.setCenter({lat:midLat,lng:midLng});
