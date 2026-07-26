@@ -1,16 +1,7 @@
-bash
-
-cat /home/claude/flower-tool/netlify/functions/drivers.mjs
-Output
-
 import { getStore } from '@netlify/blobs';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
-}
-
-function slugify(code) {
-  return code.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
 export default async (req) => {
@@ -64,4 +55,3 @@ export default async (req) => {
 };
 
 export const config = { path: '/api/drivers' };
-Done
