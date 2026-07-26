@@ -200,7 +200,7 @@ async function init() {
     driverCode = driver.code;
     driverName = driver.name;
     document.getElementById('driverBadge').textContent = driver.name;
-    document.title = 'Smart Choice — ' + driver.name;
+    document.title = 'Smart Choice - ' + driver.name;
 
     // Load rates
     var rRes = await fetch('/api/rates');
