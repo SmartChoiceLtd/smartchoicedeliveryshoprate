@@ -363,7 +363,7 @@ function setZone(code, desc, manual){
 
 function overrideZone(){
   document.getElementById('zoneManual').hidden = false;
-  document.getElementById('fZoneOverride').value = selectedZone;
+  buildZoneButtons(selectedZone);
 }
 
 function updatePay(){
