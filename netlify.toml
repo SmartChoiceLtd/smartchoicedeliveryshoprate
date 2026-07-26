@@ -12,3 +12,8 @@
   from = "/orders"
   to = "/orders.html"
   status = 200
+
+[[redirects]]
+  from = "/driver/*"
+  to = "/driver.html"
+  status = 200
