@@ -26,7 +26,7 @@ const OUT_OF_TOWN_ZONES = [
   // South of city — west of Macleod
   { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:8  },
   { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:5  },
-  { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:20 },
+  { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'PRI',  name:'Priddis',           lat:50.8800, lng:-114.3500, radiusKm:6  },
   { code:'BRG',  name:'Bragg Creek',       lat:50.9500, lng:-114.5700, radiusKm:7  },
   { code:'MIL',  name:'Millarville',       lat:50.7567, lng:-114.3194, radiusKm:12  },
