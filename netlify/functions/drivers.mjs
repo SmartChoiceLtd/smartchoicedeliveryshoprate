@@ -7,7 +7,6 @@ function json(data, status = 200) {
 export default async (req) => {
   const store = getStore('flower-drivers');
   const url = new URL(req.url);
-
   if (req.method === 'GET') {
     const code = url.searchParams.get('code');
     if (code) {
