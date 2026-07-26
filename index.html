@@ -373,9 +373,7 @@ function placeQuoteMarkers(shop,dest){
   const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);state.map.fitBounds(b,80);
   if(window.innerWidth<768){var lb=document.getElementById('legendBody');if(lb)lb.hidden=true;}
 }
-}
-
-function selectShop(id){
+}function selectShop(id){
   state.selectedShopId=id;
   renderShopList();renderPricingTable();styleCommunities();renderLegend();
   if(state.map) drawTownPins();
