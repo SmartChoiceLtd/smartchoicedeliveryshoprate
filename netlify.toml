@@ -17,3 +17,8 @@
   from = "/driver/*"
   to = "/driver.html"
   status = 200
+
+[[redirects]]
+  from = "/driver-summary/*"
+  to = "/driver-summary.html"
+  status = 200
