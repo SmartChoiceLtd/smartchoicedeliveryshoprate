@@ -381,11 +381,12 @@ async function init() {
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
 
-    document.getElementById('fAddress').addEventListener('blur', function() {
-      if (this.value.trim() && !selectedZone) {
-        lookupZone(this.value.trim());
-      }
-    });
+   document.getElementById('fAddress').addEventListener('blur', function() {
+  if (this.value.trim() && !selectedZone) {
+    formattedAddress = this.value.trim();
+    lookupZone(this.value.trim());
+  }
+});
 
     document.getElementById('submitBtn').addEventListener('click', submitDelivery);
     document.getElementById('summaryBtn').addEventListener('click', function() {
