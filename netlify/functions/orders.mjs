@@ -153,6 +153,7 @@ export default async (req) => {
       shop_code: shopCode,
       shop_full: raw.shop_full,
       driver: raw.driver,
+      driver_pay: raw.driver_pay || 0,
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
       zone_code: zoneCode,
