@@ -1,4 +1,3 @@
-cat > /home/claude/flower-tool/driver-summary.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -232,12 +231,3 @@ init();
 </script>
 </body>
 </html>
-HTMLEOF
-echo "Lines: $(wc -l < /home/claude/flower-tool/driver-summary.html)"
-python3 -c "
-import re
-content = open('/home/claude/flower-tool/driver-summary.html').read()
-m = re.search(r'<script>(.*)</script>', content, re.S)
-open('/tmp/chk.js','w').write(m.group(1))
-"
-node --check /tmp/chk.js && echo "JS OK"
