@@ -8,7 +8,6 @@
   :root{
     --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
     --border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;
-    --out1:#C9E4CA;--out2:#88C08A;--out3:#4A90A4;--out4:#2C5F8A;--out5:#1A3A5C;
     --radius:12px;
   }
   *{box-sizing:border-box;}
@@ -24,7 +23,7 @@
   .key-card p{color:var(--ink-soft);font-size:14px;line-height:1.6;}
   .error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
   .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;font-weight:600;}
-  .btn:hover{opacity:0.92;} .btn:disabled{opacity:0.5;cursor:default;}
+  .btn:hover{opacity:0.92;}.btn:disabled{opacity:0.5;cursor:default;}
   .btn-sm{padding:6px 12px;font-size:13px;}
   .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
   .layout{flex:1;display:flex;min-height:0;}
@@ -43,6 +42,16 @@
   table.pricing th,table.pricing td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:left;}
   .swatch-box{width:13px;height:13px;border-radius:3px;display:inline-block;vertical-align:middle;}
   table.pricing input[type=number]{width:68px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+  /* quote type toggle */
+  .toggle-row{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .toggle-row button{flex:1;padding:7px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);}
+  .toggle-row button.active{background:var(--accent);color:#fff;font-weight:600;}
+  /* piece count row */
+  .piece-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;}
+  .piece-row label{color:var(--ink-soft);white-space:nowrap;}
+  .piece-row input{width:60px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+  /* wholesale badge */
+  .badge-ws{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#E8F4E8;color:#2C6B2C;margin-right:6px;}
   .quote-result{margin-top:10px;font-size:13px;}
   .quote-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg);}
   .quote-price{font-size:26px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
@@ -59,8 +68,6 @@
   .iw-title{font-weight:700;margin-bottom:4px;}
   .iw-row{margin-bottom:6px;color:var(--ink-soft);}
   .iw-row select{padding:4px;border-radius:6px;border:1px solid var(--border);}
-
-  /* pricing sheet modal */
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
   .modal{background:var(--card);border-radius:var(--radius);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;}
   .modal h2{font-size:18px;margin-bottom:4px;}
@@ -70,9 +77,8 @@
   .modal table td{padding:6px 8px;border-bottom:1px solid var(--border);}
   .modal-actions{display:flex;gap:8px;margin-top:4px;}
   .modal h3{font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin:16px 0 6px;}
-
   @media print{.modal-actions{display:none;}.topbar,.sidebar,.map-wrap{display:none;}.modal-bg{position:static;background:none;padding:0;}.modal{max-height:none;box-shadow:none;}}
-  @media(max-width:880px){.layout{flex-direction:column;}.sidebar{width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:50vh;}}
+  @media(max-width:880px){.layout{flex-direction:column;}.sidebar{width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:55vh;}}
 </style>
 </head>
 <body>
@@ -84,12 +90,12 @@
 <div class="key-gate" id="keyGate">
   <div class="key-card">
     <h2>Loading&hellip;</h2>
-    <p id="loadingMsg" style="color:var(--ink-soft);">Connecting to Google Maps&hellip;</p>
+    <p id="loadingMsg" style="color:var(--ink-soft);">Connecting&hellip;</p>
     <div class="error" id="keyError" hidden></div>
   </div>
 </div>
 <div id="lookupNotFound" class="key-gate" hidden>
-  <div class="key-card"><h2>Shop not found</h2><p>This link does not match a shop on file. Check the link or ask your administrator for the correct one.</p></div>
+  <div class="key-card"><h2>Shop not found</h2><p>This link does not match a shop on file.</p></div>
 </div>
 <div class="layout" id="mainApp" hidden>
   <aside class="sidebar">
@@ -113,6 +119,14 @@
     </section>
     <section class="panel">
       <h2>Get a quote</h2>
+      <div class="toggle-row" id="quoteTypeToggle">
+        <button class="active" data-type="retail">Retail</button>
+        <button data-type="wholesale">Wholesale</button>
+      </div>
+      <div class="piece-row" id="pieceRow" hidden>
+        <label>Number of pieces:</label>
+        <input type="number" id="pieceCount" min="1" value="1">
+      </div>
       <input id="destinationInput" placeholder="Destination address">
       <button class="btn btn-sm" id="quoteBtn">Calculate price</button>
       <div class="quote-result" id="quoteResult"></div>
@@ -123,37 +137,52 @@
     <div class="legend" id="legend"></div>
   </main>
 </div>
-
-<!-- Pricing sheet modal -->
 <div class="modal-bg" id="priceSheetModal" hidden>
   <div class="modal" id="priceSheetContent"></div>
 </div>
-
 <script>
 const CALGARY_ZONES=['C1','C2','C3','C4'];
-const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4','OUT5'];
-const ZONE_LABELS={C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',OUT1:'Immediate surrounds',OUT2:'Rural / acreage',OUT3:'Kananaskis / Canmore',OUT4:'Banff',OUT5:'Lake Louise'};
-const ZONE_COLORS={C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A',OUT5:'#1A3A5C'};
+const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
+const ZONE_LABELS={
+  C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',
+  OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
+};
+const ZONE_COLORS={
+  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
+  OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
+};
+// Named towns — each gets a colored pin on the map
 const NAMED_TOWNS=[
-  {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8},
-  {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8},
-  {name:'Chestermere',zone:'OUT1',lat:51.0487,lng:-113.8225,radiusKm:7},
-  {name:'Okotoks',zone:'OUT1',lat:50.7258,lng:-113.9758,radiusKm:8},
-  {name:'Strathmore',zone:'OUT1',lat:51.0378,lng:-113.4003,radiusKm:8},
-  {name:'High River',zone:'OUT1',lat:50.5808,lng:-113.8747,radiusKm:8},
-  {name:'Kananaskis',zone:'OUT3',lat:50.9311,lng:-115.0986,radiusKm:15},
-  {name:'Canmore',zone:'OUT3',lat:51.0894,lng:-115.3582,radiusKm:8},
-  {name:'Banff',zone:'OUT4',lat:51.1784,lng:-115.5708,radiusKm:10},
-  {name:'Lake Louise',zone:'OUT5',lat:51.4254,lng:-116.1773,radiusKm:12}
+  {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
+  {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
+  {name:'Chestermere',zone:'OUT1',lat:51.0487,lng:-113.8225,radiusKm:7,color:'#4CAF50'},
+  {name:'Okotoks',zone:'OUT1',lat:50.7258,lng:-113.9758,radiusKm:8,color:'#4CAF50'},
+  {name:'Strathmore',zone:'OUT1',lat:51.0378,lng:-113.4003,radiusKm:8,color:'#4CAF50'},
+  {name:'High River',zone:'OUT1',lat:50.5808,lng:-113.8747,radiusKm:8,color:'#4CAF50'},
+  {name:'Kananaskis',zone:'OUT2',lat:50.9311,lng:-115.0986,radiusKm:15,color:'#2196F3'},
+  {name:'Canmore',zone:'OUT2',lat:51.0894,lng:-115.3582,radiusKm:8,color:'#2196F3'},
+  {name:'Banff',zone:'OUT3',lat:51.1784,lng:-115.5708,radiusKm:10,color:'#1565C0'},
+  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'}
 ];
-function outerBandForDistance(km){if(km<=40)return'OUT1';if(km<=80)return'OUT2';if(km<=120)return'OUT3';if(km<=160)return'OUT4';return null;}
-const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
 
-const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townCircles:[],infoWindow:null,lastDestination:null};
+// Wholesale config
+const WS_INTOWN_BASE=16;   // first piece, in-town wholesale
+const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
+
+function outerBandForDistance(km){
+  if(km<=20)return'OUT1';
+  if(km<=40)return'OUT2';
+  if(km<=70)return'OUT3';
+  if(km<=100)return'OUT4';
+  return null;
+}
+
+const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
+const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
 function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
 const ROUTE=parseRoute();
 
-/* ---- geometry ---- */
+/* geometry */
 function getCommunityName(props){const keys=['name','NAME','comm_name','COMM_NAME'];for(const k of keys)if(props&&props[k])return String(props[k]);if(props){const ks=Object.keys(props);if(ks.length)return String(props[ks[0]]);}return'Unknown';}
 function computeCentroid(g){if(!g)return null;const c=[];const col=rings=>rings.forEach(r=>r.forEach(p=>c.push(p)));if(g.type==='Polygon')col(g.coordinates);else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>col(p));if(!c.length)return null;const s=c.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]);return{lng:s[0]/c.length,lat:s[1]/c.length};}
 function pointInRing(pt,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>pt.lat)!==(yj>pt.lat))&&(pt.lng<(xj-xi)*(pt.lat-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
@@ -163,29 +192,38 @@ function haversineKm(a,b){const R=6371,r=d=>d*Math.PI/180;const dLat=r(b.lat-a.l
 function bandForDistance(km){if(km<=10)return'C1';if(km<=15)return'C2';if(km<=20)return'C3';return'C4';}
 function findNamedTown(pt){let best=null,bd=Infinity;for(const t of NAMED_TOWNS){const d=haversineKm(pt,{lat:t.lat,lng:t.lng});if(d<=t.radiusKm&&d<bd){best=t;bd=d;}}return best;}
 
-/* ---- api / config ---- */
-async function fetchMapsKey(){const r=await fetch('/api/config');if(!r.ok)throw new Error('Could not load configuration. Check GOOGLE_MAPS_KEY is set in Netlify.');const d=await r.json();if(d.error)throw new Error(d.error);return d.key;}
-function loadGoogleMaps(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();window.__gmapsReady=()=>res();const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady`;s.onerror=()=>rej(new Error('Could not load Google Maps.'));document.head.appendChild(s);setTimeout(()=>rej(new Error('Timed out loading Google Maps.')),10000);});}
+/* wholesale price calc */
+function calcWholesalePrice(basePrice,pieces,isInTown){
+  const p=Math.max(1,parseInt(pieces)||1);
+  if(isInTown){
+    return WS_INTOWN_BASE + (p-1)*WS_EXTRA_PER_PIECE;
+  }else{
+    return basePrice + (p-1)*WS_EXTRA_PER_PIECE;
+  }
+}
+
+/* api */
+async function fetchMapsKey(){const r=await fetch('/api/config');if(!r.ok)throw new Error('Could not load configuration.');const d=await r.json();if(d.error)throw new Error(d.error);return d.key;}
+function loadGoogleMaps(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();window.__gmapsReady=()=>res();const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady`;s.onerror=()=>rej(new Error('Could not load Google Maps.'));document.head.appendChild(s);setTimeout(()=>rej(new Error('Timed out.')),10000);});}
 async function loadCommunities(){const r=await fetch(COMMUNITY_GEOJSON_URL);if(!r.ok)throw new Error('Could not load Calgary community data.');const t=await r.text();let g;try{g=JSON.parse(t);}catch(e){throw new Error('Invalid community GeoJSON.');}if(!g.features||!g.features.length)throw new Error('No community features found.');return g.features.map(f=>{const name=getCommunityName(f.properties);f.properties=f.properties||{};f.properties.quoteToolName=name;return{name,raw:f,geometry:f.geometry,centroid:computeCentroid(f.geometry)};});}
 async function geocodeAddress(address){const r=await fetch('/api/geocode?address='+encodeURIComponent(address+', Alberta, Canada'));const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not find that address.');return d;}
 async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
-/* ---- shop model ---- */
-function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95,OUT5:120};}
+/* shop model */
+function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
 function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
 function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
 function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
 
-/* ---- backend ---- */
+/* backend */
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
 async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save changes.');return r.json();}
 
-/* ---- helpers ---- */
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
-/* ---- shop list ---- */
+/* shop list */
 function renderShopList(){
   const el=document.getElementById('shopList');
   if(!state.shops.length){el.innerHTML='<p class="hint">No shops yet &mdash; add one below.</p>';return;}
@@ -205,7 +243,7 @@ function copyShopLink(shopId,btn){
   else window.prompt('Copy this link:',url);
 }
 
-/* ---- pricing table ---- */
+/* pricing table */
 function renderPricingTable(){
   const shop=getSelectedShop();
   const panel=document.getElementById('pricingPanel');
@@ -215,76 +253,64 @@ function renderPricingTable(){
   const body=document.getElementById('pricingBody');
   const cRows=CALGARY_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
   const oRows=OUTER_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
-  const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[t.zone]}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
-  body.innerHTML=`<h3>Calgary zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Price</th></tr></thead><tbody>${cRows}</tbody></table><h3>Outer zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Price</th></tr></thead><tbody>${oRows}</tbody></table><h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3><table class="pricing"><thead><tr><th></th><th>Town</th><th>Price</th></tr></thead><tbody>${tRows}</tbody></table>`;
-  body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();updateTownCircles();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
+  const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${t.color}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
+  const wsNote=`<div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px;color:#2C5F2C;"><strong>Wholesale rates:</strong> In-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece.</div>`;
+  body.innerHTML=`<h3>Calgary zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${cRows}</tbody></table><h3>Outer / rural zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${oRows}</tbody></table><h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3><table class="pricing"><thead><tr><th></th><th>Town</th><th>Retail price</th></tr></thead><tbody>${tRows}</tbody></table>${wsNote}`;
+  body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
   body.querySelectorAll('input[data-town]').forEach(i=>{i.addEventListener('change',()=>{if(!shop.townPrices)shop.townPrices={};const t=i.dataset.town,v=parseFloat(i.value);shop.townPrices[t]=isNaN(v)?null:v;apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
 }
 
-/* ---- legend ---- */
+/* legend */
 function renderLegend(){
   const shop=getSelectedShop();
   const legend=document.getElementById('legend');
   if(!shop){legend.innerHTML='';return;}
   const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
   const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  legend.innerHTML=`<div class="legend-section">Calgary communities</div>${cH}<div class="legend-section">Outer zones</div>${oH}`;
+  legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
 }
 
-/* ---- map ---- */
+/* map */
 function initMap(){
   state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
   state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
   const fc={type:'FeatureCollection',features:state.communities.map(c=>c.raw)};
   state.map.data.addGeoJson(fc);
   state.map.data.addListener('click',onCommunityClick);
-  drawTownCircles();
+  drawTownPins();
 }
 
-function drawTownCircles(){
-  state.townCircles.forEach(c=>c.setMap(null));
-  state.townCircles=[];
+function makePinSvg(color){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.27 0 0 6.27 0 14c0 9.625 14 22 14 22S28 23.625 28 14C28 6.27 21.73 0 14 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>`;
+  return'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
+}
+
+function drawTownPins(){
+  state.townMarkers.forEach(m=>m.setMap(null));
+  state.townMarkers=[];
   const shop=getSelectedShop();
   NAMED_TOWNS.forEach(town=>{
-    const price=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:shop.zonePrices[town.zone]||0):0;
-    const circle=new google.maps.Circle({
-      map:state.map,
-      center:{lat:town.lat,lng:town.lng},
-      radius:town.radiusKm*1000,
-      fillColor:ZONE_COLORS[town.zone],
-      fillOpacity:0.35,
-      strokeColor:ZONE_COLORS[town.zone],
-      strokeWeight:2,
-      strokeOpacity:0.8,
-      zIndex:2,
-      clickable:true
-    });
-    const label=new google.maps.Marker({
+    const retailPrice=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:shop.zonePrices[town.zone]||0):null;
+    const marker=new google.maps.Marker({
       map:state.map,
       position:{lat:town.lat,lng:town.lng},
-      icon:{path:google.maps.SymbolPath.CIRCLE,scale:0},
-      label:{text:`${town.name}\n$${price}`,color:'#1A1A1A',fontSize:'11px',fontWeight:'600'},
-      clickable:false,
-      zIndex:3
+      title:town.name,
+      icon:{url:makePinSvg(town.color),scaledSize:new google.maps.Size(28,36),anchor:new google.maps.Point(14,36)},
+      label:{text:town.name,color:'#1A1A1A',fontSize:'11px',fontWeight:'600',className:'town-label'},
+      zIndex:10
     });
-    circle.addListener('click',()=>showTownInfoWindow(town,price,new google.maps.LatLng(town.lat,town.lng)));
-    state.townCircles.push(circle,label);
+    marker.addListener('click',()=>{
+      const content=document.createElement('div');
+      content.className='iw';
+      const price=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:shop.zonePrices[town.zone]||0):'-';
+      const wsPrice=shop?calcWholesalePrice(Number(price),1,false):'-';
+      content.innerHTML=`<div class="iw-title">${escapeHtml(town.name)}</div><div class="iw-row">Zone: <strong>${town.zone}</strong></div><div class="iw-row">Retail: <strong>$${Number(price).toFixed(2)}</strong></div><div class="iw-row">Wholesale (1 pc): <strong>$${Number(wsPrice).toFixed(2)}</strong></div>`;
+      if(state.infoWindow)state.infoWindow.close();
+      state.infoWindow=new google.maps.InfoWindow({content,position:{lat:town.lat,lng:town.lng}});
+      state.infoWindow.open(state.map);
+    });
+    state.townMarkers.push(marker);
   });
-}
-
-function updateTownCircles(){
-  state.townCircles.forEach(c=>c.setMap(null));
-  state.townCircles=[];
-  drawTownCircles();
-}
-
-function showTownInfoWindow(town,price,position){
-  const content=document.createElement('div');
-  content.className='iw';
-  content.innerHTML=`<div class="iw-title">${escapeHtml(town.name)}</div><div class="iw-row">Zone: <strong>${town.zone}</strong> &mdash; ${ZONE_LABELS[town.zone]}</div><div class="iw-row">Delivery price: <strong>$${Number(price).toFixed(2)}</strong></div>`;
-  if(state.infoWindow)state.infoWindow.close();
-  state.infoWindow=new google.maps.InfoWindow({content,position});
-  state.infoWindow.open(state.map);
 }
 
 function styleCommunities(){
@@ -305,7 +331,8 @@ function onCommunityClick(e){
   if(ROUTE.mode!=='admin'){
     const content=document.createElement('div');
     content.className='iw';
-    content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone ${current} &mdash; $${shop.zonePrices[current]||0}</div>`;
+    const wsBase=calcWholesalePrice(shop.zonePrices[current]||0,1,true);
+    content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone ${current} &mdash; Retail $${shop.zonePrices[current]||0}</div><div class="iw-row">Wholesale (1 pc): $${wsBase}</div>`;
     if(state.infoWindow)state.infoWindow.close();
     state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
     state.infoWindow.open(state.map);return;
@@ -333,10 +360,10 @@ function placeQuoteMarkers(shop,dest){
   const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
 }
 
-/* ---- select shop ---- */
 function selectShop(id){
   state.selectedShopId=id;
-  renderShopList();renderPricingTable();styleCommunities();renderLegend();updateTownCircles();
+  renderShopList();renderPricingTable();styleCommunities();renderLegend();
+  if(state.map) drawTownPins();
 }
 function enterLookupView(shop){
   state.shops=[shop];state.selectedShopId=shop.id;
@@ -347,16 +374,23 @@ function enterLookupView(shop){
   const banner=document.getElementById('lookupBanner');
   banner.hidden=false;
   banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p>`;
-  styleCommunities();renderLegend();updateTownCircles();
+  styleCommunities();renderLegend();if(state.map)drawTownPins();
 }
 
-/* ---- autocomplete ---- */
 function setupAutocomplete(input){
   const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'ca'},fields:['formatted_address','geometry']});
   ac.addListener('place_changed',()=>{const p=ac.getPlace();if(p.geometry)state.lastDestination={address:p.formatted_address,lat:p.geometry.location.lat(),lng:p.geometry.location.lng()};});
 }
 
-/* ---- quote ---- */
+/* quote type toggle */
+document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
+  const btn=e.target.closest('button');if(!btn)return;
+  state.quoteType=btn.dataset.type;
+  this.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));
+  document.getElementById('pieceRow').hidden=state.quoteType!=='wholesale';
+  document.getElementById('quoteResult').innerHTML='';
+});
+
 function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
 function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
@@ -364,53 +398,71 @@ async function generateQuote(){
   const shop=getSelectedShop();
   if(!shop){showQuoteError('Select or add a shop first.');return;}
   const input=document.getElementById('destinationInput');
+  const pieces=parseInt(document.getElementById('pieceCount').value)||1;
+  const isWholesale=state.quoteType==='wholesale';
   let dest=state.lastDestination&&state.lastDestination.address===input.value?state.lastDestination:null;
   setQuoteLoading(true);
   try{
     if(!dest){const g=await geocodeAddress(input.value);dest={address:g.formatted,lat:g.lat,lng:g.lng};}
+
     // 1. Calgary community?
     const community=findCommunity(dest);
     if(community){
       const zoneCode=shop.communityZones[community.name]||'C4';
-      const price=shop.zonePrices[zoneCode]||0;
+      const retailPrice=shop.zonePrices[zoneCode]||0;
+      const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
       let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
-      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,price,driveKm});
+      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:true});
       placeQuoteMarkers(shop,dest);return;
     }
+
     // 2. Named town?
     const town=findNamedTown(dest);
     if(town){
       const flat=shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:null;
-      const price=flat!==null?flat:(shop.zonePrices[town.zone]||0);
-      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,price});
+      const retailPrice=flat!==null?flat:(shop.zonePrices[town.zone]||0);
+      const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,retailPrice,finalPrice,isWholesale,pieces,isInTown:false});
       placeQuoteMarkers(shop,dest);return;
     }
-    // 3. Distance fallback
+
+    // 3. Rural distance fallback
     const driveKm=await drivingDistanceKm(shop,dest);
     const zoneCode=outerBandForDistance(driveKm);
     if(!zoneCode){
-      document.getElementById('quoteResult').innerHTML=`
-        <div class="quote-contact">
-          <strong>Outside standard delivery area</strong><br>
-          ${driveKm.toFixed(1)} km driving distance &mdash; beyond our standard zones.<br>
-          Please contact the shop directly for a custom quote.
-        </div>`;
+      document.getElementById('quoteResult').innerHTML=`<div class="quote-contact"><strong>Outside standard delivery area</strong><br>${driveKm.toFixed(1)} km driving distance &mdash; beyond standard zones.<br>Please contact the shop directly for a custom quote.</div>`;
       placeQuoteMarkers(shop,dest);return;
     }
-    const price=shop.zonePrices[zoneCode]||0;
-    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,price,driveKm});
+    const retailPrice=shop.zonePrices[zoneCode]||0;
+    const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:false});
     placeQuoteMarkers(shop,dest);
   }catch(err){showQuoteError(err.message);}
   finally{setQuoteLoading(false);}
 }
 
-function renderQuote({shop,dest,label,sublabel,zoneCode,price,driveKm}){
-  const quoteText=`Delivery quote — ${shop.name}\nDestination: ${dest.address}\nZone: ${zoneCode} (${label} — ${sublabel})\nPrice: $${Number(price).toFixed(2)}${driveKm!==undefined?'\nDriving distance: '+driveKm.toFixed(1)+' km':''}\nGenerated: ${new Date().toLocaleString()}`;
+function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown}){
+  const wsDetail=isWholesale?(isInTown
+    ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
+    :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
+  const quoteText=[
+    `Delivery quote — ${shop.name}`,
+    `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
+    `Destination: ${dest.address}`,
+    `Zone: ${zoneCode} (${label} — ${sublabel})`,
+    isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
+    `Delivery price: $${Number(finalPrice).toFixed(2)}`,
+    driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
+    `Generated: ${new Date().toLocaleString()}`
+  ].filter(Boolean).join('\n');
+
   document.getElementById('quoteResult').innerHTML=`
     <div class="quote-card">
-      <div class="quote-price">$${Number(price).toFixed(2)}</div>
+      <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
       <div class="quote-meta">
+        ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
         <span class="badge">${zoneCode}</span>${escapeHtml(label)} <span style="color:var(--ink-soft)">(${escapeHtml(sublabel)})</span><br>
+        ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
         ${escapeHtml(dest.address)}<br>
         ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
       </div>
@@ -419,78 +471,73 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,price,driveKm}){
         <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
       </div>
     </div>`;
+
   document.getElementById('copyQuoteBtn').addEventListener('click',()=>{
     const btn=document.getElementById('copyQuoteBtn');
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(quoteText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy quote',1500);}).catch(()=>window.prompt('Copy this quote:',quoteText));
-    else window.prompt('Copy this quote:',quoteText);
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(quoteText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy quote',1500);}).catch(()=>window.prompt('Copy:',quoteText));
+    else window.prompt('Copy:',quoteText);
   });
   document.getElementById('printQuoteBtn').addEventListener('click',()=>{
-    const w=window.open('','_blank','width=500,height=400');
-    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;}p{margin:4px 0;font-size:14px;}.price{font-size:28px;font-weight:700;color:#B8472B;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(price).toFixed(2)}</div><p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
+    const w=window.open('','_blank','width=520,height=460');
+    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
   });
 }
 
-/* ---- pricing sheet ---- */
+/* pricing sheet */
 function showPricingSheet(){
   const shop=getSelectedShop();if(!shop)return;
   const modal=document.getElementById('priceSheetModal');
   const content=document.getElementById('priceSheetContent');
   const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-
-  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td><strong>$${shop.zonePrices[z]||0}</strong></td></tr>`).join('');
-  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td><strong>$${shop.zonePrices[z]||0}</strong></td></tr>`).join('');
-  const tRows=NAMED_TOWNS.map(t=>{
-    const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;
-    const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);
-    const note=flat!==null?'flat rate':'zone rate';
-    return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[t.zone]};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} &mdash; ${escapeHtml(note)}</td><td><strong>$${Number(price).toFixed(2)}</strong></td></tr>`;
-  }).join('');
+  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>$${WS_INTOWN_BASE} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>Zone rate + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const tRows=NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);const note=flat!==null?'flat':'zone';return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.color};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} (${note})</td><td>$${Number(price).toFixed(2)}</td><td>$${Number(price).toFixed(2)} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`;}).join('');
 
   content.innerHTML=`
     <h2>Delivery pricing &mdash; ${escapeHtml(shop.name)}</h2>
     <p class="modal-sub">${escapeHtml(shop.address)} &bull; As of ${date}</p>
     <h3>Calgary zones</h3>
-    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Price</th></tr></thead><tbody>${cRows}</tbody></table>
-    <h3>Outer zones (distance-based for rural addresses)</h3>
-    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Price</th></tr></thead><tbody>${oRows}</tbody></table>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${cRows}</tbody></table>
+    <h3>Rural / outer zones</h3>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${oRows}</tbody></table>
     <h3>Named town rates</h3>
-    <table><thead><tr><th>Town</th><th>Zone / type</th><th>Price</th></tr></thead><tbody>${tRows}</tbody></table>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Calgary community pricing varies by zone assigned to each community. Click any community on the map to see its zone. Addresses beyond standard zones require a custom quote.</p>
+    <table><thead><tr><th>Town</th><th>Zone / type</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${tRows}</tbody></table>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote.</p>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="window.print()">Print</button>
       <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
       <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
     </div>`;
 
-  // plain text version for copy
   const plainText=[
-    `DELIVERY PRICING — ${shop.name}`,
-    `${shop.address}`,
-    `As of ${date}`,
-    '',
-    'CALGARY ZONES',
+    `DELIVERY PRICING — ${shop.name}`,shop.address,`As of ${date}`,'',
+    'RETAIL PRICES',
+    'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
-    '',
-    'OUTER ZONES',
+    'Rural/outer zones:',
     ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
-    '',
-    'NAMED TOWN RATES',
-    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);return`  ${t.name} (${t.zone}${flat!==null?' flat rate':' zone rate'}): $${Number(price).toFixed(2)}`;})
+    'Named towns:',
+    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);return`  ${t.name} (${t.zone}${flat!==null?' flat':' zone'}): $${Number(price).toFixed(2)}`;}),
+    '','WHOLESALE PRICES',
+    `In-town: $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece`,
+    `Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece`,
+    'Out-of-town zone rates:',
+    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0} base`),
+    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);return`  ${t.name}: $${Number(price).toFixed(2)} base`;})
   ].join('\n');
 
   document.getElementById('copySheetBtn').addEventListener('click',()=>{
     const btn=document.getElementById('copySheetBtn');
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy pricing:',plainText));
-    else window.prompt('Copy pricing:',plainText);
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
+    else window.prompt('Copy:',plainText);
   });
-
   modal.hidden=false;
 }
 
 document.getElementById('priceSheetModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
 
-/* ---- boot ---- */
+/* boot */
 async function boot(){
   const errEl=document.getElementById('keyError');
   const loadingMsg=document.getElementById('loadingMsg');
