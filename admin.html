@@ -289,12 +289,4 @@ loadDrivers();
 </script>
 </body>
 </html>
-HTMLEOF
-echo "Lines: $(wc -l < /home/claude/flower-tool/admin.html)"
-python3 -c "
-import re
-content = open('/home/claude/flower-tool/admin.html').read()
-m = re.search(r'<script>(.*)</script>', content, re.S)
-open('/tmp/chk.js','w').write(m.group(1))
-"
-node --check /tmp/chk.js && echo "Admin JS OK"
+
