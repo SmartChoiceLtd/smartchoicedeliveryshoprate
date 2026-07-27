@@ -1,3 +1,5 @@
+Output
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +16,9 @@
 .container{max-width:540px;margin:0 auto;padding:16px;}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
 .card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 14px;}
+.toggle-row{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.toggle-btn{flex:1;padding:10px;font-size:14px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
+.toggle-btn.active{background:var(--accent);color:#fff;font-weight:700;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
 .field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
@@ -43,6 +48,7 @@
 .loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+optgroup{font-weight:700;color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -65,6 +71,13 @@
   </div>
   <div class="container">
     <div id="errorMsg" class="error" hidden></div>
+
+    <!-- Delivery type toggle -->
+    <div class="toggle-row" id="deliveryTypeToggle">
+      <button class="toggle-btn active" data-type="store">Store to Door</button>
+      <button class="toggle-btn" data-type="wholesale">Wholesale</button>
+    </div>
+
     <div class="card">
       <h2>Delivery Details</h2>
       <div class="field-row">
@@ -74,7 +87,7 @@
         </div>
         <div class="field">
           <label>Order ID</label>
-          <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9" pattern="[0-9]{1,9}">
+          <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
       </div>
       <div class="field">
@@ -82,7 +95,7 @@
         <input type="text" id="fName" placeholder="Name or company">
       </div>
       <div class="field">
-        <label>Shop</label>
+        <label id="shopLabel">Shop</label>
         <select id="fShop"><option value="">Select shop...</option></select>
       </div>
       <div class="field">
@@ -118,6 +131,7 @@
         </div>
       </div>
     </div>
+
     <div class="card">
       <h2>Delivery Status</h2>
       <div class="status-grid" id="statusGrid">
@@ -139,6 +153,7 @@
         <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
       </div>
     </div>
+
     <div class="card">
       <h2>Notes &amp; Photo</h2>
       <div class="field">
@@ -150,6 +165,7 @@
         <input type="file" id="fPhoto" accept="image/*" capture="environment">
       </div>
     </div>
+
     <button class="btn" id="submitBtn">Submit Delivery</button>
     <button class="btn btn-secondary" id="summaryBtn">View Today's Summary</button>
   </div>
@@ -174,6 +190,7 @@ var shops = [];
 var selectedZone = '';
 var selectedStatuses = [];
 var formattedAddress = '';
+var deliveryType = 'store'; // 'store' or 'wholesale'
 
 var pathParts = location.pathname.split('/').filter(Boolean);
 var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
@@ -183,7 +200,14 @@ function showNotFound() {
   document.getElementById('notFound').hidden = false;
 }
 
+function isWholesaleZone(code) {
+  return code && code.toUpperCase().startsWith('W');
+}
+
 function getNeighbourZones(code) {
+  if (deliveryType === 'wholesale') {
+    return Object.keys(rates).filter(isWholesaleZone).sort();
+  }
   var city = ['C1','C2','C3','C4','C5'];
   var idx = city.indexOf(code);
   if (idx >= 0) {
@@ -194,7 +218,12 @@ function getNeighbourZones(code) {
 }
 
 function buildZoneButtons(suggested) {
-  var list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
+  var list;
+  if (deliveryType === 'wholesale') {
+    list = Object.keys(rates).filter(isWholesaleZone).sort();
+  } else {
+    list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
+  }
   var container = document.getElementById('zoneButtons');
   container.innerHTML = '';
   list.forEach(function(z) {
@@ -230,7 +259,9 @@ function updatePay() {
   var gdpi = r.gdpi || 0;
   var total = base + extra + gdpi;
   document.getElementById('payAmount').textContent = '$' + total.toFixed(2);
-  document.getElementById('payBreakdown').textContent = 'Base $' + base.toFixed(2) + (extra > 0 ? ' + ' + (pieces-1) + ' extra x $' + r.dratex.toFixed(2) : '') + ' + fuel $' + gdpi.toFixed(2);
+  document.getElementById('payBreakdown').textContent = 'Base $' + base.toFixed(2) +
+    (extra > 0 ? ' + ' + (pieces-1) + ' extra x $' + r.dratex.toFixed(2) : '') +
+    ' + fuel $' + gdpi.toFixed(2);
   document.getElementById('payPreview').hidden = false;
 }
 
@@ -239,10 +270,19 @@ function lookupZone(address) {
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
   selectedZone = '';
+
+  if (deliveryType === 'wholesale') {
+    document.getElementById('zoneLoading').hidden = true;
+    document.getElementById('zoneManual').hidden = false;
+    buildZoneButtons(null);
+    return;
+  }
+
   var shopId = document.getElementById('fShop').value;
   var shop = shops.find(function(s) { return s.id === shopId; });
   var params = 'address=' + encodeURIComponent(address);
   if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
+
   fetch('/api/suggest-zone?' + params)
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -261,10 +301,50 @@ function lookupZone(address) {
     });
 }
 
+function populateShopDropdown() {
+  var sel = document.getElementById('fShop');
+  sel.innerHTML = '<option value="">Select shop...</option>';
+
+  if (deliveryType === 'wholesale') {
+    document.getElementById('shopLabel').textContent = 'Wholesale Account';
+    var wShops = shops.filter(function(s){ return s.name.toUpperCase().startsWith('W') || (s.wholesale); });
+    var allGrp = document.createElement('optgroup');
+    allGrp.label = 'Wholesale Accounts';
+    shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.name;
+      allGrp.appendChild(opt);
+    });
+    sel.appendChild(allGrp);
+  } else {
+    document.getElementById('shopLabel').textContent = 'Shop';
+    var featured = shops.filter(function(s){ return s.featured; });
+    var others = shops.filter(function(s){ return !s.featured; });
+
+    if (featured.length) {
+      var featGrp = document.createElement('optgroup');
+      featGrp.label = 'Frequently Used';
+      featured.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = s.name;
+        featGrp.appendChild(opt);
+      });
+      sel.appendChild(featGrp);
+    }
+
+    var allGrp = document.createElement('optgroup');
+    allGrp.label = 'All Shops';
+    others.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.name;
+      allGrp.appendChild(opt);
+    });
+    sel.appendChild(allGrp);
+  }
+}
+
 function resetForm() {
-  selectedZone = '';
-  selectedStatuses = [];
-  formattedAddress = '';
+  selectedZone = ''; selectedStatuses = []; formattedAddress = '';
   document.getElementById('fOrderId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
@@ -311,6 +391,7 @@ async function submitDelivery() {
     driver_name: driverName,
     total_pieces: pieces,
     zone: selectedZone,
+    delivery_type: deliveryType,
     delivery_status: selectedStatuses,
     delivery_time: document.getElementById('fTime').value,
     accepted_by: document.getElementById('fAcceptedBy').value.trim(),
@@ -321,9 +402,7 @@ async function submitDelivery() {
   };
   try {
     var res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('Status ' + res.status);
     document.getElementById('successDetail').textContent = selectedZone + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
@@ -333,8 +412,7 @@ async function submitDelivery() {
     errEl.textContent = 'Could not submit: ' + e.message;
     errEl.hidden = false;
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Submit Delivery';
+    btn.disabled = false; btn.textContent = 'Submit Delivery';
   }
 }
 
@@ -353,13 +431,7 @@ async function init() {
 
     var sRes = await fetch('/api/shops');
     shops = await sRes.json();
-    var shopSel = document.getElementById('fShop');
-    shops.sort(function(a,b) { return a.name.localeCompare(b.name); }).forEach(function(s) {
-      var opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = s.name;
-      shopSel.appendChild(opt);
-    });
+    populateShopDropdown();
 
     var now = new Date();
     document.getElementById('fDate').value = now.toISOString().slice(0,10);
@@ -368,6 +440,18 @@ async function init() {
     var cfgRes = await fetch('/api/config');
     var cfg = await cfgRes.json();
     loadMaps(cfg.key);
+
+    document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      deliveryType = btn.dataset.type;
+      document.querySelectorAll('.toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+      populateShopDropdown();
+      selectedZone = '';
+      document.getElementById('zoneResult').hidden = true;
+      document.getElementById('zoneManual').hidden = true;
+      document.getElementById('payPreview').hidden = true;
+    });
 
     document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -381,12 +465,12 @@ async function init() {
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
 
-   document.getElementById('fAddress').addEventListener('blur', function() {
-  if (this.value.trim() && !selectedZone) {
-    formattedAddress = this.value.trim();
-    lookupZone(this.value.trim());
-  }
-});
+    document.getElementById('fAddress').addEventListener('blur', function() {
+      if (this.value.trim() && !selectedZone) {
+        formattedAddress = this.value.trim();
+        lookupZone(this.value.trim());
+      }
+    });
 
     document.getElementById('submitBtn').addEventListener('click', submitDelivery);
     document.getElementById('summaryBtn').addEventListener('click', function() {
@@ -401,7 +485,7 @@ async function init() {
     document.getElementById('app').hidden = false;
 
   } catch(e) {
-    console.error('init error:', e.message, e.stack);
+    console.error('init error:', e.message);
     showNotFound();
   }
 }
