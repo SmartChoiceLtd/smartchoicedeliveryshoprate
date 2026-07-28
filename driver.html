@@ -92,6 +92,20 @@ optgroup{font-weight:700;color:var(--ink-soft);}
         <label>Recipient Name</label>
         <input type="text" id="fName" placeholder="Name or company">
       </div>
+      <div class="field" id="wholesalerField" hidden>
+        <label>Pick Up From (Wholesaler)</label>
+        <select id="fWholesaler">
+          <option value="">Select wholesaler...</option>
+          <option value="AM">AM AMAZING FLORAL WHOLESALE</option>
+          <option value="AT">AT ATLANTIC</option>
+          <option value="BA">BA BERNARD ANDERSON</option>
+          <option value="FC">FC FLOWER CENTER</option>
+          <option value="FS">FS FLORISTS SUPPLY</option>
+          <option value="MB">MB MBS WHOLESALE</option>
+          <option value="QF">QF QFRESH LOGISTICS</option>
+          <option value="SB">SB SBE WHOLESALE</option>
+        </select>
+      </div>
       <div class="field">
         <label id="shopLabel">Shop</label>
         <select id="fShop"><option value="">Select shop...</option></select>
@@ -215,10 +229,40 @@ function getNeighbourZones(code) {
   return [code,'C4','C5','DEW','RVS','MDF'];
 }
 
+function getWholesaleZoneForShop(shop) {
+  if (!shop || !shop.lat || !shop.lng) return 'WPU';
+  var lat = shop.lat, lng = shop.lng;
+  // Calgary bounding box
+  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return 'WPU';
+  // Named town matching
+  var towns = [
+    {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
+    {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
+    {zone:'WCH', lat:51.0487, lng:-113.8225, r:7},
+    {zone:'WPO', lat:50.7258, lng:-113.9758, r:8},
+    {zone:'WST', lat:51.0378, lng:-113.4003, r:8},
+    {zone:'WHR', lat:50.5808, lng:-113.8747, r:8},
+    {zone:'WLY', lat:51.1000, lng:-113.5000, r:6},
+    {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
+  ];
+  function hav(a, b) {
+    var R=6371, r=function(d){return d*Math.PI/180;};
+    var dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng);
+    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+  }
+  for (var i=0; i<towns.length; i++) {
+    var t = towns[i];
+    if (hav({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return t.zone;
+  }
+  return 'WPU'; // default fallback
+}
+
 function buildZoneButtons(suggested) {
   var list;
   if (deliveryType === 'wholesale') {
-    list = Object.keys(rates).filter(isWholesaleZone).sort();
+    // Only show WPU and WPH as manual options
+    list = ['WPU', 'WPH'];
   } else {
     list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
   }
@@ -229,6 +273,11 @@ function buildZoneButtons(suggested) {
     var btn = document.createElement('button');
     btn.className = 'zone-btn';
     btn.textContent = z + (r ? ' $'+r.drate : '');
+    if (z === suggested) {
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.background = 'var(--accent-soft)';
+      btn.style.fontWeight = '700';
+    }
     btn.onclick = function() { setZone(z, 'Manual selection', true); };
     container.appendChild(btn);
   });
@@ -255,11 +304,18 @@ function updatePay() {
   var base = r.drate || 0;
   var extra = (pieces - 1) * (r.dratex || 0);
   var gdpi = r.gdpi || 0;
-  var total = base + extra + gdpi;
+  // BY premium: +$1.50 driver pay when delivering to BY (Blossoms YYC) on wholesale
+  var byPremium = 0;
+  if (deliveryType === 'wholesale') {
+    var receivingShop = shops.find(function(s){ return s.id === document.getElementById('fShop').value; });
+    if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
+  }
+  var total = base + extra + gdpi + byPremium;
   document.getElementById('payAmount').textContent = '$' + total.toFixed(2);
   document.getElementById('payBreakdown').textContent = 'Base $' + base.toFixed(2) +
     (extra > 0 ? ' + ' + (pieces-1) + ' extra x $' + r.dratex.toFixed(2) : '') +
-    ' + fuel $' + gdpi.toFixed(2);
+    ' + fuel $' + gdpi.toFixed(2) +
+    (byPremium > 0 ? ' + BY premium $' + byPremium.toFixed(2) : '');
   document.getElementById('payPreview').hidden = false;
 }
 
@@ -304,10 +360,11 @@ function populateShopDropdown() {
   sel.innerHTML = '<option value="">Select shop...</option>';
 
   if (deliveryType === 'wholesale') {
-    document.getElementById('shopLabel').textContent = 'Wholesale Account';
-    var wShops = shops.filter(function(s){ return s.name.toUpperCase().startsWith('W') || (s.wholesale); });
+    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop)';
+    document.getElementById('wholesalerField').hidden = false;
+    document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
     var allGrp = document.createElement('optgroup');
-    allGrp.label = 'Wholesale Accounts';
+    allGrp.label = 'Receiving Shop (invoiced)';
     shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
       var opt = document.createElement('option');
       opt.value = s.id; opt.textContent = s.name;
@@ -315,7 +372,10 @@ function populateShopDropdown() {
     });
     sel.appendChild(allGrp);
   } else {
+    document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
+    document.getElementById('wholesalerField').hidden = true;
+    document.getElementById('fAddress').placeholder = 'Start typing address...';
     var featured = shops.filter(function(s){ return s.featured; });
     var others = shops.filter(function(s){ return !s.featured; });
 
@@ -385,6 +445,12 @@ async function submitDelivery() {
     address: address,
     shop: shop ? shop.name : shopId,
     shop_code: shop ? shop.name.split(' ')[0] : '',
+    wholesaler: deliveryType === 'wholesale' ? document.getElementById('fWholesaler').value : '',
+    billing_party: (function() {
+      if (deliveryType !== 'wholesale') return '';
+      var w = document.getElementById('fWholesaler').value;
+      return (w === 'AT') ? w : (document.getElementById('fShop').options[document.getElementById('fShop').selectedIndex] || {}).text || '';
+    })(),
     driver: driverCode,
     driver_name: driverName,
     total_pieces: pieces,
@@ -449,6 +515,7 @@ async function init() {
       document.getElementById('zoneResult').hidden = true;
       document.getElementById('zoneManual').hidden = true;
       document.getElementById('payPreview').hidden = true;
+      document.getElementById('fShop').value = '';
     });
 
     document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
@@ -462,6 +529,22 @@ async function init() {
     });
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
+
+    document.getElementById('fShop').addEventListener('change', function() {
+      if (deliveryType === 'wholesale') {
+        var shopId = this.value;
+        var shop = shops.find(function(s){ return s.id === shopId; });
+        if (shop) {
+          // Auto-fill address from shop
+          var addr = shop.address || '';
+          document.getElementById('fAddress').value = addr;
+          formattedAddress = addr;
+          // Auto-calculate zone from shop location
+          var wZone = getWholesaleZoneForShop(shop);
+          setZone(wZone, wZone + ' — auto from ' + shop.name, false);
+        }
+      }
+    });
 
     document.getElementById('fAddress').addEventListener('blur', function() {
       if (this.value.trim() && !selectedZone) {
