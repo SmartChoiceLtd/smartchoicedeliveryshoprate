@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -160,17 +160,6 @@ optgroup{font-weight:700;color:var(--ink-soft);}
 
     <div class="card" id="statusCard">
       <h2>Delivery Status</h2>
-      <div class="card" id="wholesaleStatusCard" hidden>
-      <h2>Delivery Confirmation</h2>
-      <div class="field">
-        <label>Accepted By</label>
-        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
-      </div>
-      <div class="field">
-        <label>Delivery Time</label>
-        <input type="time" id="fWholesaleTime">
-      </div>
-    </div>
       <div class="status-grid" id="statusGrid">
         <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
         <button class="status-btn" data-status="Neighboured">Neighboured</button>
@@ -216,6 +205,18 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <button class="status-btn" data-contact="Text">Text</button>
           <button class="status-btn" data-contact="Door Tag">Door Tag</button>
         </div>
+      </div>
+    </div>
+
+    <div class="card" id="wholesaleStatusCard" hidden>
+      <h2>Delivery Confirmation</h2>
+      <div class="field">
+        <label>Accepted By</label>
+        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+      <div class="field">
+        <label>Delivery Time</label>
+        <input type="time" id="fWholesaleTime">
       </div>
     </div>
 
@@ -431,7 +432,6 @@ function populateShopDropdown() {
     document.getElementById('recipientNameField').hidden = true;
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
-    
     var allGrp = document.createElement('optgroup');
     allGrp.label = 'Receiving Shop (invoiced)';
     shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
@@ -445,10 +445,9 @@ function populateShopDropdown() {
     document.getElementById('shopLabel').textContent = 'Shop';
     document.getElementById('fAddress').placeholder = 'Start typing address...';
     document.getElementById('recipientNameField').hidden = false;
-    document.getElementById('statusCard').hidden = false;
-    document.getElementById('wholesaleStatusCard').hidden = true;      
-    
     document.getElementById('billingQueryField').hidden = true;
+    document.getElementById('statusCard').hidden = false;
+    document.getElementById('wholesaleStatusCard').hidden = true;
     var featured = shops.filter(function(s){ return s.featured; });
     var others = shops.filter(function(s){ return !s.featured; });
 
@@ -479,7 +478,7 @@ function resetForm() {
   document.getElementById('fOrderId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
-  document.getElementById('fP iieces').value = '1';
+  document.getElementById('fPieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
   document.getElementById('fWholesaleAcceptedBy').value = '';
@@ -502,7 +501,6 @@ function resetForm() {
   document.getElementById('neighbouredToField').hidden = true;
   var now = new Date();
   document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  document.getElementById('fWholesaleTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
   document.getElementById('successScreen').hidden = true;
   document.getElementById('app').hidden = false;
 }
@@ -551,12 +549,8 @@ async function submitDelivery() {
       if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
       return statuses;
     })(),
-    delivery_time: deliveryType === 'wholesale'
-      ? document.getElementById('fWholesaleTime').value
-      : document.getElementById('fTime').value,
-    accepted_by: deliveryType === 'wholesale' 
-      ? document.getElementById('fWholesaleAcceptedBy').value.trim()
-      : document.getElementById('fAcceptedBy').value.trim(),
+    delivery_time: deliveryType === 'wholesale' ? document.getElementById('fWholesaleTime').value : document.getElementById('fTime').value,
+    accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
     comments: document.getElementById('fComments').value.trim(),
     driver_pay: driverPay,
@@ -611,6 +605,7 @@ async function init() {
     var now = new Date();
     document.getElementById('fDate').value = now.toISOString().slice(0,10);
     document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    document.getElementById('fWholesaleTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
 
     var cfgRes = await fetch('/api/config');
     var cfg = await cfgRes.json();
@@ -658,19 +653,12 @@ async function init() {
       });
     });
 
-   // Direct sub-options (multi-select)
-document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    this.classList.toggle('selected');
-    // Doorstep - prompt for photo
-    if (this.dataset.sub === 'Doorstep') {
-      if (this.classList.contains('selected')) {
-        document.getElementById('fPhoto').scrollIntoView({behavior:'smooth', block:'center'});
-        setTimeout(function() { document.getElementById('fPhoto').click(); }, 500);
-      }
-    }
-  });
-});
+    // Direct sub-options (multi-select)
+    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
+      });
+    });
 
     // Undeliverable sub-options (multi-select)
     document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
