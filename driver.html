@@ -1,3 +1,5 @@
+Output
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="SCD Driver">
 <meta name="theme-color" content="#B8472B">
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icon.svg">
 <title>Smart Choice Delivery</title>
 <style>
 :root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
@@ -95,10 +97,6 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
       </div>
-      <div class="field">
-        <label>Recipient Name</label>
-        <input type="text" id="fName" placeholder="Name or company">
-      </div>
       <div class="field" id="wholesalerField" hidden>
         <label>Pick Up From (Wholesaler)</label>
         <select id="fWholesaler">
@@ -108,14 +106,25 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <option value="BA">BA BERNARD ANDERSON</option>
           <option value="FC">FC FLOWER CENTER</option>
           <option value="FS">FS FLORISTS SUPPLY</option>
-          <option value="MB">MB MBS WHOLESALE</option>
+          <option value="SV">SV SAVANAH</option>
           <option value="QF">QF QFRESH LOGISTICS</option>
           <option value="SB">SB SBE WHOLESALE</option>
         </select>
       </div>
+      <div class="field" id="billingQueryField" hidden>
+        <label>Invoice To</label>
+        <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
+          <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
+          <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
+        </div>
+      </div>
       <div class="field">
         <label id="shopLabel">Shop</label>
         <select id="fShop"><option value="">Select shop...</option></select>
+      </div>
+      <div class="field" id="recipientNameField">
+        <label>Recipient Name</label>
+        <input type="text" id="fName" placeholder="Name or company">
       </div>
       <div class="field">
         <label>Delivery Address</label>
@@ -171,6 +180,17 @@ optgroup{font-weight:700;color:var(--ink-soft);}
         <label>Accepted By</label>
         <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
       </div>
+      <div class="field" id="contactMethodField" hidden style="margin-top:10px;">
+        <label>Recipient Contact Method</label>
+        <div class="status-grid" id="contactMethodGrid">
+          <button class="status-btn" data-contact="In Person">In Person</button>
+          <button class="status-btn" data-contact="Direct By Phone">Direct By Phone</button>
+          <button class="status-btn" data-contact="Voicemail">Voicemail</button>
+          <button class="status-btn" data-contact="Text">Text</button>
+          <button class="status-btn" data-contact="Door Tag">Door Tag</button>
+          <button class="status-btn" data-contact="Incorrect Contact Info">Incorrect Contact Info</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -221,6 +241,18 @@ function showNotFound() {
 
 function isWholesaleZone(code) {
   return code && code.toUpperCase().startsWith('W');
+}
+
+var WHOLESALER_BILLING = {
+  AT: 'wholesaler', FS: 'wholesaler',
+  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'shop', QF: 'shop'
+};
+
+function setBillingDefault(code) {
+  var billing = WHOLESALER_BILLING[code] || 'shop';
+  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.billing === billing);
+  });
 }
 
 function getNeighbourZones(code) {
@@ -370,6 +402,7 @@ function populateShopDropdown() {
     document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop)';
     document.getElementById('wholesalerField').hidden = false;
     document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
+    document.getElementById('recipientNameField').hidden = true;
     var allGrp = document.createElement('optgroup');
     allGrp.label = 'Receiving Shop (invoiced)';
     shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
@@ -381,8 +414,9 @@ function populateShopDropdown() {
   } else {
     document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
-    document.getElementById('wholesalerField').hidden = true;
     document.getElementById('fAddress').placeholder = 'Start typing address...';
+    document.getElementById('recipientNameField').hidden = false;
+    document.getElementById('billingQueryField').hidden = true;
     var featured = shops.filter(function(s){ return s.featured; });
     var others = shops.filter(function(s){ return !s.featured; });
 
@@ -418,6 +452,9 @@ function resetForm() {
   document.getElementById('fAcceptedBy').value = '';
   document.getElementById('fNeighbouredTo').value = '';
   document.getElementById('fPhoto').value = '';
+  document.getElementById('contactMethodField').hidden = true;
+  document.getElementById('billingQueryField').hidden = true;
+  document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
   document.getElementById('zoneResult').hidden = true;
   document.getElementById('zoneManual').hidden = true;
   document.getElementById('payPreview').hidden = true;
@@ -469,6 +506,19 @@ async function submitDelivery() {
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
     comments: document.getElementById('fComments').value.trim(),
     driver_pay: driverPay,
+    contact_method: (function(){
+      var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
+      return sel ? sel.dataset.contact : '';
+    })(),
+    billing_party: (function() {
+      if (deliveryType !== 'wholesale') return '';
+      var active = document.querySelector('#billingToggle .toggle-btn.active');
+      var billing = active ? active.dataset.billing : 'shop';
+      var w = document.getElementById('fWholesaler').value;
+      if (billing === 'wholesaler') return w;
+      var shopSel = document.getElementById('fShop');
+      return shopSel.options[shopSel.selectedIndex] ? shopSel.options[shopSel.selectedIndex].text : '';
+    })(),
     source: 'driver_form'
   };
   try {
@@ -536,6 +586,29 @@ async function init() {
     });
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
+
+    document.getElementById('fAcceptedBy').addEventListener('input', function() {
+      document.getElementById('contactMethodField').hidden = !this.value.trim();
+    });
+
+    document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+        this.classList.add('selected');
+      });
+    });
+
+    document.getElementById('billingToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+    });
+
+    document.getElementById('fWholesaler').addEventListener('change', function() {
+      var code = this.value;
+      if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
+      else { document.getElementById('billingQueryField').hidden = true; }
+    });
 
     document.getElementById('fShop').addEventListener('change', function() {
       if (deliveryType === 'wholesale') {
@@ -611,3 +684,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+Done
