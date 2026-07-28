@@ -635,12 +635,18 @@ async function init() {
       });
     });
 
-    // Direct sub-options (multi-select)
-    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        this.classList.toggle('selected');
-      });
-    });
+   // Direct sub-options (multi-select)
+document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    this.classList.toggle('selected');
+    // Doorstep - prompt for photo
+    if (this.dataset.sub === 'Doorstep') {
+      if (this.classList.contains('selected')) {
+        document.getElementById('fPhoto').scrollIntoView({behavior:'smooth', block:'center'});
+        setTimeout(function() { document.getElementById('fPhoto').click(); }, 500);
+      }
+    }
+  });
 
     // Undeliverable sub-options (multi-select)
     document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
@@ -749,5 +755,5 @@ if ('serviceWorker' in navigator) {
 </body>
 </html>
 Done
-Copy everything from <!DOCTYPE html> to </html> and paste into GitHub replacing driver.html. Com
+
 
