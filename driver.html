@@ -158,8 +158,19 @@ optgroup{font-weight:700;color:var(--ink-soft);}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="statusCard">
       <h2>Delivery Status</h2>
+      <div class="card" id="wholesaleStatusCard" hidden>
+      <h2>Delivery Confirmation</h2>
+      <div class="field">
+        <label>Accepted By</label>
+        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+      <div class="field">
+        <label>Delivery Time</label>
+        <input type="time" id="fWholesaleTime">
+      </div>
+    </div>
       <div class="status-grid" id="statusGrid">
         <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
         <button class="status-btn" data-status="Neighboured">Neighboured</button>
@@ -468,7 +479,7 @@ function resetForm() {
   document.getElementById('fOrderId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
-  document.getElementById('fPieces').value = '1';
+  document.getElementById('fP iieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
   document.getElementById('fNeighbouredTo').value = '';
@@ -503,7 +514,7 @@ async function submitDelivery() {
   if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; return; }
   if (!shopId) { errEl.textContent = 'Select a shop.'; errEl.hidden = false; return; }
   if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
-  if (!selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
+  if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
   btn.disabled = true; btn.textContent = 'Submitting...';
   var shop = shops.find(function(s) { return s.id === shopId; });
   var r = rates[selectedZone] || {};
@@ -539,7 +550,9 @@ async function submitDelivery() {
       return statuses;
     })(),
     delivery_time: document.getElementById('fTime').value,
-    accepted_by: document.getElementById('fAcceptedBy').value.trim(),
+    accepted_by: deliveryType === 'wholesale' 
+      ? document.getElementById('fWholesaleAcceptedBy').value.trim()
+      : document.getElementById('fAcceptedBy').value.trim(),
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
     comments: document.getElementById('fComments').value.trim(),
     driver_pay: driverPay,
