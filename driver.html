@@ -418,6 +418,9 @@ function populateShopDropdown() {
     document.getElementById('wholesalerField').hidden = false;
     document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
     document.getElementById('recipientNameField').hidden = true;
+    document.getElementById('statusCard').hidden = true;
+    document.getElementById('wholesaleStatusCard').hidden = false;
+    
     var allGrp = document.createElement('optgroup');
     allGrp.label = 'Receiving Shop (invoiced)';
     shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
@@ -431,6 +434,9 @@ function populateShopDropdown() {
     document.getElementById('shopLabel').textContent = 'Shop';
     document.getElementById('fAddress').placeholder = 'Start typing address...';
     document.getElementById('recipientNameField').hidden = false;
+    document.getElementById('statusCard').hidden = false;
+    document.getElementById('wholesaleStatusCard').hidden = true;      
+    
     document.getElementById('billingQueryField').hidden = true;
     var featured = shops.filter(function(s){ return s.featured; });
     var others = shops.filter(function(s){ return !s.featured; });
