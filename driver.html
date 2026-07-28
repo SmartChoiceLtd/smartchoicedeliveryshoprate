@@ -1,5 +1,3 @@
-Output
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -106,9 +104,9 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <option value="BA">BA BERNARD ANDERSON</option>
           <option value="FC">FC FLOWER CENTER</option>
           <option value="FS">FS FLORISTS SUPPLY</option>
+          <option value="SV">SV SAVANAH</option>
           <option value="QF">QF QFRESH LOGISTICS</option>
           <option value="SB">SB SBE WHOLESALE</option>
-          <option value="SV">SV SAVANAH</option>
         </select>
       </div>
       <div class="field" id="billingQueryField" hidden>
@@ -165,16 +163,34 @@ optgroup{font-weight:700;color:var(--ink-soft);}
       <div class="status-grid" id="statusGrid">
         <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
         <button class="status-btn" data-status="Neighboured">Neighboured</button>
-        <button class="status-btn" data-status="Concierge/Reception">Concierge</button>
-        <button class="status-btn" data-status="Loading Dock">Loading Dock</button>
-        <button class="status-btn" data-status="Mailroom">Mailroom</button>
-        <button class="status-btn" data-status="Doorstep">Doorstep</button>
         <button class="status-btn" data-status="Redirect">Redirect</button>
         <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
       </div>
+      <!-- Direct to Address sub-options -->
+      <div id="directSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="directSubGrid">
+          <button class="status-btn" data-sub="Concierge/Reception">Concierge</button>
+          <button class="status-btn" data-sub="Mailroom">Mailroom</button>
+          <button class="status-btn" data-sub="Loading Dock">Loading Dock</button>
+          <button class="status-btn" data-sub="Doorstep">Doorstep</button>
+        </div>
+      </div>
+      <!-- Neighboured sub-options -->
       <div class="field" id="neighbouredToField" hidden style="margin-top:10px;">
         <label>Neighboured To</label>
         <input type="text" id="fNeighbouredTo" placeholder="Left with...">
+      </div>
+      <!-- Redirect sub-options -->
+      <div class="field" id="redirectField" hidden style="margin-top:10px;">
+        <label>Redirect Details</label>
+        <input type="text" id="fRedirectDetail" placeholder="Redirected to...">
+      </div>
+      <!-- Undeliverable sub-options -->
+      <div id="undeliverableSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="undeliverableSubGrid">
+          <button class="status-btn" data-unsub="Incorrect Address">Incorrect Address</button>
+          <button class="status-btn" data-unsub="Incorrect Contact Info">Incorrect Contact Info</button>
+        </div>
       </div>
       <div class="field" style="margin-top:10px;">
         <label>Accepted By</label>
@@ -188,7 +204,6 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <button class="status-btn" data-contact="Voicemail">Voicemail</button>
           <button class="status-btn" data-contact="Text">Text</button>
           <button class="status-btn" data-contact="Door Tag">Door Tag</button>
-          <button class="status-btn" data-contact="Incorrect Contact Info">Incorrect Contact Info</button>
         </div>
       </div>
     </div>
@@ -454,7 +469,13 @@ function resetForm() {
   document.getElementById('fPhoto').value = '';
   document.getElementById('contactMethodField').hidden = true;
   document.getElementById('billingQueryField').hidden = true;
+  document.getElementById('directSubField').hidden = true;
+  document.getElementById('redirectField').hidden = true;
+  document.getElementById('undeliverableSubField').hidden = true;
+  document.getElementById('fRedirectDetail').value = '';
   document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#directSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#undeliverableSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
   document.getElementById('zoneResult').hidden = true;
   document.getElementById('zoneManual').hidden = true;
   document.getElementById('payPreview').hidden = true;
@@ -500,7 +521,17 @@ async function submitDelivery() {
     total_pieces: pieces,
     zone: selectedZone,
     delivery_type: deliveryType,
-    delivery_status: selectedStatuses,
+    delivery_status: (function() {
+      var statuses = selectedStatuses.slice();
+      // Add direct sub-options
+      document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
+      // Add undeliverable sub-options
+      document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
+      // Add redirect detail
+      var rd = document.getElementById('fRedirectDetail').value.trim();
+      if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
+      return statuses;
+    })(),
     delivery_time: document.getElementById('fTime').value,
     accepted_by: document.getElementById('fAcceptedBy').value.trim(),
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
@@ -578,10 +609,43 @@ async function init() {
     document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var status = this.dataset.status;
-        var idx = selectedStatuses.indexOf(status);
-        if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
-        else { selectedStatuses.push(status); this.classList.add('selected'); }
+        // Undeliverable is exclusive
+        if (status === 'Undeliverable') {
+          selectedStatuses = ['Undeliverable'];
+          document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+          this.classList.add('selected');
+        } else {
+          // Deselect Undeliverable if selecting something else
+          var unIdx = selectedStatuses.indexOf('Undeliverable');
+          if (unIdx >= 0) {
+            selectedStatuses.splice(unIdx, 1);
+            document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){
+              if (b.dataset.status === 'Undeliverable') b.classList.remove('selected');
+            });
+          }
+          var idx = selectedStatuses.indexOf(status);
+          if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
+          else { selectedStatuses.push(status); this.classList.add('selected'); }
+        }
+        // Show/hide sub-options
+        document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
         document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+        document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
+        document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+      });
+    });
+
+    // Direct sub-options (multi-select)
+    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
+      });
+    });
+
+    // Undeliverable sub-options (multi-select)
+    document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
       });
     });
 
@@ -685,3 +749,5 @@ if ('serviceWorker' in navigator) {
 </body>
 </html>
 Done
+Copy everything from <!DOCTYPE html> to </html> and paste into GitHub replacing driver.html. Com
+
