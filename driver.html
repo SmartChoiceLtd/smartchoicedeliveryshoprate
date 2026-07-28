@@ -110,7 +110,8 @@ optgroup{font-weight:700;color:var(--ink-soft);}
         </select>
       </div>
       <div class="field" id="billingQueryField" hidden>
-        <label>Invoice To</label>
+        <<label>Invoice To</label>
+        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT &amp; FS default to Wholesaler except as indicated on signout sheet. All others default to Receiving Shop. Override only if billing differs.</p>
         <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
           <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
           <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
@@ -208,18 +209,13 @@ optgroup{font-weight:700;color:var(--ink-soft);}
       </div>
     </div>
 
-    <div class="card" id="wholesaleStatusCard" hidden>
+   <div class="card" id="wholesaleStatusCard" hidden>
       <h2>Delivery Confirmation</h2>
       <div class="field">
         <label>Accepted By</label>
         <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
       </div>
-      <div class="field">
-        <label>Delivery Time</label>
-        <input type="time" id="fWholesaleTime">
-      </div>
     </div>
-
     <div class="card">
       <h2>Notes &amp; Photo</h2>
       <div class="field">
