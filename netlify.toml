@@ -7,3 +7,23 @@
   from = "/shop/*"
   to = "/index.html"
   status = 200
+
+[[redirects]]
+  from = "/orders"
+  to = "/orders.html"
+  status = 200
+
+[[redirects]]
+  from = "/driver/*"
+  to = "/driver.html"
+  status = 200
+
+[[redirects]]
+  from = "/driver-summary/*"
+  to = "/driver-summary.html"
+  status = 200
+  
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200

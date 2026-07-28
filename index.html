@@ -151,7 +151,7 @@ const ZONE_COLORS={
   C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
-// Named towns — each gets a colored pin on the map
+// Named towns ΓÇö each gets a colored pin on the map
 const NAMED_TOWNS=[
   {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
   {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
@@ -446,10 +446,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote — ${shop.name}`,
+    `Delivery quote ΓÇö ${shop.name}`,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} — ${sublabel})`,
+    `Zone: ${zoneCode} (${label} ΓÇö ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
     `Delivery price: $${Number(finalPrice).toFixed(2)}`,
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
@@ -511,7 +511,7 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING — ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING ΓÇö ${shop.name}`,shop.address,`As of ${date}`,'',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),

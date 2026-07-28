@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver Summary</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
+*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+[hidden]{display:none !important;}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
+.driver-badge{background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}
+.back-btn{font-size:13px;color:var(--accent);text-decoration:none;border:1px solid var(--accent);padding:6px 12px;border-radius:8px;}
+.container{max-width:600px;margin:0 auto;padding:16px;}
+.period-toggle{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.period-btn{flex:1;padding:8px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);}
+.period-btn.active{background:var(--accent);color:#fff;font-weight:600;}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;}
+.stat-value{font-size:24px;font-weight:700;font-family:Georgia,serif;color:var(--accent);}
+.stat-label{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin-top:4px;}
+.delivery-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+.delivery-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.delivery-name{font-weight:600;font-size:14px;}
+.delivery-pay{font-size:16px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
+.delivery-detail{font-size:12px;color:var(--ink-soft);line-height:1.6;}
+.zone-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent);margin-right:4px;}
+.total-bar{background:var(--green-soft);border:1px solid #A8CFA8;border-radius:var(--radius);padding:16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+.total-label{font-size:13px;color:var(--green);}
+.total-amount{font-size:22px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
+.btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);}
+.empty{text-align:center;padding:40px;color:var(--ink-soft);}
+.loading{text-align:center;padding:40px;color:var(--ink-soft);}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@media print{.topbar .back-btn,.period-toggle,.btn{display:none;}.topbar{border:none;padding:0 0 12px;}.container{padding:0;max-width:100%;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Delivery Summary</h1>
+  <span class="driver-badge" id="driverBadge"></span>
+  <a class="back-btn" id="backBtn" href="#">Back to form</a>
+</div>
+
+<div class="container">
+  <div class="period-toggle">
+    <button class="period-btn active" data-period="today" id="btnToday">Today</button>
+    <button class="period-btn" data-period="week" id="btnWeek">This Week</button>
+  </div>
+
+  <div id="loadingDiv" class="loading">
+    <div class="spinner"></div>
+    <p>Loading deliveries...</p>
+  </div>
+
+  <div id="contentDiv" hidden>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="statDeliveries">0</div>
+        <div class="stat-label">Deliveries</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statPieces">0</div>
+        <div class="stat-label">Pieces</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statPay">$0</div>
+        <div class="stat-label">Est. Pay</div>
+      </div>
+    </div>
+
+    <div class="total-bar">
+      <div class="total-label" id="totalLabel">Today's total pay</div>
+      <div class="total-amount" id="totalPay">$0.00</div>
+    </div>
+
+    <div id="deliveryList"></div>
+
+    <div id="emptyDiv" class="empty" hidden>No deliveries for this period.</div>
+
+    <button class="btn" onclick="window.print()">Print Summary</button>
+    <button class="btn btn-secondary" id="backBtn2">Back to form</button>
+  </div>
+</div>
+
+<script>
+var driverCode = '';
+var allOrders = [];
+var currentPeriod = 'today';
+
+var pathParts = location.pathname.split('/').filter(Boolean);
+var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+
+function getToday() {
+  return new Date().toISOString().slice(0,10);
+}
+
+function getWeekStart() {
+  var now = new Date();
+  var day = now.getDay();
+  var monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  monday.setHours(0,0,0,0);
+  return monday;
+}
+
+function parseDate(o) {
+  var raw = o.date || o.received_at || '';
+  if (!raw) return new Date(0);
+  var d = new Date(raw);
+  if (!isNaN(d.getTime())) return d;
+  var mo = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  var m = raw.match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if (m) return new Date(parseInt(m[3]), mo[m[2]]||0, parseInt(m[1]));
+  return new Date(0);
+}
+
+function filterOrders() {
+  var today = getToday();
+  var weekStart = getWeekStart();
+  return allOrders.filter(function(o) {
+    if (o.driver !== driverCode && o.driver !== driverCode.toLowerCase()) return false;
+    var d = parseDate(o);
+    if (currentPeriod === 'today') {
+      return (o.date || o.received_at || '').slice(0,10) === today;
+    } else {
+      return d >= weekStart;
+    }
+  });
+}
+
+function render() {
+  var orders = filterOrders();
+  var totalDeliveries = orders.length;
+  var totalPieces = orders.reduce(function(s,o) { return s + (parseInt(o.total_pieces)||1); }, 0);
+  var totalPay = orders.reduce(function(s,o) { return s + (parseFloat(o.driver_pay)||0); }, 0);
+
+  document.getElementById('statDeliveries').textContent = totalDeliveries;
+  document.getElementById('statPieces').textContent = totalPieces;
+  document.getElementById('statPay').textContent = '$' + totalPay.toFixed(2);
+  document.getElementById('totalPay').textContent = '$' + totalPay.toFixed(2);
+  document.getElementById('totalLabel').textContent = currentPeriod === 'today' ? "Today's total pay" : "This week's total pay";
+
+  var list = document.getElementById('deliveryList');
+  var emptyDiv = document.getElementById('emptyDiv');
+
+  if (!orders.length) {
+    list.innerHTML = '';
+    emptyDiv.hidden = false;
+    return;
+  }
+  emptyDiv.hidden = true;
+
+  list.innerHTML = orders.map(function(o) {
+    var pay = parseFloat(o.driver_pay) || 0;
+    var status = Array.isArray(o.delivery_status) ? o.delivery_status[0] : (o.delivery_status || '');
+    var time = o.delivery_time || '';
+    return '<div class="delivery-card">' +
+      '<div class="delivery-header">' +
+        '<div>' +
+          '<div class="delivery-name">' + esc(o.name || 'Unknown') + '</div>' +
+          '<div style="font-size:11px;color:var(--ink-soft);">' + esc(o.shop || '') + (time ? ' &bull; ' + esc(time) : '') + '</div>' +
+        '</div>' +
+        '<div class="delivery-pay">$' + pay.toFixed(2) + '</div>' +
+      '</div>' +
+      '<div class="delivery-detail">' +
+        '<span class="zone-pill">' + esc(o.zone_code || o.zone || '-') + '</span>' +
+        esc(o.formatted_address || o.address || '') +
+        (o.total_pieces > 1 ? ' &bull; ' + o.total_pieces + ' pcs' : '') +
+        (status ? ' &bull; ' + esc(status) : '') +
+        (o.neighboured_to ? ' &bull; Left with: ' + esc(o.neighboured_to) : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+async function init() {
+  try {
+    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
+    if (!res.ok) {
+      document.getElementById('loadingDiv').innerHTML = '<p style="color:var(--ink-soft)">Driver not found.</p>';
+      return;
+    }
+    var driver = await res.json();
+    driverCode = driver.code;
+    document.getElementById('driverBadge').textContent = driver.name;
+    document.title = driver.name + ' - Summary';
+    document.getElementById('backBtn').href = '/driver/' + urlDriverCode.toLowerCase();
+    document.getElementById('backBtn2').onclick = function() {
+      window.location.href = '/driver/' + urlDriverCode.toLowerCase();
+    };
+
+    var oRes = await fetch('/api/orders');
+    allOrders = await oRes.json();
+
+    document.getElementById('loadingDiv').hidden = true;
+    document.getElementById('contentDiv').hidden = false;
+    render();
+
+  } catch(e) {
+    document.getElementById('loadingDiv').innerHTML = '<p style="color:var(--ink-soft)">Could not load summary: ' + e.message + '</p>';
+  }
+}
+
+document.getElementById('btnToday').addEventListener('click', function() {
+  currentPeriod = 'today';
+  document.getElementById('btnToday').classList.add('active');
+  document.getElementById('btnWeek').classList.remove('active');
+  render();
+});
+
+document.getElementById('btnWeek').addEventListener('click', function() {
+  currentPeriod = 'week';
+  document.getElementById('btnWeek').classList.add('active');
+  document.getElementById('btnToday').classList.remove('active');
+  render();
+});
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop Import</title>
+<style>
+body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;background:#FAF7F2;color:#2B2620;}
+h1{font-family:Georgia,serif;font-size:20px;}
+.btn{background:#B8472B;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;cursor:pointer;width:100%;margin-top:16px;}
+.btn:disabled{opacity:0.5;}
+.log{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:14px;margin-top:16px;font-size:12px;font-family:monospace;max-height:400px;overflow-y:auto;white-space:pre-wrap;}
+.progress{background:#E6DECF;border-radius:999px;height:8px;margin-top:12px;}
+.progress-bar{background:#B8472B;border-radius:999px;height:8px;width:0;transition:width 0.3s;}
+</style>
+</head>
+<body>
+<h1>Shop Bulk Import</h1>
+<p style="color:#6B6256;font-size:13px;">Imports all shops with Calgary centre coordinates as placeholder. Update individual shop addresses later through the quote tool.</p>
+<button class="btn" id="importBtn">Import All Shops</button>
+<div class="progress" hidden id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="log" id="log" hidden></div>
+
+<script>
+var SHOPS = [
+  {code:'AC',name:'AC ACADIA GROWER DIRECT'},
+  {code:'AF',name:'AF AL FRACHE'},
+  {code:'AL',name:'AL ALLANS FLOWERS'},
+  {code:'ALP',name:'ALP ALPINE FLOWERS'},
+  {code:'AM',name:'AM AMAZING FLORAL WHOLESALE'},
+  {code:'AMB',name:'AMB AMBORELLA'},
+  {code:'AMBR',name:'AMBR AMBROSIA'},
+  {code:'AT',name:'AT ATLANTIC'},
+  {code:'AV',name:'AV AVENIDA FLOWERS'},
+  {code:'B9',name:'B9 BLOOMS ON 9TH'},
+  {code:'BA',name:'BA BERNARD ANDERSON'},
+  {code:'BAD',name:'BAD BLOOMS AND DESIGN'},
+  {code:'BB',name:'BB BB BASKETS'},
+  {code:'BBB',name:'BBB BLOOMS BY BUNCHES'},
+  {code:'BE',name:'BE BLACK EARTH'},
+  {code:'BEN',name:'BEN BENJI BLOOMS'},
+  {code:'BK',name:'BK BASKETS AND BEYOND'},
+  {code:'BOB',name:'BOB BOY O BOY'},
+  {code:'BOP',name:'BOP BIRD OF PARADISE FLORAL'},
+  {code:'BQ',name:'BQ BRIE AND BANQUET'},
+  {code:'BU',name:'BU BLOOMS AND BUTTERFLIES'},
+  {code:'BV',name:'BV BONAVISTA'},
+  {code:'BY',name:'BY BLOSSOMS YYC'},
+  {code:'CE',name:'CE CREATIVE EDGE'},
+  {code:'CF',name:'CF CLAERENS FLOWERS'},
+  {code:'CH',name:'CH CASHYN HOMES'},
+  {code:'CK',name:'CK CHICKWEED FLORAL'},
+  {code:'CLF',name:'CLF CALGARY LOCAL FLORIST'},
+  {code:'CLW',name:'CLW CUSTOM LASER WORKS'},
+  {code:'CN',name:'CN CREATIONS BY NAZIA'},
+  {code:'CW',name:'CW CHARLOTTES WEB'},
+  {code:'DA',name:'DA DAHLIA FLOWERS'},
+  {code:'DB',name:'DB DEBS BRIDAL'},
+  {code:'DC',name:'DC DIVINE CREATIONS'},
+  {code:'DE',name:'DE DEVINE PETALS'},
+  {code:'DEV',name:'DEV DEVOUR CATERING'},
+  {code:'DF',name:'DF DOWNTOWN FLOWERS'},
+  {code:'DO',name:'DO DESIGNING ON THE EDGE'},
+  {code:'DV',name:'DV DEER VALLEY'},
+  {code:'EF',name:'EF ENCHANTED'},
+  {code:'EP',name:'EP ENCHANTED PETALS'},
+  {code:'FA',name:'FA FLOWER ARTISTRY'},
+  {code:'FB',name:'FB FLOWERS AND BEYOND'},
+  {code:'FC',name:'FC FLOWER CENTER'},
+  {code:'FCU',name:'FCU FLOWER CULTURE'},
+  {code:'FD',name:'FD FLORAL DELIVERY'},
+  {code:'FF',name:'FF FALL FOR FLORALS'},
+  {code:'FG',name:'FG FLOWER GALLERY'},
+  {code:'FHY',name:'FHY FLORAL HAVEN YYC'},
+  {code:'FI',name:'FI FINESSE FLOWERS'},
+  {code:'FJ',name:'FJ FLOWER BY JANIE'},
+  {code:'FL',name:'FL FLEURISH'},
+  {code:'FLO',name:'FLO FLOART STUDIO'},
+  {code:'FM',name:'FM FLOWER MAGIC'},
+  {code:'FN',name:'FN FLOWER AURA BY NATASHA SHOP'},
+  {code:'FNS',name:'FNS FLOWER AURA BY NATASHA STUDIO'},
+  {code:'FO',name:'FO FORGET ME NOT'},
+  {code:'FPA',name:'FPA FUNKY PETALS AIRDRIE'},
+  {code:'FPK',name:'FPK FUNKY PETALS KENSINGTON'},
+  {code:'FS',name:'FS FLORISTS SUPPLY'},
+  {code:'FT',name:'FT FLOWERS AT MARKET'},
+  {code:'FV',name:'FV FOXGLOVE'},
+  {code:'FW',name:'FW FLOWER WHISPERS'},
+  {code:'FX',name:'FX FLOWER CHIX'},
+  {code:'FXN',name:'FXN FLOWER CHIX NORTH'},
+  {code:'GF',name:'GF GARDENIA FLOWERS'},
+  {code:'GR',name:'GR GYPSY ROSE'},
+  {code:'HC',name:'HC HEN AND CHICKS'},
+  {code:'HH',name:'HH HOLLAND HOUSE'},
+  {code:'HP',name:'HP HAWTHORNE PLAINS'},
+  {code:'HV',name:'HV HOME VINTER'},
+  {code:'IF',name:'IF INCREDIBLE FLORIST'},
+  {code:'IG',name:'IG NATHAN'},
+  {code:'IT',name:'IT ITINERANTE BANKERS HALL'},
+  {code:'KF',name:'KF KENSINGTON FLOWERS'},
+  {code:'LB',name:'LB LAUREN BELL'},
+  {code:'LFW',name:'LFW LYNN FLETCHER WEDDINGS'},
+  {code:'LKB',name:'LKB LUKES BRIDGELAND'},
+  {code:'LKK',name:'LKK LUKES KILLARNEY'},
+  {code:'LM',name:'LM LA MAISON FLOWER STUDIO'},
+  {code:'LOT',name:'LOT LOTTA FLOWERS'},
+  {code:'LP',name:'LP LAUREN PLANTE'},
+  {code:'LU',name:'LU LUNA BLOOM'},
+  {code:'MA',name:'MA MANDALA'},
+  {code:'MB',name:'MB MBS WHOLESALE'},
+  {code:'MF',name:'MF MICHELLES FLOWER'},
+  {code:'MFM',name:'MFM MARLOW FLORAL WORKS MISSION'},
+  {code:'MFS',name:'MFS MARLOW FLORAL WORKS SOUTH'},
+  {code:'MJ',name:'MJ MARKET JUNCTION'},
+  {code:'ML',name:'ML MANUEL LATRUWE'},
+  {code:'MM',name:'MM MICHELE MASTERSON'},
+  {code:'MR',name:'MR MAY ROSE'},
+  {code:'MY',name:'MY MY FLORIST'},
+  {code:'MZ',name:'MZ MENZIES'},
+  {code:'NB',name:'NB NUTRITION AND BEYOND'},
+  {code:'NR',name:'NR NECTARE AND ROOT'},
+  {code:'NW',name:'NW NORTHWEST FLORIST'},
+  {code:'OA',name:'OA OASIS'},
+  {code:'OF',name:'OF OKOTOKS FLOWER AND GIFT'},
+  {code:'OR',name:'OR OLIVER REAL ESTATE'},
+  {code:'OT',name:'OT ORSO TRADES'},
+  {code:'PA',name:'PA PANDA 130'},
+  {code:'PCA',name:'PCA PANDA CANADA'},
+  {code:'PCO',name:'PCO PANDA COCHRANE'},
+  {code:'PCR',name:'PCR PANDA CROWFOOT'},
+  {code:'PD',name:'PD POSH DESIGNS'},
+  {code:'PO',name:'PO PURPLE ORCHID'},
+  {code:'PS',name:'PS PRETTY SWEET'},
+  {code:'PSU',name:'PSU PANDA SUNRIDGE'},
+  {code:'QF',name:'QF QFRESH LOGISTICS'},
+  {code:'SB',name:'SB SBE WHOLESALE'},
+  {code:'SCD',name:'SCD SMART CHOICE DELIVERY'},
+  {code:'SCV',name:'SCV SWEET CAKES BY VERNZ'},
+  {code:'SF',name:'SF SMALL FLOWER'},
+  {code:'SK',name:'SK SK FLORIST'},
+  {code:'SRS',name:'SRS SWEET ROOTS STUDIO'},
+  {code:'SV',name:'SV SAVANAH'},
+  {code:'SW',name:'SW SWEET WILLIAMS CO FLORAL'},
+  {code:'SZ',name:'SZ STEMZ'},
+  {code:'TD',name:'TD TRIMS AND DREAMS'},
+  {code:'TF',name:'TF THALEA FLOWERS'},
+  {code:'TH',name:'TH TREEHOUSE'},
+  {code:'TNX',name:'TNX TNX TROPICALS'},
+  {code:'TP',name:'TP TOUCH OF PETALS'},
+  {code:'TW',name:'TW TWIGS'},
+  {code:'UR',name:'UR URBAN ROOTS'},
+  {code:'VA',name:'VA VAVABLOOM'},
+  {code:'VC',name:'VC VIOLET AND COMPANY'},
+  {code:'VCW',name:'VCW VILLAGE CRAFT WINEMAKER'},
+  {code:'VT',name:'VT VINTAGE THISTLE'},
+  {code:'WA',name:'WA WILD ABOUT FLOWERS'},
+  {code:'WF',name:'WF WILDFLOWER'},
+  {code:'WFC',name:'WFC WILD FLORALS AND CO'},
+  {code:'WH',name:'WH WHIPTT'},
+  {code:'WHF',name:'WHF WHITES FLOWERS'},
+  {code:'WO',name:'WO WILD ORCHID'},
+  {code:'YA',name:'YA YARA'},
+  {code:'YR',name:'YR YRENE RAMIREZ'},
+];
+
+var CALGARY_LAT = 51.0447;
+var CALGARY_LNG = -114.0719;
+
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+document.getElementById('importBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var log = document.getElementById('log');
+  var progressWrap = document.getElementById('progressWrap');
+  var progressBar = document.getElementById('progressBar');
+  log.hidden = false;
+  progressWrap.hidden = false;
+  log.textContent = 'Starting import of ' + SHOPS.length + ' shops...\n\n';
+
+  var success = 0, failed = 0, skipped = 0;
+
+  for (var i = 0; i < SHOPS.length; i++) {
+    var shop = SHOPS[i];
+    progressBar.style.width = Math.round((i / SHOPS.length) * 100) + '%';
+
+    try {
+      var payload = {
+        name: shop.name,
+        address: 'Calgary, AB, Canada',
+        lat: CALGARY_LAT,
+        lng: CALGARY_LNG,
+        zonePrices: {C1:10,C2:12,C3:13,C4:14,C5:15,OUT1:25,OUT2:35,OUT3:55,OUT4:75},
+        communityZones: {},
+        townPrices: {}
+      };
+
+      var res = await fetch('/api/shops', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        success++;
+        log.textContent += '✓ ' + shop.code + ' — ' + shop.name + '\n';
+      } else {
+        var err = await res.json().catch(function(){return{};});
+        failed++;
+        log.textContent += '✗ ' + shop.code + ' — ' + (err.error || 'Error ' + res.status) + '\n';
+      }
+    } catch(e) {
+      failed++;
+      log.textContent += '✗ ' + shop.code + ' — ' + e.message + '\n';
+    }
+
+    log.scrollTop = log.scrollHeight;
+    await sleep(100);
+  }
+
+  progressBar.style.width = '100%';
+  log.textContent += '\nDone! ' + success + ' imported, ' + failed + ' failed, ' + skipped + ' skipped.';
+  btn.textContent = 'Import Complete';
+});
+</script>
+</body>
+</html>
+

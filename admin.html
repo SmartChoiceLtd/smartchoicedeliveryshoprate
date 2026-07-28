@@ -1,0 +1,292 @@
+cat > /home/claude/flower-tool/admin.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice — Admin</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
+*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+[hidden]{display:none !important;}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
+.topbar h1{font-family:Georgia,serif;font-size:19px;font-weight:600;margin:0;flex:1;}
+.topbar a{font-size:13px;color:var(--accent);text-decoration:none;}
+.tabs{background:var(--card);border-bottom:1px solid var(--border);display:flex;padding:0 24px;}
+.tab{padding:12px 16px;font-size:14px;border:none;background:none;cursor:pointer;color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.content{max-width:800px;margin:0 auto;padding:24px;}
+.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+.section h2{font-family:Georgia,serif;font-size:16px;margin:0 0 16px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em;}
+.field input,.field select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;font-weight:600;}
+.btn:hover{opacity:0.9;}.btn:disabled{opacity:0.5;cursor:default;}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-danger{background:transparent;color:#B8472B;border:1px solid #E3B3AE;font-size:12px;padding:4px 8px;border-radius:6px;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.featured-star{color:var(--accent);font-size:16px;cursor:pointer;background:none;border:none;padding:0;}
+.copy-link{font-size:11px;color:var(--accent);cursor:pointer;background:none;border:none;text-decoration:underline;}
+.driver-code{font-family:monospace;font-weight:700;font-size:13px;}
+.inactive{opacity:0.45;}
+input[type=number]{width:80px !important;}
+.rate-zone{font-family:monospace;font-weight:700;font-size:12px;color:var(--accent);}
+.success-msg{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:8px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
+.error-msg{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:8px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
+.loading{padding:30px;text-align:center;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Admin Panel</h1>
+  <a href="/">Quote tool</a>
+  <a href="/orders">Orders</a>
+</div>
+<div class="tabs">
+  <button class="tab active" onclick="showTab('drivers')">Drivers</button>
+  <button class="tab" onclick="showTab('shops')">Shops</button>
+  <button class="tab" onclick="showTab('rates')">Rate Table</button>
+</div>
+
+<div class="content">
+
+  <!-- DRIVERS TAB -->
+  <div id="tab-drivers">
+    <div class="section">
+      <h2>Add Driver</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Driver Code</label>
+          <input type="text" id="newDriverCode" placeholder="KE" maxlength="6" style="text-transform:uppercase;">
+        </div>
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" id="newDriverName" placeholder="Kevin Michaud">
+        </div>
+        <div class="field">
+          <label>Vehicle</label>
+          <input type="text" id="newDriverVehicle" placeholder="SUV">
+        </div>
+      </div>
+      <button class="btn" id="addDriverBtn">Add Driver</button>
+      <div id="addDriverMsg" hidden></div>
+    </div>
+    <div class="section">
+      <h2>All Drivers</h2>
+      <div id="driversList" class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <!-- SHOPS TAB -->
+  <div id="tab-shops" hidden>
+    <div class="section">
+      <h2>Featured Shops <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">(shown at top of driver form — star to feature/unfeature)</span></h2>
+      <div id="shopsList" class="loading">Loading...</div>
+    </div>
+  </div>
+
+  <!-- RATES TAB -->
+  <div id="tab-rates" hidden>
+    <div class="section">
+      <h2>Zone Rate Table <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">— edit GDPI to adjust fuel surcharge</span></h2>
+      <div style="margin-bottom:12px;">
+        <button class="btn btn-sm" id="saveRatesBtn">Save All Changes</button>
+        <span id="ratesSaveMsg" style="font-size:12px;color:var(--green);margin-left:10px;" hidden>Saved!</span>
+      </div>
+      <div id="ratesTable" class="loading">Loading...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var drivers = [];
+var shops = [];
+var rates = {};
+
+function showTab(name) {
+  ['drivers','shops','rates'].forEach(function(t) {
+    document.getElementById('tab-'+t).hidden = t !== name;
+  });
+  document.querySelectorAll('.tab').forEach(function(btn,i) {
+    btn.classList.toggle('active', ['drivers','shops','rates'][i] === name);
+  });
+  if (name === 'shops' && !shops.length) loadShops();
+  if (name === 'rates' && !Object.keys(rates).length) loadRates();
+}
+
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+/* ---- DRIVERS ---- */
+async function loadDrivers() {
+  try {
+    var res = await fetch('/api/drivers');
+    drivers = await res.json();
+    renderDrivers();
+  } catch(e) {
+    document.getElementById('driversList').textContent = 'Could not load drivers.';
+  }
+}
+
+function renderDrivers() {
+  var el = document.getElementById('driversList');
+  if (!drivers.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No drivers yet.</p>'; return; }
+  el.innerHTML = '<table><thead><tr><th>Code</th><th>Name</th><th>Vehicle</th><th>Status</th><th>Link</th><th></th></tr></thead><tbody>' +
+    drivers.map(function(d) {
+      return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
+        '<td><span class="driver-code">' + esc(d.code) + '</span></td>' +
+        '<td>' + esc(d.name) + '</td>' +
+        '<td>' + esc(d.vehicle) + '</td>' +
+        '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
+        '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
+        '<td><button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button></td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+document.getElementById('addDriverBtn').addEventListener('click', async function() {
+  var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
+  var name = document.getElementById('newDriverName').value.trim();
+  var vehicle = document.getElementById('newDriverVehicle').value.trim();
+  var msgEl = document.getElementById('addDriverMsg');
+  if (!code || !name) { msgEl.className='error-msg'; msgEl.textContent='Code and name required.'; msgEl.hidden=false; return; }
+  this.disabled = true; this.textContent = 'Adding...';
+  try {
+    var res = await fetch('/api/drivers', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({code,name,vehicle}) });
+    var driver = await res.json();
+    drivers.push(driver);
+    renderDrivers();
+    document.getElementById('newDriverCode').value = '';
+    document.getElementById('newDriverName').value = '';
+    document.getElementById('newDriverVehicle').value = '';
+    msgEl.className='success-msg'; msgEl.textContent='Driver added. Link: ' + location.origin + '/driver/' + code.toLowerCase();
+    msgEl.hidden = false;
+  } catch(e) { msgEl.className='error-msg'; msgEl.textContent='Error: ' + e.message; msgEl.hidden=false; }
+  finally { this.disabled=false; this.textContent='Add Driver'; }
+});
+
+function copyDriverLink(code) {
+  var url = location.origin + '/driver/' + code.toLowerCase();
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ alert('Copied: ' + url); });
+  else window.prompt('Copy link:', url);
+}
+
+async function toggleDriver(code, active) {
+  try {
+    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({active}) });
+    var d = drivers.find(function(x){ return x.code===code; });
+    if (d) d.active = active;
+    renderDrivers();
+  } catch(e) { alert('Could not update driver.'); }
+}
+
+/* ---- SHOPS ---- */
+async function loadShops() {
+  try {
+    var res = await fetch('/api/shops');
+    shops = await res.json();
+    renderShops();
+  } catch(e) {
+    document.getElementById('shopsList').textContent = 'Could not load shops.';
+  }
+}
+
+function renderShops() {
+  var el = document.getElementById('shopsList');
+  if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops found.</p>'; return; }
+  var sorted = shops.slice().sort(function(a,b) {
+    if (a.featured && !b.featured) return -1;
+    if (!a.featured && b.featured) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Name</th><th>Address</th></tr></thead><tbody>' +
+    sorted.map(function(s) {
+      return '<tr>' +
+        '<td><button class="featured-star" onclick="toggleFeatured(\'' + esc(s.id) + '\')" title="' + (s.featured ? 'Remove from featured' : 'Add to featured') + '">' + (s.featured ? '★' : '☆') + '</button></td>' +
+        '<td>' + esc(s.name) + '</td>' +
+        '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+async function toggleFeatured(shopId) {
+  var shop = shops.find(function(s){ return s.id===shopId; });
+  if (!shop) return;
+  var featured = !shop.featured;
+  try {
+    await fetch('/api/shops/' + encodeURIComponent(shopId), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({featured}) });
+    shop.featured = featured;
+    renderShops();
+  } catch(e) { alert('Could not update shop.'); }
+}
+
+/* ---- RATES ---- */
+async function loadRates() {
+  try {
+    var res = await fetch('/api/rates');
+    rates = await res.json();
+    renderRates();
+  } catch(e) {
+    document.getElementById('ratesTable').textContent = 'Could not load rates.';
+  }
+}
+
+function renderRates() {
+  var el = document.getElementById('ratesTable');
+  var zones = Object.keys(rates).sort();
+  el.innerHTML = '<table><thead><tr><th>Zone</th><th>Driver Base</th><th>Driver Extra/pc</th><th>GDPI (fuel)</th><th>Shop Base</th><th>Shop Extra/pc</th></tr></thead><tbody>' +
+    zones.map(function(z) {
+      var r = rates[z];
+      return '<tr>' +
+        '<td><span class="rate-zone">' + z + '</span></td>' +
+        '<td><input type="number" step="0.25" value="' + (r.drate||0) + '" data-zone="' + z + '" data-field="drate"></td>' +
+        '<td><input type="number" step="0.25" value="' + (r.dratex||0) + '" data-zone="' + z + '" data-field="dratex"></td>' +
+        '<td><input type="number" step="0.25" value="' + (r.gdpi||0) + '" data-zone="' + z + '" data-field="gdpi" style="border-color:var(--accent);"></td>' +
+        '<td><input type="number" step="0.25" value="' + (r.srate||0) + '" data-zone="' + z + '" data-field="srate"></td>' +
+        '<td><input type="number" step="0.25" value="' + (r.sratex||0) + '" data-zone="' + z + '" data-field="sratex"></td>' +
+        '</tr>';
+    }).join('') +
+    '</tbody></table>';
+
+  el.querySelectorAll('input[type=number]').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var z = this.dataset.zone;
+      var f = this.dataset.field;
+      if (!rates[z]) rates[z] = {};
+      rates[z][f] = parseFloat(this.value) || 0;
+    });
+  });
+}
+
+document.getElementById('saveRatesBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    var res = await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
+    if (!res.ok) throw new Error('Status ' + res.status);
+    var msg = document.getElementById('ratesSaveMsg');
+    msg.hidden = false;
+    setTimeout(function(){ msg.hidden=true; }, 2000);
+  } catch(e) { alert('Could not save rates: ' + e.message); }
+  finally { btn.disabled=false; btn.textContent='Save All Changes'; }
+});
+
+loadDrivers();
+</script>
+</body>
+</html>
+
