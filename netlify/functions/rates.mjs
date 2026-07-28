@@ -46,6 +46,7 @@ const DEFAULT_RATES = {
   SC3:{drate:60,dratex:0,gdpi:0,srate:60,sratex:0},
   STR:{drate:22.75,dratex:1.5,gdpi:2,srate:35,sratex:3},
   TSU:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
+  WAI:{drate:16.25,dratex:1,gdpi:1,srate:25,sratex:1.5},
   WCO:{drate:19.5,dratex:1,gdpi:1,srate:30,sratex:1.5},
   WED:{drate:16.25,dratex:1,gdpi:1,srate:25,sratex:5},
   WEDO:{drate:16.25,dratex:1,gdpi:3.32,srate:25,sratex:5},
