@@ -482,6 +482,7 @@ function resetForm() {
   document.getElementById('fP iieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
+  document.getElementById('fWholesaleAcceptedBy').value = '';
   document.getElementById('fNeighbouredTo').value = '';
   document.getElementById('fPhoto').value = '';
   document.getElementById('contactMethodField').hidden = true;
@@ -501,6 +502,7 @@ function resetForm() {
   document.getElementById('neighbouredToField').hidden = true;
   var now = new Date();
   document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('fWholesaleTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
   document.getElementById('successScreen').hidden = true;
   document.getElementById('app').hidden = false;
 }
@@ -549,7 +551,9 @@ async function submitDelivery() {
       if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
       return statuses;
     })(),
-    delivery_time: document.getElementById('fTime').value,
+    delivery_time: deliveryType === 'wholesale'
+      ? document.getElementById('fWholesaleTime').value
+      : document.getElementById('fTime').value,
     accepted_by: deliveryType === 'wholesale' 
       ? document.getElementById('fWholesaleAcceptedBy').value.trim()
       : document.getElementById('fAcceptedBy').value.trim(),
