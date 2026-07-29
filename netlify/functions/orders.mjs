@@ -136,7 +136,10 @@ export default async (req) => {
     }
 
     // Flag if manual zone differs from suggestion
-    const zoneConflict = zoneSuggestion?.suggested &&
+   const isWholesale = (raw.delivery_type === 'wholesale') || 
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
+    const zoneConflict = !isWholesale &&
+      zoneSuggestion?.suggested &&
       enteredZoneCode &&
       zoneSuggestion.suggested !== enteredZoneCode &&
       zoneSuggestion.confidence === 'high';
