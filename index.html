@@ -103,11 +103,7 @@
       <h2>Shops</h2>
       <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
       <div id="shopList"></div>
-      <form id="addShopForm">
-        <input id="newShopName" placeholder="Shop name" required>
-        <input id="newShopAddress" placeholder="Shop address" required>
-        <button class="btn btn-sm" type="submit">Add shop</button>
-      </form>
+      
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
@@ -569,7 +565,7 @@ if(state.shops.length)selectShop(state.shops[0].id);
   }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
 }
 
-document.getElementById('addShopForm').addEventListener('submit',async(ev)=>{
+
   ev.preventDefault();
   const name=document.getElementById('newShopName').value.trim();
   const address=document.getElementById('newShopAddress').value.trim();
