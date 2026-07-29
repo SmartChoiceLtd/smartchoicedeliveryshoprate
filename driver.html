@@ -523,7 +523,8 @@ async function submitDelivery() {
     address: address,
     shop: shop ? shop.name : shopId,
     shop_code: shop ? shop.name.split(' ')[0] : '',
-    wholesaler: deliveryType === 'wholesale' ? document.getElementById('fWholesaler').value : '',
+    delivery_time: document.getElementById('fTime').value,
+    
     billing_party: (function() {
       if (deliveryType !== 'wholesale') return '';
       var w = document.getElementById('fWholesaler').value;
@@ -601,8 +602,7 @@ async function init() {
     var now = new Date();
     document.getElementById('fDate').value = now.toISOString().slice(0,10);
     document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-    document.getElementById('fWholesaleTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
+  
     var cfgRes = await fetch('/api/config');
     var cfg = await cfgRes.json();
     loadMaps(cfg.key);
