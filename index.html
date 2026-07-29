@@ -226,14 +226,17 @@ function escapeHtml(s){const d=document.createElement('div');d.textContent=s;ret
 /* shop list */
 function renderShopList(){
   const el=document.getElementById('shopList');
-  if(!state.shops.length){el.innerHTML='<p class="hint">No shops yet &mdash; add one below.</p>';return;}
-  el.innerHTML=state.shops.map(s=>`
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
+  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||s.address.toLowerCase().includes(search));
+  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
+  el.innerHTML=filtered.map(s=>`
     <div class="shop-item-wrap">
       <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
       <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
     </div>`).join('');
   el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+}
 }
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
