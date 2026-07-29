@@ -160,23 +160,7 @@ function renderDrivers() {
     '</tbody></table>';
 }
 
-  function editDriver(code) {
-  var d = drivers.find(function(x){ return x.code===code; });
-  if (!d) return;
-  var name = window.prompt('Edit name:', d.name);
-  if (name === null) return;
-  var vehicle = window.prompt('Edit vehicle:', d.vehicle || '');
-  if (vehicle === null) return;
-  fetch('/api/drivers?code=' + encodeURIComponent(code), {
-    method: 'PUT',
-    headers: {'content-type':'application/json'},
-    body: JSON.stringify({name: name.trim(), vehicle: vehicle.trim()})
-  }).then(function(r){ return r.json(); }).then(function(updated){
-    var idx = drivers.findIndex(function(x){ return x.code===code; });
-    if (idx >= 0) drivers[idx] = updated;
-    renderDrivers();
-  }).catch(function(){ alert('Could not update driver.'); });
-}
+ 
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
   var name = document.getElementById('newDriverName').value.trim();
@@ -212,7 +196,23 @@ async function toggleDriver(code, active) {
     renderDrivers();
   } catch(e) { alert('Could not update driver.'); }
 }
-
+function editDriver(code) {
+  var d = drivers.find(function(x){ return x.code===code; });
+  if (!d) return;
+  var name = window.prompt('Edit name:', d.name);
+  if (name === null) return;
+  var vehicle = window.prompt('Edit vehicle:', d.vehicle || '');
+  if (vehicle === null) return;
+  fetch('/api/drivers?code=' + encodeURIComponent(code), {
+    method: 'PUT',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({name: name.trim(), vehicle: vehicle.trim()})
+  }).then(function(r){ return r.json(); }).then(function(updated){
+    var idx = drivers.findIndex(function(x){ return x.code===code; });
+    if (idx >= 0) drivers[idx] = updated;
+    renderDrivers();
+  }).catch(function(){ alert('Could not update driver.'); });
+}
 /* ---- SHOPS ---- */
 async function loadShops() {
   try {
