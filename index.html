@@ -237,7 +237,7 @@ function escapeHtml(s){const d=document.createElement('div');d.textContent=s;ret
   el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
 }
-}
+
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
