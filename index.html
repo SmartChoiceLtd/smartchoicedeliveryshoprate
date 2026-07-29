@@ -224,10 +224,7 @@ async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComp
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
 /* shop list */
- function renderShopList(){
-   renderShopList();
-document.getElementById('shopSearch').addEventListener('input', renderShopList);
-if(state.shops.length)selectShop(state.shops[0].id);
+function renderShopList(){
   const el=document.getElementById('shopList');
   const search=(document.getElementById('shopSearch').value||'').toLowerCase();
   const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||s.address.toLowerCase().includes(search));
@@ -565,9 +562,10 @@ async function boot(){
     }else{
       state.shops=await apiListShops();
       state.shops.forEach(seedCommunityZones);
-      renderShopList();
-      if(state.shops.length)selectShop(state.shops[0].id);
-    }
+       renderShopList();
+document.getElementById('shopSearch').addEventListener('input', renderShopList);
+if(state.shops.length)selectShop(state.shops[0].id);
+          }
   }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
 }
 
