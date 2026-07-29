@@ -151,12 +151,32 @@ function renderDrivers() {
         '<td>' + esc(d.vehicle) + '</td>' +
         '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
         '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
-        '<td><button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button></td>' +
+        '<td style="display:flex;gap:6px;">' +
+'<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
+'<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
+'</td>' +
         '</tr>';
     }).join('') +
     '</tbody></table>';
 }
 
+  function editDriver(code) {
+  var d = drivers.find(function(x){ return x.code===code; });
+  if (!d) return;
+  var name = window.prompt('Edit name:', d.name);
+  if (name === null) return;
+  var vehicle = window.prompt('Edit vehicle:', d.vehicle || '');
+  if (vehicle === null) return;
+  fetch('/api/drivers?code=' + encodeURIComponent(code), {
+    method: 'PUT',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({name: name.trim(), vehicle: vehicle.trim()})
+  }).then(function(r){ return r.json(); }).then(function(updated){
+    var idx = drivers.findIndex(function(x){ return x.code===code; });
+    if (idx >= 0) drivers[idx] = updated;
+    renderDrivers();
+  }).catch(function(){ alert('Could not update driver.'); });
+}
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
   var name = document.getElementById('newDriverName').value.trim();
