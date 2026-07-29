@@ -224,8 +224,7 @@ async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComp
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
 /* shop list */
-  document.getElementById('shopSearch').addEventListener('input', renderShopList);
-function renderShopList(){
+ function renderShopList(){
   const el=document.getElementById('shopList');
   const search=(document.getElementById('shopSearch').value||'').toLowerCase();
   const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||s.address.toLowerCase().includes(search));
