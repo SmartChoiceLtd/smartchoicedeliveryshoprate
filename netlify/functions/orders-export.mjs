@@ -1,9 +1,5 @@
 import { getStore } from '@netlify/blobs';
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
-}
-
 function csvEscape(val) {
   if (val === null || val === undefined) return '';
   const str = String(val);
@@ -27,13 +23,15 @@ export default async (req) => {
     const format = url.searchParams.get('format') || 'detail';
 
     if (format === 'detail') {
-      const headers = ['Date','Order ID','Name','Address','Shop Code','Shop','Driver','Pieces','Zone','Zone Source','Delivery Status','Delivery Time','Accepted By','Neighboured To','Comments','Received At'];
+      const headers = ['Date','Order ID','Name','Address','Shop Code','Shop','Driver','Pieces','Zone','Zone Source','Delivery Status','Delivery Time','Accepted By','Contact Method','Neighboured To','Comments','Driver Pay','Delivery Type','Wholesaler','Billing Party','Received At'];
       const rows = orders.map(o => toCSVRow([
         o.date, o.order_id, o.name, o.formatted_address || o.address,
-        o.shop_code, o.shop_full, o.driver, o.total_pieces,
+        o.shop_code, o.shop_full || o.shop, o.driver, o.total_pieces,
         o.zone_code, o.zone_source,
-        o.delivery_status, o.delivery_time, o.accepted_by,
-        o.neighboured_to, o.comments, o.received_at
+        Array.isArray(o.delivery_status) ? o.delivery_status.join('; ') : o.delivery_status,
+        o.delivery_time, o.accepted_by, o.contact_method,
+        o.neighboured_to, o.comments, o.driver_pay,
+        o.delivery_type, o.wholesaler, o.billing_party, o.received_at
       ]));
       const csv = [toCSVRow(headers), ...rows].join('\n');
       return new Response(csv, {
@@ -46,7 +44,6 @@ export default async (req) => {
     }
 
     if (format === 'pivot') {
-      // Pivot by shop + zone
       const pivot = {};
       orders.forEach(o => {
         const shop = o.shop_code || 'UNKNOWN';
@@ -71,20 +68,20 @@ export default async (req) => {
     }
 
     if (format === 'driver') {
-      // Pivot by driver + zone for driver pay
       const pivot = {};
       orders.forEach(o => {
         const driver = o.driver || 'UNKNOWN';
         const zone = o.zone_code || 'UNKNOWN';
         const key = `${driver}__${zone}`;
-        if (!pivot[key]) pivot[key] = { driver, zone, count: 0, pieces: 0 };
+        if (!pivot[key]) pivot[key] = { driver, zone, count: 0, pieces: 0, pay: 0 };
         pivot[key].count++;
         pivot[key].pieces += parseInt(o.total_pieces || 1);
+        pivot[key].pay += parseFloat(o.driver_pay || 0);
       });
-      const headers = ['Driver','Zone','Delivery Count','Total Pieces'];
+      const headers = ['Driver','Zone','Delivery Count','Total Pieces','Total Pay'];
       const rows = Object.values(pivot)
         .sort((a,b) => a.driver.localeCompare(b.driver) || a.zone.localeCompare(b.zone))
-        .map(r => toCSVRow([r.driver, r.zone, r.count, r.pieces]));
+        .map(r => toCSVRow([r.driver, r.zone, r.count, r.pieces, r.pay.toFixed(2)]));
       const csv = [toCSVRow(headers), ...rows].join('\n');
       return new Response(csv, {
         status: 200,
@@ -95,10 +92,10 @@ export default async (req) => {
       });
     }
 
-    return json({ error: 'format must be detail, pivot, or driver' }, 400);
+    return new Response(JSON.stringify({ error: 'format must be detail, pivot, or driver' }), { status: 400 });
   } catch (e) {
-    return json({ error: 'Export failed: ' + e.message }, 500);
+    return new Response(JSON.stringify({ error: 'Export failed: ' + e.message }), { status: 500 });
   }
 };
 
-export const config = { path: '/api/orders/export' };
+export const config = { path: '/api/export' };
