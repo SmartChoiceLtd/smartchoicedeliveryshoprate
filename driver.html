@@ -546,7 +546,7 @@ async function submitDelivery() {
       if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
       return statuses;
     })(),
-    delivery_time: deliveryType === 'wholesale' ? document.getElementById('fWholesaleTime').value : document.getElementById('fTime').value,
+    delivery_time: document.getElementById('fTime').value,
     accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
     comments: document.getElementById('fComments').value.trim(),
