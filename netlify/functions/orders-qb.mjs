@@ -172,7 +172,13 @@ export default async (req) => {
   return raw.slice(0,10);
 }
 var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
-var weekOrders = allOrders.filter(o => {
+return new Response(JSON.stringify({
+  total_orders: allOrders.length,
+  weekEnd: weekEnd,
+  startStr: startStr,
+  sample_dates: allOrders.slice(0,5).map(o => ({date: o.date, parsed: parseOrderDate(o)}))
+}), {status:200, headers:{'content-type':'application/json'}});
+    var weekOrders = allOrders.filter(o => {
   var dateStr = parseOrderDate(o);
   return dateStr >= startStr && dateStr <= weekEnd;
 });
