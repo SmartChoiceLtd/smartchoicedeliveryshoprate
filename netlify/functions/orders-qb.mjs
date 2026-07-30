@@ -168,7 +168,7 @@ export default async (req) => {
 
     weekOrders.forEach(o => {
       const zone = (o.zone_code || '').toUpperCase();
-      if (!zone || zone === 'NCH') return;
+      if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
 
       // Determine billing shop
       let shopCode = (o.shop_code || '').toUpperCase();
