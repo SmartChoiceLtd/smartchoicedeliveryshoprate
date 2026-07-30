@@ -158,17 +158,19 @@ export default async (req) => {
     var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
-  function parseOrderDate(o) {
+ function parseOrderDate(o) {
   var raw = o.date || o.received_at || '';
-  // Handle D/M/YYYY format
+  // Handle YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
+  // Handle DD-Mon-YYYY (e.g. 24-Jul-2026)
+  var months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  var monMatch = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if (monMatch) return monMatch[3] + '-' + (months[monMatch[2]] || '01') + '-' + monMatch[1].padStart(2,'0');
+  // Handle D/M/YYYY
   var dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (dmyMatch) {
-    return dmyMatch[3] + '-' + dmyMatch[2].padStart(2,'0') + '-' + dmyMatch[1].padStart(2,'0');
-  }
-  // Handle YYYY-MM-DD or ISO format
+  if (dmyMatch) return dmyMatch[3] + '-' + dmyMatch[2].padStart(2,'0') + '-' + dmyMatch[1].padStart(2,'0');
   return raw.slice(0,10);
 }
-
 var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
 var weekOrders = allOrders.filter(o => {
   var dateStr = parseOrderDate(o);
