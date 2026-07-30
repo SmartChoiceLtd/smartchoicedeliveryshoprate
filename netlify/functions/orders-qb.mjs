@@ -173,7 +173,10 @@ export default async (req) => {
 }
 var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
 return 
-   var weekOrders = allOrders;
+   var weekOrders = allOrders.filter(o => {
+  var shopCode = (o.shop_code || '').toUpperCase();
+  return shopCode === 'B9' || shopCode === 'KF' || shopCode === 'TH';
+});
     
     // Group by billing shop, then zone — sum shop amounts
     var shopGroups = {};
