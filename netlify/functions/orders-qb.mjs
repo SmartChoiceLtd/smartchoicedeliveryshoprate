@@ -158,11 +158,11 @@ export default async (req) => {
     var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
-    var { start, end } = getWeekDates(weekEnd);
-    var weekOrders = allOrders.filter(o => {
-      var d = new Date(o.date || o.received_at || '');
-      return d >= start && d <= end;
-    });
+    var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
+var weekOrders = allOrders.filter(o => {
+  var dateStr = (o.date || o.received_at || '').slice(0,10);
+  return dateStr >= startStr && dateStr <= weekEnd;
+});
 
     // Group by billing shop, then zone — sum shop amounts
     var shopGroups = {};
