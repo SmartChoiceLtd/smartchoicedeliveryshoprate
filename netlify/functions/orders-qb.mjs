@@ -249,7 +249,7 @@ return new Response(JSON.stringify({
     });
 
     sortedShops.forEach(shopKey => {
-      var customer = QB_CUSTOMERS[shopKEY] || shopCode;
+     var customer = QB_CUSTOMERS[shopKey] || shopKey;
       var zones = shopGroups[shopKey];
       var firstLine = true;
 
