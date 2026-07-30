@@ -197,7 +197,7 @@ return
       }
 
       if (!shopCode) return;
-      if (!shopGroups[shopCode]) shopGroups[shopCode] = {};
+      // if (!shopGroups[shopCode]) shopGroups[shopCode] = {};
 
       // Calculate shop amount for this order
       var pieces = parseInt(o.total_pieces || 1);
