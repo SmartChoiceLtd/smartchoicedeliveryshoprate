@@ -1,3 +1,5 @@
+import { getStore } from '@netlify/blobs';
+
 function csvEscape(val) {
   if (val === null || val === undefined) return '';
   const str = String(val);
