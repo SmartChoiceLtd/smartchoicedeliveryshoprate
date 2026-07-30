@@ -215,7 +215,7 @@ function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopI
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
-Cfunction copyShopLink(shopId,btn){
+function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
   const done=()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent=r,1500);};
