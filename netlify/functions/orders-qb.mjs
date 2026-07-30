@@ -229,9 +229,9 @@ export default async (req) => {
       return ca.localeCompare(cb);
     });
 
-    sortedShops.forEach(shopCode => {
-      const customer = QB_CUSTOMERS[shopCode] || shopCode;
-      const zones = shopGroups[shopCode];
+    sortedShops.forEach(shopKey => {
+      const customer = QB_CUSTOMERS[shopKEY] || shopCode;
+      const zones = shopGroups[shopKey];
       let firstLine = true;
 
       // Sort zones alphabetically
