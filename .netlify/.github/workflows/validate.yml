@@ -1,0 +1,118 @@
+mkdir -p /home/claude/flower-tool/.github/workflows
+cat > /home/claude/flower-tool/.github/workflows/validate.yml << 'EOF'
+name: Validate Code
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Check Netlify functions syntax
+        run: |
+          echo "Checking function files..."
+          for f in netlify/functions/*.mjs; do
+            echo "Checking $f..."
+            node --check "$f" || exit 1
+          done
+          echo "All functions OK"
+      
+      - name: Check HTML JavaScript
+        run: |
+          echo "Checking HTML files for JS errors..."
+          for f in *.html; do
+            echo "Checking $f..."
+            node -e "
+              const fs = require('fs');
+              const content = fs.readFileSync('$f', 'utf8');
+              const matches = content.match(/<script>([\s\S]*?)<\/script>/g);
+              if (matches) {
+                matches.forEach((m, i) => {
+                  const js = m.replace(/<\/?script>/g, '');
+                  try {
+                    new Function(js);
+                    console.log('  Script block ' + (i+1) + ' OK');
+                  } catch(e) {
+                    console.error('  ERROR in $f script block ' + (i+1) + ': ' + e.message);
+                    process.exit(1);
+                  }
+                });
+              }
+            " || exit 1
+          done
+          echo "All HTML OK"
+EOF
+echo "GitHub Action created"
+cat /home/claude/flower-tool/.github/workflows/validate.yml
+Output
+
+GitHub Action created
+name: Validate Code
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Check Netlify functions syntax
+        run: |
+          echo "Checking function files..."
+          for f in netlify/functions/*.mjs; do
+            echo "Checking $f..."
+            node --check "$f" || exit 1
+          done
+          echo "All functions OK"
+      
+      - name: Check HTML JavaScript
+        run: |
+          echo "Checking HTML files for JS errors..."
+          for f in *.html; do
+            echo "Checking $f..."
+            node -e "
+              const fs = require('fs');
+              const content = fs.readFileSync('$f', 'utf8');
+              const matches = content.match(/<script>([\s\S]*?)<\/script>/g);
+              if (matches) {
+                matches.forEach((m, i) => {
+                  const js = m.replace(/<\/?script>/g, '');
+                  try {
+                    new Function(js);
+                    console.log('  Script block ' + (i+1) + ' OK');
+                  } catch(e) {
+                    console.error('  ERROR in $f script block ' + (i+1) + ': ' + e.message);
+                    process.exit(1);
+                  }
+                });
+              }
+            " || exit 1
+          done
+          echo "All HTML OK"
