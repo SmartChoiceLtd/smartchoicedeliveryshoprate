@@ -172,12 +172,7 @@ export default async (req) => {
   return raw.slice(0,10);
 }
 var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
-return new Response(JSON.stringify({
-  total_orders: allOrders.length,
-  weekEnd: weekEnd,
-  startStr: startStr,
-  sample_dates: allOrders.slice(0,5).map(o => ({date: o.date, parsed: parseOrderDate(o)}))
-}), {status:200, headers:{'content-type':'application/json'}});
+return 
     var weekOrders = allOrders.filter(o => {
   var dateStr = parseOrderDate(o);
   return dateStr >= startStr && dateStr <= weekEnd;
@@ -189,10 +184,8 @@ return new Response(JSON.stringify({
     weekOrders.forEach(o => {
       var zone = (o.zone_code || '').toUpperCase();
       if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
-      if (!shopCode || shopCode === 'SCD') return;
-      // Determine billing shop
       var shopCode = (o.shop_code || '').toUpperCase();
-      
+      if (!shopCode || shopCode === 'SCD') return;      
       // For wholesale, billing_party determines who pays
       if (o.delivery_type === 'wholesale' && o.billing_party) {
         var bp = String(o.billing_party);
