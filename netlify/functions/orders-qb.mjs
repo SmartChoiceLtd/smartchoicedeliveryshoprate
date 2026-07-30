@@ -139,8 +139,7 @@ export default async (req) => {
 
     if (!weekEnd) {
       return new Response(JSON.stringify({ error: 'week_end parameter required (YYYY-MM-DD)' }), { status: 400 });
-    }
-
+    }1
     // Load orders and rates
     const ordersStore = getStore('flower-orders');
     const ratesStore = getStore('flower-rates');
