@@ -216,6 +216,8 @@ document.getElementById('refreshBtn').addEventListener('click', loadOrders);
 
 updateWeekLabel();
 loadOrders();
+function qbExport(){var weekEnd=prompt('Week ending date (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var startInv=prompt('Starting invoice number:','');if(!startInv)return;fetch('/api/qb-export?week_end='+weekEnd+'&start_invoice='+startInv).then(function(r){return r.blob();}).then(function(blob){var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='qb-invoices-'+weekEnd+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}).catch(function(e){alert('QB export failed: '+e.message);});}
+  
 </script>
 
 export const config = { path: '/api/export' }; 
