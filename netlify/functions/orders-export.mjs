@@ -92,6 +92,21 @@ export default async (req) => {
       });
     }
 
+    if (format === 'dates') {
+  const headers = ['Date','Shop Code','Zone','Pieces','Driver Pay'];
+  const rows = orders
+    .sort((a,b) => (a.date||'').localeCompare(b.date||''))
+    .map(o => toCSVRow([o.date, o.shop_code, o.zone_code, o.total_pieces, o.driver_pay]));
+  const csv = [toCSVRow(headers), ...rows].join('\n');
+  return new Response(csv, {
+    status: 200,
+    headers: {
+      'content-type': 'text/csv',
+      'content-disposition': 'attachment; filename="orders-dates.csv"'
+    }
+  });
+}
+
     return new Response(JSON.stringify({ error: 'format must be detail, pivot, or driver' }), { status: 400 });
   } catch (e) {
     return new Response(JSON.stringify({ error: 'Export failed: ' + e.message }), { status: 500 });
