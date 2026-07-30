@@ -2,13 +2,13 @@ import { getStore } from '@netlify/blobs';
 
 function csvEscape(val) {
   if (val === null || val === undefined) return '';
-  const str = String(val);
+  var str = String(val);
   if (str.includes(',') || str.includes('"') || str.includes('\n')) return `"${str.replace(/"/g, '""')}"`;
   return str;
 }
 function toCSVRow(fields) { return fields.map(csvEscape).join(','); }
 
-const QB_ZONE_MAP = {
+var QB_ZONE_MAP = {
   AIR:  { product:'OUT OF TOWN:AIR',          desc:'AIRDRIE $25 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
   BAK1: { product:'BAKERY:BAK1',              desc:'BAK1 CITY BASIC $15  1 PKG  OR AS QUOTED' },
   BAK2: { product:'BAKERY:BAK2',              desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' },
@@ -78,7 +78,7 @@ const QB_ZONE_MAP = {
   WBR:  { product:'WHOLESALE:WBR',            desc:'WHOLESALE PICK UP BRAGG CREEK $40 + $1.5 PER EXTRA CASE' },
 };
 
-const QB_CUSTOMERS = {
+var QB_CUSTOMERS = {
   AC:'GROWER DIRECT ACADIA', AF:'AL FRACHE FLOWERS LTD', AL:"ALLAN'S FLOWERS",
   ALP:'ALPINE BLOOMS', AM:'AMAZING FLORAL WHOLESALE LTD', AMB:'Amborella Floral Studio Inc',
   AT:'ATLANTIC ANTIGUA WHOLESALE LTD', AV:'AVENIDA FLOWERS', B9:'BLOOMS ON 9TH',
@@ -113,76 +113,76 @@ const QB_CUSTOMERS = {
   SW:'SWEET WILLIAMS CO', SZ:'STEMZ FLORIST & TREASURES', TD:'TRIMS & DREAMS',
   TF:'THALEA FLOWERS', TH:'TREEHOUSE', TNX:'TNX TROPICAL',
   TP:'TOUCH OF PETALS', TW:'TWIGS & COMPANY', UR:'Urban Roots Home',
-  VA:'VAVA BLOOM', VC:'VIOLET & CO', VCW:'VILLAGE CRAFT WINEMAKER',
+  VA:'VAVA BLOOM', VC:'VIOvar & CO', VCW:'VILLAGE CRAFT WINEMAKER',
   VT:'VINTAGE THISTLE STETTLER', WA:'WILD ABOUT FLOWERS',
   WF:'WILDFLOWERS AT KENSINGTON', WO:'WILD ORCHID',
   YA:'YARA FLOWERS LTD', YR:'YRENE RAMIREZ',
 };
 
 function formatDateQB(d) {
-  const dd = String(d.getDate()).padStart(2,'0');
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const yyyy = d.getFullYear();
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yyyy = d.getFullYear();
   return `${dd}-${mm}-${yyyy}`;
 }
 
 function getWeekDates(weekEndStr) {
-  const end = new Date(weekEndStr + 'T23:59:59');
-  const start = new Date(weekEndStr + 'T00:00:00');
+  var end = new Date(weekEndStr + 'T23:59:59');
+  var start = new Date(weekEndStr + 'T00:00:00');
   start.setDate(end.getDate() - 6);
   return { start, end };
 }
 
 export default async (req) => {
   try {
-    const url = new URL(req.url);
-    const weekEnd = url.searchParams.get('week_end');
-    const startInvoice = parseInt(url.searchParams.get('start_invoice') || '1');
+    var url = new URL(req.url);
+    var weekEnd = url.searchParams.get('week_end');
+    var startInvoice = parseInt(url.searchParams.get('start_invoice') || '1');
 
     if (!weekEnd) {
       return new Response(JSON.stringify({ error: 'week_end parameter required (YYYY-MM-DD)' }), { status: 400 });
     }1
     // Load orders and rates
-    const ordersStore = getStore('flower-orders');
-    const ratesStore = getStore('flower-rates');
+    var ordersStore = getStore('flower-orders');
+    var ratesStore = getStore('flower-rates');
 
-    const { blobs } = await ordersStore.list();
-    let allOrders = (await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })))).filter(Boolean);
+    var { blobs } = await ordersStore.list();
+    var allOrders = (await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })))).filter(Boolean);
 
     // Load rate table
-    let rates = {};
+    var rates = {};
     try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
     // Default rates fallback
-    const DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:20,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
-    const DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
+    var DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:20,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
+    var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
-    const { start, end } = getWeekDates(weekEnd);
-    const weekOrders = allOrders.filter(o => {
-      const d = new Date(o.date || o.received_at || '');
+    var { start, end } = getWeekDates(weekEnd);
+    var weekOrders = allOrders.filter(o => {
+      var d = new Date(o.date || o.received_at || '');
       return d >= start && d <= end;
     });
 
     // Group by billing shop, then zone — sum shop amounts
-    const shopGroups = {};
+    var shopGroups = {};
 
     weekOrders.forEach(o => {
-      const zone = (o.zone_code || '').toUpperCase();
+      var zone = (o.zone_code || '').toUpperCase();
       if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
       if (!shopCode || shopCode === 'SCD') return;
       // Determine billing shop
-      let shopCode = (o.shop_code || '').toUpperCase();
+      var shopCode = (o.shop_code || '').toUpperCase();
       
       // For wholesale, billing_party determines who pays
       if (o.delivery_type === 'wholesale' && o.billing_party) {
-        const bp = String(o.billing_party);
+        var bp = String(o.billing_party);
         // If billing_party is a known shop code, use it
         if (QB_CUSTOMERS[bp.toUpperCase()]) {
           shopCode = bp.toUpperCase();
         } else {
           // Try to extract code from billing_party text
-          const firstWord = bp.split(' ')[0].toUpperCase();
+          var firstWord = bp.split(' ')[0].toUpperCase();
           if (QB_CUSTOMERS[firstWord]) shopCode = firstWord;
         }
       }
@@ -191,17 +191,17 @@ export default async (req) => {
       if (!shopGroups[shopCode]) shopGroups[shopCode] = {};
 
       // Calculate shop amount for this order
-      const pieces = parseInt(o.total_pieces || 1);
-      let amount = 0;
+      var pieces = parseInt(o.total_pieces || 1);
+      var amount = 0;
 
       if (o.shop_pay) {
         // Use stored shop_pay if available
         amount = parseFloat(o.shop_pay) || 0;
       } else {
         // Calculate from rate table
-        const r = rates[zone] || {};
-        const srate = r.srate || DEFAULT_SRATE[zone] || 0;
-        const sratex = r.sratex || DEFAULT_SRATEX[zone] || 0;
+        var r = rates[zone] || {};
+        var srate = r.srate || DEFAULT_SRATE[zone] || 0;
+        var sratex = r.sratex || DEFAULT_SRATEX[zone] || 0;
         amount = srate + (pieces - 1) * sratex;
       }
 
@@ -210,35 +210,35 @@ export default async (req) => {
     });
 
     // Build QB invoice date info
-    const weekEndDate = new Date(weekEnd + 'T12:00:00');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const weekEndFormatted = `${months[weekEndDate.getMonth()]} ${weekEndDate.getDate()} ${weekEndDate.getFullYear()}`;
-    const invoiceDate = formatDateQB(weekEndDate);
-    const memo = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`;
+    var weekEndDate = new Date(weekEnd + 'T12:00:00');
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var weekEndFormatted = `${months[weekEndDate.getMonth()]} ${weekEndDate.getDate()} ${weekEndDate.getFullYear()}`;
+    var invoiceDate = formatDateQB(weekEndDate);
+    var memo = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`;
 
-    const headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo',
+    var headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo',
       'Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','*ItemAmount','*ItemTaxCode','ItemTaxAmount'];
 
-    const rows = [];
-    let invoiceNo = startInvoice;
+    var rows = [];
+    var invoiceNo = startInvoice;
 
     // Sort shops alphabetically by customer name
-    const sortedShops = Object.keys(shopGroups).sort((a,b) => {
-      const ca = QB_CUSTOMERS[a] || a;
-      const cb = QB_CUSTOMERS[b] || b;
+    var sortedShops = Object.keys(shopGroups).sort((a,b) => {
+      var ca = QB_CUSTOMERS[a] || a;
+      var cb = QB_CUSTOMERS[b] || b;
       return ca.localeCompare(cb);
     });
 
     sortedShops.forEach(shopKey => {
-      const customer = QB_CUSTOMERS[shopKEY] || shopCode;
-      const zones = shopGroups[shopKey];
-      let firstLine = true;
+      var customer = QB_CUSTOMERS[shopKEY] || shopCode;
+      var zones = shopGroups[shopKey];
+      var firstLine = true;
 
       // Sort zones alphabetically
       Object.keys(zones).sort().forEach(zone => {
-        const amount = parseFloat(zones[zone].toFixed(2));
+        var amount = parseFloat(zones[zone].toFixed(2));
         if (amount <= 0) return;
-        const qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
+        var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
 
         rows.push(toCSVRow([
           firstLine ? invoiceNo : '',
@@ -262,7 +262,7 @@ export default async (req) => {
       invoiceNo++;
     });
 
-    const csv = [toCSVRow(headers), ...rows].join('\n');
+    var csv = [toCSVRow(headers), ...rows].join('\n');
     return new Response(csv, {
       status: 200,
       headers: {
@@ -276,5 +276,5 @@ export default async (req) => {
   }
 };
 
-export const config = { path: '/api/qb-export' };
+export var config = { path: '/api/qb-export' };
 
