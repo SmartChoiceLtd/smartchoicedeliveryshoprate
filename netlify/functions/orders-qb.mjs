@@ -158,9 +158,20 @@ export default async (req) => {
     var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
-    var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
+  function parseOrderDate(o) {
+  var raw = o.date || o.received_at || '';
+  // Handle D/M/YYYY format
+  var dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    return dmyMatch[3] + '-' + dmyMatch[2].padStart(2,'0') + '-' + dmyMatch[1].padStart(2,'0');
+  }
+  // Handle YYYY-MM-DD or ISO format
+  return raw.slice(0,10);
+}
+
+var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
 var weekOrders = allOrders.filter(o => {
-  var dateStr = (o.date || o.received_at || '').slice(0,10);
+  var dateStr = parseOrderDate(o);
   return dateStr >= startStr && dateStr <= weekEnd;
 });
 
