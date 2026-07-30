@@ -182,7 +182,7 @@ return
       var zone = (o.zone_code || '').toUpperCase();
       if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
       var shopCode = (o.shop_code || '').toUpperCase();
-      if (!shopCode || shopCode === 'SCD') return;      
+      // if (!shopCode || shopCode === 'SCD') return;      
       // For wholesale, billing_party determines who pays
       if (o.delivery_type === 'wholesale' && o.billing_party) {
         var bp = String(o.billing_party);
