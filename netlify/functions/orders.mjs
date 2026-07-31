@@ -100,8 +100,8 @@ export default async (req) => {
       comments:         body['Comments']                 || null,
     };
 
-    const shopCode = extractShopCode(raw.shop_full) || raw.shop;
-    const enteredZoneCode = extractZoneCode(raw.zone_full) || raw.zone;
+    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
 
     // Auto-calculate zone if not entered or flagged as needing calculation
     let zoneCode = enteredZoneCode;
