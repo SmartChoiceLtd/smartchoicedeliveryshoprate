@@ -172,7 +172,6 @@ export default async (req) => {
   return raw.slice(0,10);
 }
 var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
-return 
     var weekOrders = allOrders.filter(o => {
   var dateStr = parseOrderDate(o);
   return dateStr >= startStr && dateStr <= weekEnd;
