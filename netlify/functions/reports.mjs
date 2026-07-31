@@ -1,7 +1,3 @@
-bash
-
-cat /home/claude/flower-tool/netlify/functions/reports.mjs
-Output
 
 import { getStore } from '@netlify/blobs';
 
@@ -265,4 +261,3 @@ export default async (req) => {
 };
 
 export const config = { path: '/api/reports' };
-Done
