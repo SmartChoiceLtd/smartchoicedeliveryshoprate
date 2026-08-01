@@ -43,7 +43,7 @@ const CSS = `
   .header-right{text-align:right;font-size:10px;font-weight:bold;}
   .stats{display:flex;gap:10px;margin-bottom:8px;}
   .stat{border:1px solid #ddd;padding:4px 10px;border-radius:4px;text-align:center;}
-  .stat-val{font-size:13px;font-weight:bold;color:#B8472B;}
+  .stat-val{font-size:13px;font-weight:bold;color:#0C769E;}
   .stat-lbl{font-size:8px;color:#666;}
   .content{display:flex;gap:10px;}
   .summary{min-width:155px;max-width:155px;}
