@@ -28,7 +28,8 @@ function fmt(iso) {
 function displayName(code, storedName) {
   if (!storedName || storedName.trim().toUpperCase() === code.toUpperCase()) return code;
   // Remove leading code prefix (e.g. "KF KENSINGTON FLOWERS" -> "KENSINGTON FLOWERS")
-  const stripped = storedName.replace(new RegExp('^' + code + '\\s+', 'i'), '').trim();
+const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const stripped = storedName.replace(new RegExp('^' + escaped + '\\s+', 'i'), '').trim();
   return stripped || storedName;
 }
 
