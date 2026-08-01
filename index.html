@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -376,7 +374,21 @@ document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
 });
 
 function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
-function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
+async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
+  function renderShopList(){
+  const el=document.getElementById('shopList');
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
+  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||(s.address||'').toLowerCase().includes(search));
+  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
+  el.innerHTML=filtered.map(s=>`
+    <div class="shop-item-wrap">
+      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
+      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+    </div>`).join('');
+  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+}
+  function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
 async function generateQuote(){
   const shop=getSelectedShop();
