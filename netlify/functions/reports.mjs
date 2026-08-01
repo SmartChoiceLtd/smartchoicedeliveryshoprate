@@ -215,7 +215,7 @@ export default async (req) => {
       html += `<div class="page">
         <div class="header">
           <div class="header-left">
-           <div class="title">${sc} ${shop.name.replace(/^[A-Z0-9]+ /,'')} &mdash; Week Ending ${weekLabel}</div>
+           <div class="title">${sc} ${shop.name.replace(new RegExp('^'+sc+'\\s*','i'),'')} &mdash; Week Ending ${weekLabel}</div>
             <div class="sub">SMART CHOICE DELIVERY SHOP DETAIL &bull; INVOICE PERIOD ${weekEnd}</div>
           </div>
           <div class="header-right">SMART CHOICE DELIVERY<br>Shop Weekly Detail</div>
