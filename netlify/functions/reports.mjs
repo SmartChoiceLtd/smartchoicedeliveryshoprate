@@ -24,6 +24,14 @@ function fmt(iso) {
   return `${parseInt(d)}-${months[parseInt(m)-1]}-${y.slice(2)}`;
 }
 
+// Extract display name — remove code prefix if present
+function displayName(code, storedName) {
+  if (!storedName || storedName.trim().toUpperCase() === code.toUpperCase()) return code;
+  // Remove leading code prefix (e.g. "KF KENSINGTON FLOWERS" -> "KENSINGTON FLOWERS")
+  const stripped = storedName.replace(new RegExp('^' + code + '\\s+', 'i'), '').trim();
+  return stripped || storedName;
+}
+
 const CSS = `
   body{font-family:Arial,sans-serif;font-size:9px;margin:0;color:#000;}
   .page{width:270mm;padding:8mm;page-break-after:always;box-sizing:border-box;}
@@ -77,6 +85,29 @@ export default async (req) => {
   let rates = {};
   try { rates = await ratesStore.get('rates',{type:'json'}) || {}; } catch(e) {}
 
+  // Load driver names from drivers store
+  const driverNames = {};
+  try {
+    const driversStore = getStore('flower-drivers');
+    const {blobs: dBlobs} = await driversStore.list();
+    const dList = (await Promise.all(dBlobs.map(b => driversStore.get(b.key,{type:'json'})))).filter(Boolean);
+    dList.forEach(d => { if (d.code) driverNames[d.code.toUpperCase()] = d.name; });
+  } catch(e) {}
+
+  // Load shop names from shops store
+  const shopNames = {};
+  try {
+    const shopsStore = getStore('flower-shops');
+    const {blobs: sBlobs} = await shopsStore.list();
+    const sList = (await Promise.all(sBlobs.map(b => shopsStore.get(b.key,{type:'json'})))).filter(Boolean);
+    sList.forEach(s => {
+      if (s.name) {
+        const code = s.name.trim().split(/\s+/)[0].toUpperCase();
+        shopNames[code] = s.name;
+      }
+    });
+  } catch(e) {}
+
   const weekLabel = fmt(weekEnd);
   let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reports ${weekLabel}</title><style>${CSS}</style></head><body>`;
 
@@ -85,7 +116,7 @@ export default async (req) => {
     weekOrders.forEach(o => {
       const dc = (o.driver || '').toUpperCase();
       if (!dc || dc === 'SCD') return;
-      if (!drivers[dc]) drivers[dc] = {name: o.driver_name || dc, orders:[]};
+      if (!drivers[dc]) drivers[dc] = {orders:[]};
       drivers[dc].orders.push(o);
     });
 
@@ -94,9 +125,12 @@ export default async (req) => {
     targets.forEach(dc => {
       const drv = drivers[dc];
       if (!drv) return;
+      // Get full driver name from store, fallback to order field, fallback to code
+      const driverFullName = driverNames[dc] || drv.orders[0]?.driver_name || dc;
+      const driverTitle = `${dc} ${driverFullName !== dc ? driverFullName : ''}`.trim();
+
       const orders = drv.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
 
-      // Calculate pay components per order
       const orderPay = orders.map(o => {
         const zone = (o.zone_code||'').toUpperCase();
         const pieces = parseInt(o.total_pieces||1);
@@ -113,7 +147,6 @@ export default async (req) => {
         return {o, zone, pieces, drate, gdpi, total};
       });
 
-      // Summary pivot
       const zoneDrate = {}, zoneGdpi = {};
       let sumDrate = 0, sumGdpi = 0;
       orderPay.forEach(({zone, drate, gdpi}) => {
@@ -123,13 +156,13 @@ export default async (req) => {
         sumGdpi += gdpi;
       });
       const totalDue = sumDrate + sumGdpi;
-      const allZones = [...new Set([...Object.keys(zoneDrate)])].sort();
+      const allZones = [...new Set(Object.keys(zoneDrate))].sort();
 
       html += `<div class="page">
         <div class="header">
           <div class="header-left">
-           <div class="title">${dc} ${drv.name} &mdash; Week Ending ${weekLabel}</div>
-          <div class="sub">Driver ${dc} &bull;
+            <div class="title">${driverTitle} &mdash; Week Ending ${weekLabel}</div>
+            <div class="sub">SMART CHOICE DELIVERY DRIVER DETAIL</div>
           </div>
           <div class="header-right">SMART CHOICE DELIVERY<br>Driver Weekly Detail</div>
         </div>
@@ -186,7 +219,7 @@ export default async (req) => {
     weekOrders.forEach(o => {
       const sc = (o.shop_code||'').toUpperCase();
       if (!sc || sc === 'SCD') return;
-      if (!shops[sc]) shops[sc] = {name: o.shop_full||o.shop||sc, orders:[]};
+      if (!shops[sc]) shops[sc] = {orders:[]};
       shops[sc].orders.push(o);
     });
 
@@ -195,6 +228,12 @@ export default async (req) => {
     targets.forEach(sc => {
       const shop = shops[sc];
       if (!shop) return;
+
+      // Get full shop name — from store, or from order fields
+      const storedShopName = shopNames[sc] || shop.orders[0]?.shop_full || shop.orders[0]?.shop || sc;
+      const shopFullName = displayName(sc, storedShopName);
+      const shopTitle = `${sc} ${shopFullName}`;
+
       const orders = shop.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
 
       const orderAmts = orders.map(o => {
@@ -215,7 +254,7 @@ export default async (req) => {
       html += `<div class="page">
         <div class="header">
           <div class="header-left">
-           <div class="title">${sc} ${shop.name.replace(new RegExp('^'+sc+'\\s*','i'),'')} &mdash; Week Ending ${weekLabel}</div>
+            <div class="title">${shopTitle} &mdash; Week Ending ${weekLabel}</div>
             <div class="sub">SMART CHOICE DELIVERY SHOP DETAIL &bull; INVOICE PERIOD ${weekEnd}</div>
           </div>
           <div class="header-right">SMART CHOICE DELIVERY<br>Shop Weekly Detail</div>
@@ -258,5 +297,3 @@ export default async (req) => {
   html += '</body></html>';
   return new Response(html, {status:200, headers:{'content-type':'text/html; charset=utf-8'}});
 };
-
-export const config = { path: '/api/reports' };
