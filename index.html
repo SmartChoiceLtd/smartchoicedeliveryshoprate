@@ -430,10 +430,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote ΓÇö ${shop.name}`,
+    `Delivery quote - ${shop.name}`,,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} ΓÇö ${sublabel})`,
+    `Zone: ${zoneCode} (${label} - ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
     `Delivery price: $${Number(finalPrice).toFixed(2)}`,
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
@@ -495,7 +495,7 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING ΓÇö ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,'',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
