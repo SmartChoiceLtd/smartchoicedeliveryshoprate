@@ -297,3 +297,6 @@ export default async (req) => {
   html += '</body></html>';
   return new Response(html, {status:200, headers:{'content-type':'text/html; charset=utf-8'}});
 };
+
+export const config = { path: '/api/reports' };
+
