@@ -40,7 +40,7 @@ const CSS = `
   .content{display:flex;gap:10px;}
   .summary{min-width:155px;max-width:155px;}
   .stbl{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;}
-  .stbl th{background:#2B2620;color:#fff;padding:3px 5px;text-align:left;}
+  .dtbl th{background:#2B2620;color:#fff;padding:2px 4px;text-align:left;white-space:nowrap;}
   .stbl td{padding:2px 5px;border-bottom:1px solid #eee;}
   .stbl .tot td{font-weight:bold;border-top:2px solid #000;background:#f0f0f0;}
   .grand{font-size:11px;font-weight:bold;padding:5px 6px;background:#EAF4EA;border:1px solid #A8CFA8;border-radius:3px;margin-top:4px;}
