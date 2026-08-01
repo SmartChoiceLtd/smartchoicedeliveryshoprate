@@ -176,7 +176,7 @@ function outerBandForDistance(km){
 }
 
 const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
-const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
+var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
 function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
 const ROUTE=parseRoute();
 
