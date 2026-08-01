@@ -1,3 +1,6 @@
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,7 +140,8 @@
   <div class="modal" id="priceSheetContent"></div>
 </div>
 <script>
-const CALGARY_ZONES=['C1','C2','C3','C4'];
+function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
+const CALGARY_ZONES=
 const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
 const ZONE_LABELS={
   C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',
