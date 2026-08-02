@@ -438,30 +438,7 @@ function populateShopDropdown() {
     document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = false;
     document.getElementById('wholesaleStatusCard').hidden = true;
-    var featured = shops.filter(function(s){ return s.featured; });
-    var others = shops.filter(function(s){ return !s.featured; });
-
-    if (featured.length) {
-      var featGrp = document.createElement('optgroup');
-      featGrp.label = 'Frequently Used';
-      featured.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
-        var opt = document.createElement('option');
-        opt.value = s.id; opt.textContent = s.name;
-        featGrp.appendChild(opt);
-      });
-      sel.appendChild(featGrp);
-    }
-
-    var allGrp = document.createElement('optgroup');
-    allGrp.label = 'All Shops';
-    others.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
-      var opt = document.createElement('option');
-      opt.value = s.id; opt.textContent = s.name;
-      allGrp.appendChild(opt);
-    });
-    sel.appendChild(allGrp);
-  }
-}
+ 
 
 function resetForm() {
   selectedZone = ''; selectedStatuses = []; formattedAddress = '';
