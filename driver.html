@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SCD Driver">
-<meta name="theme-color" content="#B8472B">
+<meta name="theme-color" content="#0C769E">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon.svg">
 <title>Smart Choice Delivery</title>
 <style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;}
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
 *{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 [hidden]{display:none !important;}
 .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;}
@@ -53,7 +53,12 @@
 .loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-optgroup{font-weight:700;color:var(--ink-soft);}
+.shop-search-wrap{position:relative;}
+.shop-dd{position:absolute;z-index:200;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);display:none;}
+.shop-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+.shop-dd-item:last-child{border-bottom:none;}
+.shop-dd-item:hover{background:var(--accent-soft);}
+.shop-dd-header{padding:5px 12px;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;background:var(--bg);}
 </style>
 </head>
 <body>
@@ -77,7 +82,6 @@ optgroup{font-weight:700;color:var(--ink-soft);}
   <div class="container">
     <div id="errorMsg" class="error" hidden></div>
 
-    <!-- Delivery type toggle -->
     <div class="toggle-row" id="deliveryTypeToggle">
       <button class="toggle-btn active" data-type="store">Store to Door</button>
       <button class="toggle-btn" data-type="wholesale">Wholesale</button>
@@ -110,7 +114,7 @@ optgroup{font-weight:700;color:var(--ink-soft);}
         </select>
       </div>
       <div class="field" id="billingQueryField" hidden>
-       <label>Invoice To</label>
+        <label>Invoice To</label>
         <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT &amp; FS default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
         <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
           <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
@@ -119,9 +123,11 @@ optgroup{font-weight:700;color:var(--ink-soft);}
       </div>
       <div class="field">
         <label id="shopLabel">Shop</label>
-        <input type="text" id="fShopSearch" placeholder="Search shop..." autocomplete="off">
-        <input type="hidden" id="fShop">
-        <div id="fShopDropdown" style="display:none;position:absolute;z-index:100;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:220px;overflow-y:auto;width:calc(100% - 32px);box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+        <div class="shop-search-wrap">
+          <input type="text" id="fShopSearch" placeholder="Search shop..." autocomplete="off">
+          <input type="hidden" id="fShop">
+          <div class="shop-dd" id="fShopDropdown"></div>
+        </div>
       </div>
       <div class="field" id="recipientNameField">
         <label>Recipient Name</label>
@@ -169,7 +175,6 @@ optgroup{font-weight:700;color:var(--ink-soft);}
         <button class="status-btn" data-status="Redirect">Redirect</button>
         <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
       </div>
-      <!-- Direct to Address sub-options -->
       <div id="directSubField" hidden style="margin-top:8px;">
         <div class="status-grid" id="directSubGrid">
           <button class="status-btn" data-sub="Concierge/Reception">Concierge</button>
@@ -178,17 +183,14 @@ optgroup{font-weight:700;color:var(--ink-soft);}
           <button class="status-btn" data-sub="Doorstep">Doorstep</button>
         </div>
       </div>
-      <!-- Neighboured sub-options -->
       <div class="field" id="neighbouredToField" hidden style="margin-top:10px;">
         <label>Neighboured To</label>
         <input type="text" id="fNeighbouredTo" placeholder="Left with...">
       </div>
-      <!-- Redirect sub-options -->
       <div class="field" id="redirectField" hidden style="margin-top:10px;">
         <label>Redirect Details</label>
         <input type="text" id="fRedirectDetail" placeholder="Redirected to...">
       </div>
-      <!-- Undeliverable sub-options -->
       <div id="undeliverableSubField" hidden style="margin-top:8px;">
         <div class="status-grid" id="undeliverableSubGrid">
           <button class="status-btn" data-unsub="Incorrect Address">Incorrect Address</button>
@@ -211,13 +213,14 @@ optgroup{font-weight:700;color:var(--ink-soft);}
       </div>
     </div>
 
-   <div class="card" id="wholesaleStatusCard" hidden>
+    <div class="card" id="wholesaleStatusCard" hidden>
       <h2>Delivery Confirmation</h2>
       <div class="field">
         <label>Accepted By</label>
         <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
       </div>
     </div>
+
     <div class="card">
       <h2>Notes &amp; Photo</h2>
       <div class="field">
@@ -254,7 +257,7 @@ var shops = [];
 var selectedZone = '';
 var selectedStatuses = [];
 var formattedAddress = '';
-var deliveryType = 'store'; // 'store' or 'wholesale'
+var deliveryType = 'store';
 
 var pathParts = location.pathname.split('/').filter(Boolean);
 var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
@@ -296,9 +299,7 @@ function getNeighbourZones(code) {
 function getWholesaleZoneForShop(shop) {
   if (!shop || !shop.lat || !shop.lng) return 'WPU';
   var lat = shop.lat, lng = shop.lng;
-  // Calgary bounding box
   if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return 'WPU';
-  // Named town matching
   var towns = [
     {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
     {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
@@ -310,22 +311,21 @@ function getWholesaleZoneForShop(shop) {
     {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
   ];
   function hav(a, b) {
-    var R=6371, r=function(d){return d*Math.PI/180;};
-    var dLat=r(b.lat-a.lat), dLng=r(b.lng-a.lng);
-    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+    var R=6371, rd=function(d){return d*Math.PI/180;};
+    var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
+    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
     return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
   }
   for (var i=0; i<towns.length; i++) {
     var t = towns[i];
     if (hav({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return t.zone;
   }
-  return 'WPU'; // default fallback
+  return 'WPU';
 }
 
 function buildZoneButtons(suggested) {
   var list;
   if (deliveryType === 'wholesale') {
-    // Only show WPU and WPH as manual options
     list = ['WPU', 'WPH'];
   } else {
     list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
@@ -368,10 +368,10 @@ function updatePay() {
   var base = r.drate || 0;
   var extra = (pieces - 1) * (r.dratex || 0);
   var gdpi = r.gdpi || 0;
-  // BY premium: +$1.50 driver pay when delivering to BY (Blossoms YYC) on wholesale
   var byPremium = 0;
   if (deliveryType === 'wholesale') {
-    var receivingShop = shops.find(function(s){ return s.id === document.getElementById('fShop').value; });
+    var shopId = document.getElementById('fShop').value;
+    var receivingShop = shops.find(function(s){ return s.id === shopId; });
     if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
   }
   var total = base + extra + gdpi + byPremium;
@@ -419,17 +419,15 @@ function lookupZone(address) {
     });
 }
 
+/* Shop search dropdown */
 function populateShopDropdown() {
-  var sel = document.getElementById('fShop');
-  sel.innerHTML = '<option value="">Select shop...</option>';
-
   if (deliveryType === 'wholesale') {
     document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop)';
     document.getElementById('wholesalerField').hidden = false;
     document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
     document.getElementById('recipientNameField').hidden = true;
     document.getElementById('statusCard').hidden = true;
-   document.getElementById('wholesaleStatusCard').hidden = false;
+    document.getElementById('wholesaleStatusCard').hidden = false;
   } else {
     document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
@@ -438,7 +436,54 @@ function populateShopDropdown() {
     document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = false;
     document.getElementById('wholesaleStatusCard').hidden = true;
- 
+  }
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShop').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
+}
+
+function renderShopDropdown(search) {
+  var dd = document.getElementById('fShopDropdown');
+  var s = (search || '').toLowerCase();
+  var featured = shops.filter(function(sh){ return sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var others = shops.filter(function(sh){ return !sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var html = '';
+  if (featured.length && !s) {
+    html += '<div class="shop-dd-header">Frequently Used</div>';
+    featured.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  var allShops = s ? featured.concat(others) : others;
+  if (allShops.length) {
+    if (!s) html += '<div class="shop-dd-header">All Shops</div>';
+    allShops.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  if (!featured.length && !allShops.length) {
+    html = '<div style="padding:10px 14px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
+  }
+  dd.innerHTML = html;
+  dd.querySelectorAll('.shop-dd-item').forEach(function(item) {
+    item.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var id = this.dataset.id;
+      var shop = shops.find(function(sh){ return sh.id === id; });
+      if (!shop) return;
+      document.getElementById('fShop').value = id;
+      document.getElementById('fShopSearch').value = shop.name;
+      document.getElementById('fShopDropdown').style.display = 'none';
+      if (deliveryType === 'wholesale') {
+        var addr = shop.address || '';
+        document.getElementById('fAddress').value = addr;
+        formattedAddress = addr;
+        var wZone = getWholesaleZoneForShop(shop);
+        setZone(wZone, wZone + ' - auto from ' + shop.name, false);
+      }
+    });
+  });
+}
 
 function resetForm() {
   selectedZone = ''; selectedStatuses = []; formattedAddress = '';
@@ -451,6 +496,9 @@ function resetForm() {
   document.getElementById('fWholesaleAcceptedBy').value = '';
   document.getElementById('fNeighbouredTo').value = '';
   document.getElementById('fPhoto').value = '';
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShop').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
   document.getElementById('contactMethodField').hidden = true;
   document.getElementById('billingQueryField').hidden = true;
   document.getElementById('directSubField').hidden = true;
@@ -468,11 +516,10 @@ function resetForm() {
   document.getElementById('neighbouredToField').hidden = true;
   var now = new Date();
   document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  document.getElementById('fShopSearch').value = '';
-  document.getElementById('fShopDropdown').style.display = 'none';
   document.getElementById('successScreen').hidden = true;
   document.getElementById('app').hidden = false;
 }
+
 async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
@@ -488,6 +535,13 @@ async function submitDelivery() {
   var r = rates[selectedZone] || {};
   var pieces = parseInt(document.getElementById('fPieces').value) || 1;
   var driverPay = (r.drate || 0) + ((pieces - 1) * (r.dratex || 0)) + (r.gdpi || 0);
+  var billingParty = '';
+  if (deliveryType === 'wholesale') {
+    var active = document.querySelector('#billingToggle .toggle-btn.active');
+    var billing = active ? active.dataset.billing : 'shop';
+    var w = document.getElementById('fWholesaler').value;
+    billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
+  }
   var payload = {
     date: document.getElementById('fDate').value,
     order_id: document.getElementById('fOrderId').value.trim() || '1',
@@ -495,20 +549,15 @@ async function submitDelivery() {
     address: address,
     shop: shop ? shop.name : shopId,
     shop_code: shop ? shop.name.split(' ')[0] : '',
-    delivery_time: document.getElementById('fTime').value,
-    
-     driver: driverCode,
+    driver: driverCode,
     driver_name: driverName,
     total_pieces: pieces,
     zone: selectedZone,
     delivery_type: deliveryType,
     delivery_status: (function() {
       var statuses = selectedStatuses.slice();
-      // Add direct sub-options
       document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
-      // Add undeliverable sub-options
       document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
-      // Add redirect detail
       var rd = document.getElementById('fRedirectDetail').value.trim();
       if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
       return statuses;
@@ -522,15 +571,8 @@ async function submitDelivery() {
       var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
       return sel ? sel.dataset.contact : '';
     })(),
-    billing_party: (function() {
-      if (deliveryType !== 'wholesale') return '';
-      var active = document.querySelector('#billingToggle .toggle-btn.active');
-      var billing = active ? active.dataset.billing : 'shop';
-      var w = document.getElementById('fWholesaler').value;
-      if (billing === 'wholesaler') return w;
-      var shopSel = document.getElementById('fShop');
-      return shopSel.options[shopSel.selectedIndex] ? shopSel.options[shopSel.selectedIndex].text : '';
-    })(),
+    billing_party: billingParty,
+    wholesaler: document.getElementById('fWholesaler').value,
     source: 'driver_form'
   };
   try {
@@ -569,34 +611,47 @@ async function init() {
     var now = new Date();
     document.getElementById('fDate').value = now.toISOString().slice(0,10);
     document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  
+
     var cfgRes = await fetch('/api/config');
     var cfg = await cfgRes.json();
     loadMaps(cfg.key);
+
+    // Shop search
+    document.getElementById('fShopSearch').addEventListener('input', function() {
+      var s = this.value.trim();
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(s);
+    });
+    document.getElementById('fShopSearch').addEventListener('focus', function() {
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(this.value.trim());
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
+        document.getElementById('fShopDropdown').style.display = 'none';
+      }
+    });
 
     document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
       var btn = e.target.closest('.toggle-btn');
       if (!btn) return;
       deliveryType = btn.dataset.type;
-      document.querySelectorAll('.toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+      document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
       populateShopDropdown();
       selectedZone = '';
       document.getElementById('zoneResult').hidden = true;
       document.getElementById('zoneManual').hidden = true;
       document.getElementById('payPreview').hidden = true;
-      document.getElementById('fShop').value = '';
     });
 
     document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var status = this.dataset.status;
-        // Undeliverable is exclusive
         if (status === 'Undeliverable') {
           selectedStatuses = ['Undeliverable'];
           document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
           this.classList.add('selected');
         } else {
-          // Deselect Undeliverable if selecting something else
           var unIdx = selectedStatuses.indexOf('Undeliverable');
           if (unIdx >= 0) {
             selectedStatuses.splice(unIdx, 1);
@@ -608,7 +663,6 @@ async function init() {
           if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
           else { selectedStatuses.push(status); this.classList.add('selected'); }
         }
-        // Show/hide sub-options
         document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
         document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
         document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
@@ -616,18 +670,12 @@ async function init() {
       });
     });
 
-    // Direct sub-options (multi-select)
     document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        this.classList.toggle('selected');
-      });
+      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
     });
 
-    // Undeliverable sub-options (multi-select)
     document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        this.classList.toggle('selected');
-      });
+      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
     });
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
@@ -649,40 +697,10 @@ async function init() {
       document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
     });
 
-    document.getElementById('fShopSearch').addEventListener('input', function() {
-      document.getElementById('fShopDropdown').style.display = 'block';
-      renderShopDropdown(this.value.trim());
-    });
-    document.getElementById('fShopSearch').addEventListener('focus', function() {
-      document.getElementById('fShopDropdown').style.display = 'block';
-      renderShopDropdown(this.value.trim());
-    });
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
-        document.getElementById('fShopDropdown').style.display = 'none';
-      }
-    });
-    
     document.getElementById('fWholesaler').addEventListener('change', function() {
       var code = this.value;
       if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
       else { document.getElementById('billingQueryField').hidden = true; }
-    });
-
-    document.getElementById('fShop').addEventListener('change', function() {
-      if (deliveryType === 'wholesale') {
-        var shopId = this.value;
-        var shop = shops.find(function(s){ return s.id === shopId; });
-        if (shop) {
-          // Auto-fill address from shop
-          var addr = shop.address || '';
-          document.getElementById('fAddress').value = addr;
-          formattedAddress = addr;
-          // Auto-calculate zone from shop location
-          var wZone = getWholesaleZoneForShop(shop);
-          setZone(wZone, wZone + ' — auto from ' + shop.name, false);
-        }
-      }
     });
 
     document.getElementById('fAddress').addEventListener('blur', function() {
@@ -732,7 +750,6 @@ function loadMaps(key) {
 
 init();
 
-// Register service worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js').catch(function(e) {
@@ -743,5 +760,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
-
 
