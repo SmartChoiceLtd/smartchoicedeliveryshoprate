@@ -17,7 +17,8 @@ function haversineKm(a, b) {
 // Ordered from smallest/most specific to largest to avoid false matches
 const OUT_OF_TOWN_ZONES = [
   // Immediate Calgary area — west side
-  { code:'BAL',  name:'Balzac',            lat:51.2100, lng:-114.0200, radiusKm:6  },
+  { code:'BAL',  name:'Balzac',            lat:51.2100, lng:-114.0200, radiusKm:4  },
+  { code:'TSA',  name:'Tsuu Tina Adjacent',      lat:50.9175, lng:-114.1615, radiusKm:4  },
   { code:'TSU',  name:'Tsuu Tina Nation',  lat:50.9800, lng:-114.2600, radiusKm:4  },
   { code:'BPW',  name:'Bearspaw',          lat:51.1500, lng:-114.3000, radiusKm:8  },
   { code:'SBK',  name:'Springbank',        lat:51.0800, lng:-114.3500, radiusKm:8  },
@@ -127,7 +128,15 @@ export default async (req) => {
       address_searched: address
     });
   }
-
+// Step 1a: C5 north border communities — check by name before zone radius matching
+  if (isC5NorthCommunity(formatted) && isLikelyInCalgary(lat, lng)) {
+    return json({
+      suggested: 'C5',
+      confidence: 'high',
+      message: 'North Calgary border community — C5 rate applies',
+      formatted_address: formatted
+    });
+  }
   const { lat, lng, formatted } = geo;
 
   // Step 2: check named out-of-town zones first (before Calgary check)
