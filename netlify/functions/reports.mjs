@@ -58,7 +58,7 @@ const CSS = `
   .dtbl td{padding:2px 4px;border-bottom:1px solid #eee;white-space:nowrap;overflow:hidden;max-width:90px;text-overflow:ellipsis;}
   .dtbl tr:nth-child(even){background:#f9f9f9;}
   .dtbl .chk{text-align:center;}
-  .invoice-band{background:#F4DCC9;padding:5px 8px;border-radius:3px;margin-bottom:7px;font-size:9px;}
+  .invoice-band{background:#F4DCC9;padding:5px 8px;border-radius:3px;margin-bottom:7px;font-size:9px;color:#B8472B;font-weight:600;}
   @media print{body{margin:0;}@page{size:landscape;margin:5mm;}}
 `;
 
