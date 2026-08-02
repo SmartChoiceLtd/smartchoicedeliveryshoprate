@@ -60,6 +60,7 @@ var QB_ZONE_MAP = {
   SPL:  { product:'SEASONAL PLANTERS:SPL',    desc:'SEASONAL PLANTERS $20 PLUS $5 EACH ADDITIONAL' },
   SPO:  { product:'SEASONAL PLANTERS:SPO',    desc:'SEASONAL PLANTERS OUT OF TOWN: $25 OR AS QUOTED' },
   STR:  { product:'OUT OF TOWN:STR',          desc:'STRATHMORE $35' },
+  TSA: { product:'OUT OF TOWN:TSA', desc:'TSUU TINA ADJACENT - ALPINE PARK DISTRICT $23' },
   TSU:  { product:'OUT OF TOWN:TSU',          desc:'TSUU TSIINA' },
   TVA:  { product:'OUT OF TOWN:TVA',          desc:'TURNER VALLEY $50' },
   WAI:  { product:'WHOLESALE:WAI',            desc:'WHOLESALE PICK UP AIRDRIE $25 + $1.5 PER EXTRA CASE' },
