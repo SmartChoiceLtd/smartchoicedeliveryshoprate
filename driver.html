@@ -430,15 +430,8 @@ function populateShopDropdown() {
     document.getElementById('recipientNameField').hidden = true;
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
-    var allGrp = document.createElement('optgroup');
-    allGrp.label = 'Receiving Shop (invoiced)';
-    shops.sort(function(a,b){ return a.name.localeCompare(b.name); }).forEach(function(s) {
-      var opt = document.createElement('option');
-      opt.value = s.id; opt.textContent = s.name;
-      allGrp.appendChild(opt);
-    });
-    sel.appendChild(allGrp);
-  } else {
+   
+     else {
     document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
     document.getElementById('fAddress').placeholder = 'Start typing address...';
@@ -499,10 +492,11 @@ function resetForm() {
   document.getElementById('neighbouredToField').hidden = true;
   var now = new Date();
   document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
   document.getElementById('successScreen').hidden = true;
   document.getElementById('app').hidden = false;
 }
-
 async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
@@ -527,12 +521,7 @@ async function submitDelivery() {
     shop_code: shop ? shop.name.split(' ')[0] : '',
     delivery_time: document.getElementById('fTime').value,
     
-    billing_party: (function() {
-      if (deliveryType !== 'wholesale') return '';
-      var w = document.getElementById('fWholesaler').value;
-      return (w === 'AT') ? w : (document.getElementById('fShop').options[document.getElementById('fShop').selectedIndex] || {}).text || '';
-    })(),
-    driver: driverCode,
+     driver: driverCode,
     driver_name: driverName,
     total_pieces: pieces,
     zone: selectedZone,
@@ -684,6 +673,20 @@ async function init() {
       document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
     });
 
+    document.getElementById('fShopSearch').addEventListener('input', function() {
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(this.value.trim());
+    });
+    document.getElementById('fShopSearch').addEventListener('focus', function() {
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(this.value.trim());
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
+        document.getElementById('fShopDropdown').style.display = 'none';
+      }
+    });
+    
     document.getElementById('fWholesaler').addEventListener('change', function() {
       var code = this.value;
       if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
