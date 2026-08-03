@@ -100,13 +100,15 @@ function json(data, status = 200) {
   });
 }
 // ERV/EVA split — divided by Hwy 8 (approx lat 51.005, lng range -114.22 to -114.45)
-function getElbowZone(lat, lng) {
-  // Must be in the Elbow area west of city
-  if (lng < -114.22 && lng > -114.50 && lat > 50.96 && lat < 51.06) {
-    return lat >= 51.0 ? 'ERV' : 'EVA';
-  }
+const ERV_COMMUNITIES = ['Clearwater Park', 'Stonepine', 'Elbow River Estates'];
+const EVA_COMMUNITIES = ['Elbow Valley', 'Whispering Water', 'Lott Creek', 'Majestic View', 'Golden Aspen'];
+
+function getElbowZoneByName(formatted) {
+  if (!formatted) return null;
+  const upper = formatted.toUpperCase();
+  if (ERV_COMMUNITIES.some(c => upper.includes(c.toUpperCase()))) return 'ERV';
+  if (EVA_COMMUNITIES.some(c => upper.includes(c.toUpperCase()))) return 'EVA';
   return null;
-}
 export default async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
@@ -135,15 +137,13 @@ export default async (req) => {
 
   const { lat, lng, formatted } = geo;
 // ERV/EVA boundary check — split by Hwy 8
-  const elbowZone = getElbowZone(lat, lng);
+ const elbowZone = getElbowZoneByName(formatted);
   if (elbowZone) {
     return json({
       suggested: elbowZone,
       confidence: 'high',
-      message: elbowZone === 'ERV' ? 'Clearwater Park / Elbow River Estates (north of Hwy 8)' : 'Elbow Valley (south of Hwy 8)',
-      formatted_address: formatted,
-      debug_lat: lat,
-      debug_lng: lng
+      message: elbowZone === 'ERV' ? 'Clearwater Park / Elbow River Estates' : 'Elbow Valley',
+      formatted_address: formatted
     });
   }
   // Step 2: check named out-of-town zones first (before Calgary check)
