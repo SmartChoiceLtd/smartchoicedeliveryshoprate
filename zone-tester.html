@@ -1,173 +1,159 @@
+python3 << 'EOF'
+import csv, re, json
 
+results = {}
+with open('/mnt/user-data/uploads/datatest.csv', encoding='utf-8-sig') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        address = (row.get('Address') or '').strip()
+        dzone = (row.get('DZONE') or '').strip()
+        if not address or len(address) < 8 or not re.match(r'^\d+', address): continue
+        if dzone in ('WPU','WAI','WCO','WCH','WPO','WST','WHR','WLY','WLO','WPH','SPL','SPO','SC2','SC3','NCH',''): continue
+        if any(c in address for c in ["'",'"','\\']): continue
+        key = address.lower().strip()
+        if key not in results:
+            results[key] = {'address': address, 'zone': dzone, 'count': 0}
+        results[key]['count'] += 1
+
+sorted_results = sorted(results.values(), key=lambda x: -x['count'])[:200]
+
+# Build HTML with properly escaped JSON
+test_json = json.dumps(sorted_results, ensure_ascii=True)
+
+html = '''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zone Accuracy Tester</title>
 <style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;}
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;}
 *{box-sizing:border-box;}body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;max-width:1100px;margin:0 auto;}
 h1{font-family:Georgia,serif;color:var(--accent);}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;}
-.btn:disabled{opacity:0.5;}
-.btn-warm{background:var(--warm);}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;margin-right:8px;}
+.btn:disabled{opacity:0.5;}.btn-warm{background:var(--warm);}
 .stats{display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 16px;text-align:center;}
 .stat-val{font-size:22px;font-weight:700;}
-.stat-val.pass{color:#2C6B2C;}.stat-val.fail{color:var(--warm);}.stat-val.warn{color:#7A5C00;}
+.pass{color:#2C6B2C;}.fail{color:var(--warm);}.warn{color:#7A5C00;}
 .progress{background:#E6DECF;border-radius:999px;height:10px;margin:10px 0;}
 .progress-bar{background:var(--accent);border-radius:999px;height:10px;width:0;transition:width 0.2s;}
 table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px;}
 th{background:var(--accent);color:#fff;padding:8px;text-align:left;}
 td{padding:6px 8px;border-bottom:1px solid var(--border);}
-tr.pass{background:#EAF4EA;}tr.fail{background:#FBEAEA;}tr.skip{background:#FFF8E1;}
+tr.pass td{background:#EAF4EA;}tr.fail td{background:#FBEAEA;}tr.skip td{background:#FFF8E1;}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;}
-.badge-pass{background:#EAF4EA;color:#2C6B2C;}
-.badge-fail{background:#FBEAEA;color:#B8472B;}
-.badge-skip{background:#FFF8E1;color:#7A5C00;}
-.badge-pend{background:#E6DECF;color:#6B6256;}
-#downloadBtn{display:none;}
+.bp{background:#EAF4EA;color:#2C6B2C;}.bf{background:#FBEAEA;color:#B8472B;}.bs{background:#FFF8E1;color:#7A5C00;}
 </style>
 </head>
 <body>
 <h1>Zone Accuracy Tester</h1>
-<p style="color:var(--ink-soft);font-size:13px;">Tests ''' + str(len(test_data)) + ''' addresses against the zone suggestion engine using historical data as ground truth. Runs in batches to avoid rate limits.</p>
-
-<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+<p style="color:var(--ink-soft);font-size:13px;">Tests 200 high-frequency addresses from historical data against the zone suggestion engine.</p>
+<div>
   <button class="btn" id="startBtn">Run Tests</button>
   <button class="btn btn-warm" id="stopBtn" disabled>Stop</button>
-  <button class="btn" id="downloadBtn">Download Results CSV</button>
-  <label style="font-size:13px;color:var(--ink-soft);">
-    Delay between requests: 
-    <select id="delayMs" style="padding:4px;border:1px solid var(--border);border-radius:6px;">
-      <option value="300">300ms (fast)</option>
-      <option value="500" selected>500ms (normal)</option>
-      <option value="1000">1s (slow)</option>
-    </select>
-  </label>
+  <button class="btn" id="dlBtn" style="display:none">Download CSV</button>
+  <label style="font-size:13px;margin-left:8px;">Delay: <select id="delay"><option value="400">400ms</option><option value="600" selected>600ms</option><option value="1000">1s</option></select></label>
 </div>
-
-<div class="progress"><div class="progress-bar" id="progressBar"></div></div>
-<div id="statusMsg" style="font-size:12px;color:var(--ink-soft);margin:4px 0;"></div>
-
+<div class="progress"><div class="progress-bar" id="pb"></div></div>
+<div id="status" style="font-size:12px;color:var(--ink-soft);margin:4px 0;"></div>
 <div class="stats">
-  <div class="stat"><div class="stat-val pass" id="statPass">0</div>Pass</div>
-  <div class="stat"><div class="stat-val fail" id="statFail">0</div>Fail</div>
-  <div class="stat"><div class="stat-val warn" id="statSkip">0</div>No suggestion</div>
-  <div class="stat"><div class="stat-val" id="statTotal">0</div>Tested</div>
-  <div class="stat"><div class="stat-val" id="statAcc" style="color:var(--accent);">—</div>Accuracy</div>
+  <div class="stat"><div class="stat-val pass" id="sPass">0</div>Pass</div>
+  <div class="stat"><div class="stat-val fail" id="sFail">0</div>Fail</div>
+  <div class="stat"><div class="stat-val warn" id="sSkip">0</div>No match</div>
+  <div class="stat"><div class="stat-val" id="sTotal">0</div>Tested</div>
+  <div class="stat"><div class="stat-val" id="sAcc" style="color:var(--accent);">-</div>Accuracy</div>
 </div>
-
-<table id="resultsTable">
-  <thead><tr>
-    <th>#</th><th>Address</th><th>Expected</th><th>Got</th><th>Confidence</th><th>Result</th><th>Note</th>
-  </tr></thead>
-  <tbody id="resultsBody"></tbody>
-</table>
-
+<table><thead><tr><th>#</th><th>Address</th><th>Expected</th><th>Got</th><th>Result</th><th>Message</th></tr></thead>
+<tbody id="tbody"></tbody></table>
 <script>
-var TEST_DATA = ''' + json.dumps(test_data) + ''';
-var results = [];
-var running = false;
-var stopRequested = false;
-var pass = 0, fail = 0, skip = 0;
+var DATA = ''' + test_json + ''';
+var res = [], running = false, stop = false, pass = 0, fail = 0, skip = 0;
 
-document.getElementById('startBtn').addEventListener('click', runTests);
-document.getElementById('stopBtn').addEventListener('click', function(){ stopRequested = true; });
+document.getElementById('startBtn').onclick = run;
+document.getElementById('stopBtn').onclick = function(){ stop = true; };
+document.getElementById('dlBtn').onclick = download;
 
-async function runTests() {
-  if (running) return;
-  running = true; stopRequested = false;
-  pass = 0; fail = 0; skip = 0; results = [];
-  document.getElementById('resultsBody').innerHTML = '';
+async function run() {
+  running = true; stop = false; pass = 0; fail = 0; skip = 0; res = [];
+  document.getElementById('tbody').innerHTML = '';
   document.getElementById('startBtn').disabled = true;
   document.getElementById('stopBtn').disabled = false;
-  document.getElementById('downloadBtn').style.display = 'none';
-
-  var delay = parseInt(document.getElementById('delayMs').value);
-
-  for (var i = 0; i < TEST_DATA.length; i++) {
-    if (stopRequested) break;
-    var item = TEST_DATA[i];
-    document.getElementById('progressBar').style.width = Math.round((i / TEST_DATA.length) * 100) + '%';
-    document.getElementById('statusMsg').textContent = 'Testing ' + (i+1) + ' of ' + TEST_DATA.length + ': ' + item.address;
-
-    var result = await testAddress(item.address, item.zone);
-    results.push(result);
-
-    if (result.status === 'pass') pass++;
-    else if (result.status === 'fail') fail++;
-    else skip++;
-
+  document.getElementById('dlBtn').style.display = 'none';
+  var delay = parseInt(document.getElementById('delay').value);
+  for (var i = 0; i < DATA.length; i++) {
+    if (stop) break;
+    document.getElementById('pb').style.width = Math.round(i/DATA.length*100) + '%';
+    document.getElementById('status').textContent = 'Testing ' + (i+1) + ' of ' + DATA.length + ': ' + DATA[i].address;
+    var r = await test(DATA[i]);
+    res.push(r);
+    if (r.status === 'pass') pass++; else if (r.status === 'fail') fail++; else skip++;
     updateStats(i+1);
-    appendRow(i+1, result);
-    await sleep(delay);
+    addRow(i+1, r);
+    await new Promise(function(r){ setTimeout(r, delay); });
   }
-
   running = false;
   document.getElementById('startBtn').disabled = false;
   document.getElementById('stopBtn').disabled = true;
-  document.getElementById('progressBar').style.width = '100%';
-  document.getElementById('statusMsg').textContent = 'Done! ' + pass + ' pass, ' + fail + ' fail, ' + skip + ' no suggestion';
-  document.getElementById('downloadBtn').style.display = 'inline-block';
+  document.getElementById('pb').style.width = '100%';
+  document.getElementById('status').textContent = 'Done! ' + pass + ' pass, ' + fail + ' fail, ' + skip + ' no match';
+  document.getElementById('dlBtn').style.display = 'inline-block';
 }
 
-async function testAddress(address, expectedZone) {
+async function test(item) {
   try {
-    var res = await fetch('/api/suggest-zone?address=' + encodeURIComponent(address));
-    var data = await res.json();
-    var got = data.suggested || '';
-    var status = got === expectedZone ? 'pass' : (got ? 'fail' : 'skip');
-    return { address, expectedZone, got, confidence: data.confidence || '', message: data.message || '', status };
+    var r = await fetch('/api/suggest-zone?address=' + encodeURIComponent(item.address));
+    var d = await r.json();
+    var got = d.suggested || '';
+    var status = got === item.zone ? 'pass' : (got ? 'fail' : 'skip');
+    return { address: item.address, expected: item.zone, got: got, confidence: d.confidence||'', message: d.message||'', status: status };
   } catch(e) {
-    return { address, expectedZone, got: 'ERROR', confidence: '', message: e.message, status: 'skip' };
+    return { address: item.address, expected: item.zone, got: 'ERR', confidence: '', message: e.message, status: 'skip' };
   }
 }
 
-function updateStats(total) {
-  document.getElementById('statPass').textContent = pass;
-  document.getElementById('statFail').textContent = fail;
-  document.getElementById('statSkip').textContent = skip;
-  document.getElementById('statTotal').textContent = total;
-  var acc = total > 0 ? Math.round((pass / (pass + fail)) * 100) : 0;
-  document.getElementById('statAcc').textContent = (pass + fail > 0 ? acc + '%' : '—');
+function updateStats(n) {
+  document.getElementById('sPass').textContent = pass;
+  document.getElementById('sFail').textContent = fail;
+  document.getElementById('sSkip').textContent = skip;
+  document.getElementById('sTotal').textContent = n;
+  document.getElementById('sAcc').textContent = (pass+fail>0 ? Math.round(pass/(pass+fail)*100)+'%' : '-');
 }
 
-function appendRow(n, r) {
-  var body = document.getElementById('resultsBody');
+function addRow(n, r) {
+  var b = document.getElementById('tbody');
   var tr = document.createElement('tr');
   tr.className = r.status;
-  var badge = r.status === 'pass' ? '<span class="badge badge-pass">PASS</span>' :
-               r.status === 'fail' ? '<span class="badge badge-fail">FAIL</span>' :
-               '<span class="badge badge-skip">NO MATCH</span>';
-  tr.innerHTML = '<td>' + n + '</td>' +
-    '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + r.address + '">' + r.address + '</td>' +
-    '<td><strong>' + r.expectedZone + '</strong></td>' +
-    '<td><strong>' + (r.got || '—') + '</strong></td>' +
-    '<td>' + r.confidence + '</td>' +
-    '<td>' + badge + '</td>' +
-    '<td style="max-width:200px;font-size:11px;color:var(--ink-soft);">' + r.message + '</td>';
-  body.appendChild(tr);
-  body.scrollTop = body.scrollHeight;
+  var badge = r.status==='pass' ? '<span class="badge bp">PASS</span>' : r.status==='fail' ? '<span class="badge bf">FAIL</span>' : '<span class="badge bs">NO MATCH</span>';
+  tr.innerHTML = '<td>'+n+'</td><td title="'+r.address+'" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+r.address+'</td><td><strong>'+r.expected+'</strong></td><td><strong>'+(r.got||'-')+'</strong></td><td>'+badge+'</td><td style="font-size:11px;color:var(--ink-soft);max-width:180px;">'+r.message+'</td>';
+  b.appendChild(tr);
 }
 
-function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
-
-document.getElementById('downloadBtn').addEventListener('click', function() {
+function download() {
   var csv = 'Address,Expected,Got,Confidence,Status,Message\\n';
-  results.forEach(function(r) {
-    csv += [r.address, r.expectedZone, r.got, r.confidence, r.status, r.message].map(function(v){
-      v = String(v||'');
-      if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g,'""') + '"';
-      return v;
-    }).join(',') + '\\n';
+  res.forEach(function(r){
+    csv += [r.address,r.expected,r.got,r.confidence,r.status,r.message].map(function(v){
+      v=String(v||''); if(v.includes(','))v='"'+v+'"'; return v;
+    }).join(',')+'\\n';
   });
-  var blob = new Blob([csv], {type:'text/csv'});
   var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'zone-accuracy-results.csv';
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'zone-results.csv';
   a.click();
-});
+}
 </script>
 </body>
 </html>'''
+
+with open('/mnt/user-data/outputs/zone-tester.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+print(f"Built with {len(sorted_results)} test cases")
+EOF
+Output
+
+Built with 200 test cases
+
+Presented file
+Done
+Replace zone-tes
+<
