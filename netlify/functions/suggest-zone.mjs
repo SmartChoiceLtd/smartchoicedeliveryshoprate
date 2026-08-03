@@ -22,8 +22,8 @@ const OUT_OF_TOWN_ZONES = [
   { code:'TSU',  name:'Tsuu Tina Nation',  lat:50.9800, lng:-114.2600, radiusKm:4  },
   { code:'BPW',  name:'Bearspaw',          lat:51.1500, lng:-114.3000, radiusKm:8  },
   { code:'SBK',  name:'Springbank',        lat:51.0800, lng:-114.3500, radiusKm:8  },
-  { code:'ERV',  name:'Elbow River Estates', lat:50.9800, lng:-114.2800, radiusKm:5 },
-  { code:'EVA',  name:'Elbow Valley',      lat:51.0000, lng:-114.4000, radiusKm:6  },
+  { code:'ERV',  name:'Clearwater Park / Elbow River Estates', lat:51.0200, lng:-114.2700, radiusKm:5  },
+  { code:'EVA',  name:'Elbow Valley',            lat:50.9800, lng:-114.3800, radiusKm:6  },
   // South of city — west of Macleod
   { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:6  },
   { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:4  },
