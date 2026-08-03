@@ -103,7 +103,7 @@ function json(data, status = 200) {
 function getElbowZone(lat, lng) {
   // Must be in the Elbow area west of city
   if (lng < -114.22 && lng > -114.50 && lat > 50.96 && lat < 51.06) {
-    return lat >= 51.005 ? 'ERV' : 'EVA';
+    return lat >= 51.0 ? 'ERV' : 'EVA';
   }
   return null;
 }
