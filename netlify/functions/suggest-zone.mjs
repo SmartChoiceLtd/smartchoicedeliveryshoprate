@@ -1,5 +1,3 @@
-import { getStore } from '@netlify/blobs';
-
 const GOOGLE_GEOCODE = 'https://maps.googleapis.com/maps/api/geocode/json';
 const GOOGLE_DISTANCE = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 
