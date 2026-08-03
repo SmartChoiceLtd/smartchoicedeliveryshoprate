@@ -22,10 +22,7 @@ const OUT_OF_TOWN_ZONES = [
   { code:'TSU',  name:'Tsuu Tina Nation',  lat:50.9800, lng:-114.2600, radiusKm:4  },
   { code:'BPW',  name:'Bearspaw',          lat:51.1500, lng:-114.3000, radiusKm:8  },
   { code:'SBK',  name:'Springbank',        lat:51.0800, lng:-114.3500, radiusKm:8  },
-  { code:'ERV',  name:'Clearwater Park / Elbow River Estates', lat:51.0200, lng:-114.2700, radiusKm:5  },
-  { code:'EVA',  name:'Elbow Valley',            lat:50.9800, lng:-114.3800, radiusKm:6  },
-  // South of city — west of Macleod
-  { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:6  },
+   { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:6  },
   { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:4  },
   { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'PRI',  name:'Priddis',           lat:50.8800, lng:-114.3500, radiusKm:6  },
@@ -102,7 +99,14 @@ function json(data, status = 200) {
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
 }
-
+// ERV/EVA split — divided by Hwy 8 (approx lat 51.005, lng range -114.22 to -114.45)
+function getElbowZone(lat, lng) {
+  // Must be in the Elbow area west of city
+  if (lng < -114.22 && lng > -114.50 && lat > 50.96 && lat < 51.06) {
+    return lat >= 51.005 ? 'ERV' : 'EVA';
+  }
+  return null;
+}
 export default async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
@@ -130,7 +134,16 @@ export default async (req) => {
   }
 
   const { lat, lng, formatted } = geo;
-
+// ERV/EVA boundary check — split by Hwy 8
+  const elbowZone = getElbowZone(lat, lng);
+  if (elbowZone) {
+    return json({
+      suggested: elbowZone,
+      confidence: 'high',
+      message: elbowZone === 'ERV' ? 'Clearwater Park / Elbow River Estates (north of Hwy 8)' : 'Elbow Valley (south of Hwy 8)',
+      formatted_address: formatted
+    });
+  }
   // Step 2: check named out-of-town zones first (before Calgary check)
   // Check from smallest radius to largest to prefer specific over general
   let bestTown = null;
