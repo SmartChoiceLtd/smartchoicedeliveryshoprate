@@ -23,6 +23,7 @@ const OUT_OF_TOWN_ZONES = [
   { code:'BPW',  name:'Bearspaw',          lat:51.1500, lng:-114.3000, radiusKm:8  },
   { code:'SBK',  name:'Springbank',        lat:51.0800, lng:-114.3500, radiusKm:8  },
    { code:'DEW',  name:'DeWinton',          lat:50.8200, lng:-113.9800, radiusKm:6  },
+  { code:'EVA', name:'Elbow Valley / Elbow River Estates', lat:51.0190, lng:-114.2820, radiusKm:8 },
   { code:'HPT',  name:'Heritage Pointe',   lat:50.8500, lng:-113.9500, radiusKm:4  },
   { code:'MDF',  name:'MD Foothills',      lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'PRI',  name:'Priddis',           lat:50.8800, lng:-114.3500, radiusKm:6  },
@@ -136,16 +137,8 @@ export default async (req) => {
   }
 
   const { lat, lng, formatted } = geo;
-// ERV/EVA boundary check — split by Hwy 8
- const elbowZone = getElbowZoneByName(formatted);
-  if (elbowZone) {
-    return json({
-      suggested: elbowZone,
-      confidence: 'high',
-      message: elbowZone === 'ERV' ? 'Clearwater Park / Elbow River Estates' : 'Elbow Valley',
-      formatted_address: formatted
-    });
-  }
+
+
   // Step 2: check named out-of-town zones first (before Calgary check)
   // Check from smallest radius to largest to prefer specific over general
   let bestTown = null;
