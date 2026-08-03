@@ -141,7 +141,9 @@ export default async (req) => {
       suggested: elbowZone,
       confidence: 'high',
       message: elbowZone === 'ERV' ? 'Clearwater Park / Elbow River Estates (north of Hwy 8)' : 'Elbow Valley (south of Hwy 8)',
-      formatted_address: formatted
+      formatted_address: formatted,
+      debug_lat: lat,
+      debug_lng: lng
     });
   }
   // Step 2: check named out-of-town zones first (before Calgary check)
