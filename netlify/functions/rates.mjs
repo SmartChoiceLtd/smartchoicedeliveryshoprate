@@ -28,7 +28,7 @@ const DEFAULT_RATES = {
   FUN:{drate:9.75,dratex:1.5,gdpi:0.5,srate:15,sratex:3},
   FUNO:{drate:16.25,dratex:3,gdpi:1,srate:25,sratex:3},
   HOT:{drate:16.25,dratex:0,gdpi:0.5,srate:25,sratex:0},
-  HPT:{drate:14.3,dratex:1.5,gdpi:0.75,srate:22,sratex:3},
+  HPT:{drate:14.3,dratex:1.5,gdpi:0.75,srate:23,sratex:3},
   HRV:{drate:26,dratex:1.5,gdpi:1.5,srate:40,sratex:3},
   KAN:{drate:45,dratex:1.5,gdpi:3,srate:65,sratex:3},
   LAN:{drate:19.5,dratex:1.5,gdpi:1,srate:30,sratex:3},
