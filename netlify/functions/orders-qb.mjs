@@ -52,6 +52,7 @@ var QB_ZONE_MAP = {
   OKO:  { product:'OUT OF TOWN:OKO',          desc:'OKOTOKS $25' },
   PRI:  { product:'OUT OF TOWN:PRI',          desc:'PRIDDIS $30' },
   RVS:  { product:'OUT OF TOWN:RVS',          desc:'ROCKY VIEW COUNTY SW SE $23' },
+  RVN: { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NORTH $25' },          
   SBK:  { product:'OUT OF TOWN:SBK',          desc:'SPRINGBANK $25' },
   SC2:  { product:'SMARTCHOICE DELIVERY:SC2', desc:'SMART CHOICE DELIVERY SC2' },
   SC3:  { product:'SMARTCHOICE DELIVERY:SC3', desc:'SMART CHOICE DELIVERY SC3' },
