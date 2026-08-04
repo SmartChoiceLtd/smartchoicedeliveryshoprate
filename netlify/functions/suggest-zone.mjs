@@ -9,65 +9,63 @@ function haversineKm(a, b) {
 }
 
 const OUT_OF_TOWN_ZONES = [
-  { code:'TSA', name:'Tsuu Tina Adjacent',               lat:50.9175, lng:-114.1615, radiusKm:4  },
-  { code:'TSU', name:'Tsuu Tina Nation',                 lat:50.9800, lng:-114.2600, radiusKm:4  },
-  { code:'BAL', name:'Balzac',                           lat:51.2100, lng:-114.0200, radiusKm:3  },
-  { code:'HPT', name:'Heritage Pointe',                  lat:50.8500, lng:-113.9500, radiusKm:3  },
-  { code:'DEW', name:'DeWinton',                         lat:50.8200, lng:-113.9800, radiusKm:6  },
-  { code:'EVA', name:'Elbow Valley / Elbow River Estates', lat:51.0190, lng:-114.2820, radiusKm:8 },
-  { code:'BPW', name:'Bearspaw',                         lat:51.1500, lng:-114.3000, radiusKm:8  },
-  { code:'SBK', name:'Springbank',                       lat:51.0800, lng:-114.3500, radiusKm:8  },
-  { code:'PRI', name:'Priddis',                          lat:50.8800, lng:-114.3500, radiusKm:6  },
-  { code:'BRG', name:'Bragg Creek',                      lat:50.9500, lng:-114.5700, radiusKm:7  },
-  { code:'MDF', name:'MD Foothills',                     lat:50.7500, lng:-114.0000, radiusKm:10 },
-  { code:'MIL', name:'Millarville',                      lat:50.7567, lng:-114.3194, radiusKm:12 },
-  { code:'DVA', name:'Diamond Valley',                   lat:50.6833, lng:-114.2833, radiusKm:10 },
-  { code:'RVS', name:'Rocky View County SW/SE',          lat:50.9500, lng:-113.8000, radiusKm:12 },
-  { code:'AIR', name:'Airdrie',                          lat:51.2920, lng:-114.0144, radiusKm:8  },
-  { code:'CHE', name:'Chestermere',                      lat:51.0487, lng:-113.8225, radiusKm:7  },
-  { code:'OKO', name:'Okotoks',                          lat:50.7258, lng:-113.9758, radiusKm:8  },
-  { code:'STR', name:'Strathmore',                       lat:51.0378, lng:-113.4003, radiusKm:8  },
-  { code:'COC', name:'Cochrane',                         lat:51.1897, lng:-114.4672, radiusKm:9  },
-  { code:'LAN', name:'Langdon',                          lat:51.0000, lng:-113.6667, radiusKm:6  },
-  { code:'LYA', name:'Lyalta',                           lat:51.1000, lng:-113.5000, radiusKm:6  },
-  { code:'CAR', name:'Carsland',                         lat:51.1333, lng:-113.4333, radiusKm:6  },
-  { code:'CRO', name:'Crossfield',                       lat:51.4333, lng:-114.0333, radiusKm:7  },
-  { code:'HRV', name:'High River',                       lat:50.5808, lng:-113.8747, radiusKm:8  },
-  { code:'NAN', name:'Nanton',                           lat:50.3500, lng:-113.7667, radiusKm:8  },
-  { code:'BEI', name:'Beiseker',                         lat:51.3833, lng:-113.5333, radiusKm:7  },
-  { code:'KAN', name:'Kananaskis',                       lat:50.9311, lng:-115.0986, radiusKm:15 },
-  { code:'CAN', name:'Canmore',                          lat:51.0894, lng:-115.3582, radiusKm:9  },
-  { code:'BNF', name:'Banff',                            lat:51.1784, lng:-115.5708, radiusKm:10 },
-  { code:'LKL', name:'Lake Louise',                      lat:51.4254, lng:-116.1773, radiusKm:12 },
-  // RVS — Rocky View County SE corridor
-// East of Stoney Trail (~-114.050), south of city (~50.875), west of Strathmore (~-113.750)
-function isRVSCorridor(lat, lng, formatted) {
-  // Named RVS communities
-  const RVS_COMMUNITIES = ['Sora','Hotchkiss','Pine Creek','Ralph Klein','Shepard',
-    'Great Plains','Starfield','Twin Hills','Huxley','Belvedere'];
-  if (RVS_COMMUNITIES.some(c => (formatted||'').toUpperCase().includes(c.toUpperCase()))) return true;
-  // Geographic corridor — SE of city, east of Stoney
-  return lat > 50.840 && lat < 50.960 && lng > -114.060 && lng < -113.750;
-}
+  { code:'TSA', name:'Tsuu Tina Adjacent',                   lat:50.9175, lng:-114.1615, radiusKm:4  },
+  { code:'TSU', name:'Tsuu Tina Nation',                     lat:50.9800, lng:-114.2600, radiusKm:4  },
+  { code:'BAL', name:'Balzac',                               lat:51.2100, lng:-114.0200, radiusKm:3  },
+  { code:'HPT', name:'Heritage Pointe',                      lat:50.8500, lng:-113.9500, radiusKm:3  },
+  { code:'DEW', name:'DeWinton',                             lat:50.8200, lng:-113.9800, radiusKm:6  },
+  { code:'EVA', name:'Elbow Valley / Elbow River Estates',   lat:51.0190, lng:-114.2820, radiusKm:8  },
+  { code:'BPW', name:'Bearspaw',                             lat:51.1500, lng:-114.3000, radiusKm:8  },
+  { code:'SBK', name:'Springbank',                           lat:51.0800, lng:-114.3500, radiusKm:8  },
+  { code:'PRI', name:'Priddis',                              lat:50.8800, lng:-114.3500, radiusKm:6  },
+  { code:'BRG', name:'Bragg Creek',                          lat:50.9500, lng:-114.5700, radiusKm:7  },
+  { code:'MDF', name:'MD Foothills',                         lat:50.7500, lng:-114.0000, radiusKm:10 },
+  { code:'MIL', name:'Millarville',                          lat:50.7567, lng:-114.3194, radiusKm:12 },
+  { code:'DVA', name:'Diamond Valley',                       lat:50.6833, lng:-114.2833, radiusKm:10 },
+  { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:10 },
+  { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:10 },
+  { code:'AIR', name:'Airdrie',                              lat:51.2920, lng:-114.0144, radiusKm:8  },
+  { code:'CHE', name:'Chestermere',                          lat:51.0487, lng:-113.8225, radiusKm:7  },
+  { code:'OKO', name:'Okotoks',                              lat:50.7258, lng:-113.9758, radiusKm:8  },
+  { code:'STR', name:'Strathmore',                           lat:51.0378, lng:-113.4003, radiusKm:8  },
+  { code:'COC', name:'Cochrane',                             lat:51.1897, lng:-114.4672, radiusKm:9  },
+  { code:'LAN', name:'Langdon',                              lat:51.0000, lng:-113.6667, radiusKm:6  },
+  { code:'LYA', name:'Lyalta',                               lat:51.1000, lng:-113.5000, radiusKm:6  },
+  { code:'CAR', name:'Carsland',                             lat:51.1333, lng:-113.4333, radiusKm:6  },
+  { code:'CRO', name:'Crossfield',                           lat:51.4333, lng:-114.0333, radiusKm:7  },
+  { code:'HRV', name:'High River',                           lat:50.5808, lng:-113.8747, radiusKm:8  },
+  { code:'NAN', name:'Nanton',                               lat:50.3500, lng:-113.7667, radiusKm:8  },
+  { code:'BEI', name:'Beiseker',                             lat:51.3833, lng:-113.5333, radiusKm:7  },
+  { code:'KAN', name:'Kananaskis',                           lat:50.9311, lng:-115.0986, radiusKm:15 },
+  { code:'CAN', name:'Canmore',                              lat:51.0894, lng:-115.3582, radiusKm:9  },
+  { code:'BNF', name:'Banff',                                lat:51.1784, lng:-115.5708, radiusKm:10 },
+  { code:'LKL', name:'Lake Louise',                          lat:51.4254, lng:-116.1773, radiusKm:12 },
 ];
 
 const SHOP_FALLBACK_LAT = 51.0447;
 const SHOP_FALLBACK_LNG = -114.0719;
 
-// TSA — Tsuu T'ina Adjacent named communities
+// TSA communities
 const TSA_COMMUNITIES = ['Alpine Park', 'Vermilion Hill', 'Versant', 'Timberline', 'Bluerock'];
 
-// C5 north border communities
+// C5 border communities — north and deep SE
 const C5_NORTH_COMMUNITIES = [
-  // North border
   'Glacier Ridge', 'Ambleton', 'Symons Valley Ranch', 'Moraine',
   'Livingston', 'Carrington', 'Keystone Hills', 'Homestead',
   'Stoney', 'Stoney 4', 'Stoney Nakoda',
-  // Deep SE — north of Bow River
   'Mahogany', 'Auburn Bay', 'Seton', 'Cranston', 'Chaparral',
   'Legacy', 'Walden', 'Wolf Willow', 'Belmont', 'Rangeview',
   'Cranford', 'Cranleigh', 'Cranbrook', 'Auburn'
 ];
+
+// RVS communities — Rocky View County South
+const RVS_COMMUNITIES = [
+  'Sora', 'Hotchkiss', 'Pine Creek', 'Ralph Klein', 'Shepard',
+  'Great Plains', 'Starfield', 'Twin Hills', 'Huxley', 'Belvedere'
+];
+
+// RVN communities — Rocky View County North
+const RVN_COMMUNITIES = ['Conrich'];
 
 function isLikelyInCalgary(lat, lng) {
   return lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800;
@@ -83,6 +81,18 @@ function isC5NorthCommunity(formatted) {
   if (!formatted) return false;
   const upper = formatted.toUpperCase();
   return C5_NORTH_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVSCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVS_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVNCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVN_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
 }
 
 function cityZoneForKm(km) {
@@ -150,95 +160,65 @@ export default async (req) => {
 
   const { lat, lng, formatted } = geo;
 
-  // TSA — community name check first
+  // TSA — named community check
   if (isTSACommunity(formatted)) {
-    return json({
-      suggested: 'TSA',
-      confidence: 'high',
-      message: "Tsuu T'ina Adjacent area — out-of-town rate applies",
-      formatted_address: formatted
-    });
+    return json({ suggested:'TSA', confidence:'high',
+      message:"Tsuu T'ina Adjacent area — out-of-town rate applies",
+      formatted_address: formatted });
   }
 
-  // C5 north border communities — name check before radius matching
+  // RVN — Rocky View County North by name
+  if (isRVNCommunity(formatted)) {
+    return json({ suggested:'RVN', confidence:'high',
+      message:'Rocky View County North',
+      formatted_address: formatted });
+  }
+
+  // RVS — Rocky View County South by name
+  if (isRVSCommunity(formatted)) {
+    return json({ suggested:'RVS', confidence:'high',
+      message:'Rocky View County South',
+      formatted_address: formatted });
+  }
+
+  // C5 border communities — name check before radius matching
   if (isC5NorthCommunity(formatted) && isLikelyInCalgary(lat, lng)) {
-    return json({
-      suggested: 'C5',
-      confidence: 'high',
-      message: 'North Calgary border community — C5 rate applies',
-      formatted_address: formatted
-    });
-  }
-if (isRVSCorridor(lat, lng, formatted) && !isLikelyInCalgary(lat, lng)) {
-    return json({
-      suggested: 'RVS',
-      confidence: 'high',
-      message: 'Rocky View County SE corridor',
-      formatted_address: formatted
-    });
+    return json({ suggested:'C5', confidence:'high',
+      message:'Calgary border community — C5 rate applies',
+      formatted_address: formatted });
   }
 
-The !isLikelyInCalgary check ensures city addresses like Mahogany never fall into RVS. Commit and test both Mahogany and a Sora address.
+  // SE Calgary deep communities — intercept before rural radius matching
+  const SE_C5 = ['Seton','Auburn','Mahogany','Chaparral','Cranston',
+    'Wolf Willow','Ranchview','Ricardo Ranch','Legacy'];
+  if (isLikelyInCalgary(lat, lng) && SE_C5.some(c => formatted.toUpperCase().includes(c.toUpperCase()))) {
+    const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+    if (drivingKm !== null) {
+      const zone = cityZoneForKm(drivingKm);
+      return json({ suggested: zone.code, confidence: zone.confidence,
+        message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10 });
+    }
+    return json({ suggested:'C5', confidence:'medium',
+      message:'Deep SE Calgary community — C5 rate applies',
+      formatted_address: formatted });
+  }
 
-we could change RVS to RVC to include all of the count on the east side.   or now that there ar communities developing north of lets say the memorial dr latitude   RVS SOUTH RVN NORTH to work the rockyview corridor
+  // RVS/RVN geographic corridor — east of Stoney, outside Calgary
+  // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south)
+  if (!isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
+    if (lat >= 51.055) {
+      return json({ suggested:'RVN', confidence:'medium',
+        message:'Rocky View County North (north of Trans-Canada)',
+        formatted_address: formatted });
+    }
+    if (lat >= 50.840 && lat < 51.055) {
+      return json({ suggested:'RVS', confidence:'medium',
+        message:'Rocky View County South (south of Trans-Canada)',
+        formatted_address: formatted });
+    }
+  }
 
-Smart thinking — Rocky View County is developing fast enough that a north/south split makes operational sense. Memorial Drive (lat ~51.052) is a natural dividing line.
-
-RVS — Rocky View County South (existing zone, same pricing)
-
-Sora, Hotchkiss, Pine Creek, Shepard, Great Plains, Starfield, Twin Hills, Huxley, Belvedere
-South of Memorial Drive lat ~51.052, east of Stoney Trail
-
-RVN — Rocky View County North (new zone)
-
-Developing communities north of Memorial — Conrich, Langdon corridor, East Rocky View
-North of Memorial Drive lat ~51.052, east of city
-
-Pricing question — should RVN be same as RVS ($23) or different? The north communities may be similar distance so same pricing likely makes sense for now.
-
-Also — do you want to rename RVS to RVC (Rocky View County) as a master code, or keep RVS/RVN as the two sub-zones? The RVS code is already in QB so changing it has downstream implications.
-
-I'd suggest keeping RVS for south and adding RVN for north — no QB disruption, clean operational split. Agree?
-
-conrich north langdon south  yes RVN
-
-Set it at $25 now — easy to change in the admin rate table anytime.
-
-In GitHub → netlify/functions → suggest-zone.mjs:
-
-1. Add RVN to OUT_OF_TOWN_ZONES:
-
-javascript
-  { code:'RVN', name:'Rocky View County North', lat:51.0900, lng:-113.8500, radiusKm:10 },
-
-2. Replace the RVS radius entry with tighter bounds:
-
-javascript
-  { code:'RVS', name:'Rocky View County South', lat:50.9000, lng:-113.8500, radiusKm:10 },
-
-3. Add the corridor boundary function and check as discussed above — using Trans-Canada lat 51.055 as the RVS/RVN dividing line.
-
-In rates.mjs add:
-
-javascript
-  RVN: { drate:14.95, dratex:1.5, gdpi:0.75, srate:25, sratex:3 },
-
-And in orders-qb.mjs QB_ZONE_MAP add:
-
-javascript
-  RVN: { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NORTH $25' },
-
-Commit all three files and test Conrich and Shepard addresses.
-
-i will take a few minutes to implement SE RVS RVN
-
-Take your time — it's a meaningful set of changes. When you're done test:
-
-smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Conrich Rd NE Rocky View County
-smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Sora Blvd SE Calgary
-smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Mahogany Blvd SE Calgary
-
-Should return RVN, RVS, C5 respectively. Report back when ready.
   // Named out-of-town zones — radius matching
   let bestTown = null, bestDist = Infinity;
   for (const zone of OUT_OF_TOWN_ZONES) {
@@ -260,20 +240,13 @@ Should return RVN, RVS, C5 respectively. Report back when ready.
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
     if (drivingKm !== null) {
       const zone = cityZoneForKm(drivingKm);
-      return json({
-        suggested: zone.code,
-        confidence: zone.confidence,
+      return json({ suggested: zone.code, confidence: zone.confidence,
         message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
-        formatted_address: formatted,
-        driving_km: Math.round(drivingKm * 10) / 10
-      });
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10 });
     }
-    return json({
-      suggested: 'C3',
-      confidence: 'low',
-      message: 'Calgary address — driving distance unavailable, C3 suggested as default.',
-      formatted_address: formatted
-    });
+    return json({ suggested:'C3', confidence:'low',
+      message:'Calgary address — driving distance unavailable, C3 suggested as default.',
+      formatted_address: formatted });
   }
 
   // Secondary boundary checks
@@ -286,12 +259,6 @@ Should return RVN, RVS, C5 respectively. Report back when ready.
   if (lat > 50.83 && lat < 50.95 && lng < -114.05 && lng > -114.25) {
     return json({ suggested:'DEW', confidence:'medium',
       message:'Address appears to be in DeWinton/Sirocco corridor',
-      formatted_address: formatted });
-  }
-
-  if (lat > 50.85 && lat < 51.00 && lng > -113.95 && lng < -113.80) {
-    return json({ suggested:'RVS', confidence:'medium',
-      message:'Address appears to be in Rocky View County SE',
       formatted_address: formatted });
   }
 
