@@ -242,7 +242,7 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
       return ca.localeCompare(cb);
     });
 
-    sortedShops.forEach(shopKey => {
+   sortedShops.forEach(shopKey => {
       var code = shopKey.split(' ')[0].toUpperCase();
       var customer = QB_CUSTOMERS[code] || QB_CUSTOMERS[shopKey] || shopKey;
       var zones = shopGroups[shopKey];
