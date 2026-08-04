@@ -243,12 +243,15 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
     });
 
     sortedShops.forEach(shopKey => {
-     var customer = QB_CUSTOMERS[shopKey] || shopKey;
+      var code = shopKey.split(' ')[0].toUpperCase();
+      var customer = QB_CUSTOMERS[code] || QB_CUSTOMERS[shopKey] || shopKey;
       var zones = shopGroups[shopKey];
       var firstLine = true;
-
       // Sort zones alphabetically
       Object.keys(zones).sort().forEach(zone => {
+
+      // Sort zones alphabetically
+
         var amount = parseFloat(zones[zone].toFixed(2));
         if (amount <= 0) return;
         var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
