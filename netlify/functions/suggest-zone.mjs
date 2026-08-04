@@ -39,6 +39,16 @@ const OUT_OF_TOWN_ZONES = [
   { code:'CAN', name:'Canmore',                          lat:51.0894, lng:-115.3582, radiusKm:9  },
   { code:'BNF', name:'Banff',                            lat:51.1784, lng:-115.5708, radiusKm:10 },
   { code:'LKL', name:'Lake Louise',                      lat:51.4254, lng:-116.1773, radiusKm:12 },
+  // RVS — Rocky View County SE corridor
+// East of Stoney Trail (~-114.050), south of city (~50.875), west of Strathmore (~-113.750)
+function isRVSCorridor(lat, lng, formatted) {
+  // Named RVS communities
+  const RVS_COMMUNITIES = ['Sora','Hotchkiss','Pine Creek','Ralph Klein','Shepard',
+    'Great Plains','Starfield','Twin Hills','Huxley','Belvedere'];
+  if (RVS_COMMUNITIES.some(c => (formatted||'').toUpperCase().includes(c.toUpperCase()))) return true;
+  // Geographic corridor — SE of city, east of Stoney
+  return lat > 50.840 && lat < 50.960 && lng > -114.060 && lng < -113.750;
+}
 ];
 
 const SHOP_FALLBACK_LAT = 51.0447;
@@ -159,7 +169,76 @@ export default async (req) => {
       formatted_address: formatted
     });
   }
+if (isRVSCorridor(lat, lng, formatted) && !isLikelyInCalgary(lat, lng)) {
+    return json({
+      suggested: 'RVS',
+      confidence: 'high',
+      message: 'Rocky View County SE corridor',
+      formatted_address: formatted
+    });
+  }
 
+The !isLikelyInCalgary check ensures city addresses like Mahogany never fall into RVS. Commit and test both Mahogany and a Sora address.
+
+we could change RVS to RVC to include all of the count on the east side.   or now that there ar communities developing north of lets say the memorial dr latitude   RVS SOUTH RVN NORTH to work the rockyview corridor
+
+Smart thinking — Rocky View County is developing fast enough that a north/south split makes operational sense. Memorial Drive (lat ~51.052) is a natural dividing line.
+
+RVS — Rocky View County South (existing zone, same pricing)
+
+Sora, Hotchkiss, Pine Creek, Shepard, Great Plains, Starfield, Twin Hills, Huxley, Belvedere
+South of Memorial Drive lat ~51.052, east of Stoney Trail
+
+RVN — Rocky View County North (new zone)
+
+Developing communities north of Memorial — Conrich, Langdon corridor, East Rocky View
+North of Memorial Drive lat ~51.052, east of city
+
+Pricing question — should RVN be same as RVS ($23) or different? The north communities may be similar distance so same pricing likely makes sense for now.
+
+Also — do you want to rename RVS to RVC (Rocky View County) as a master code, or keep RVS/RVN as the two sub-zones? The RVS code is already in QB so changing it has downstream implications.
+
+I'd suggest keeping RVS for south and adding RVN for north — no QB disruption, clean operational split. Agree?
+
+conrich north langdon south  yes RVN
+
+Set it at $25 now — easy to change in the admin rate table anytime.
+
+In GitHub → netlify/functions → suggest-zone.mjs:
+
+1. Add RVN to OUT_OF_TOWN_ZONES:
+
+javascript
+  { code:'RVN', name:'Rocky View County North', lat:51.0900, lng:-113.8500, radiusKm:10 },
+
+2. Replace the RVS radius entry with tighter bounds:
+
+javascript
+  { code:'RVS', name:'Rocky View County South', lat:50.9000, lng:-113.8500, radiusKm:10 },
+
+3. Add the corridor boundary function and check as discussed above — using Trans-Canada lat 51.055 as the RVS/RVN dividing line.
+
+In rates.mjs add:
+
+javascript
+  RVN: { drate:14.95, dratex:1.5, gdpi:0.75, srate:25, sratex:3 },
+
+And in orders-qb.mjs QB_ZONE_MAP add:
+
+javascript
+  RVN: { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NORTH $25' },
+
+Commit all three files and test Conrich and Shepard addresses.
+
+i will take a few minutes to implement SE RVS RVN
+
+Take your time — it's a meaningful set of changes. When you're done test:
+
+smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Conrich Rd NE Rocky View County
+smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Sora Blvd SE Calgary
+smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?address=100 Mahogany Blvd SE Calgary
+
+Should return RVN, RVS, C5 respectively. Report back when ready.
   // Named out-of-town zones — radius matching
   let bestTown = null, bestDist = Infinity;
   for (const zone of OUT_OF_TOWN_ZONES) {
