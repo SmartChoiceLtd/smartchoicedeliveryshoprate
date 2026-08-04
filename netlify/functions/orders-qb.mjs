@@ -143,7 +143,7 @@ export default async (req) => {
 
     if (!weekEnd) {
       return new Response(JSON.stringify({ error: 'week_end parameter required (YYYY-MM-DD)' }), { status: 400 });
-    }1
+    }
     // Load orders and rates
     var ordersStore = getStore('flower-orders');
     var ratesStore = getStore('flower-rates');
@@ -185,8 +185,8 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
     weekOrders.forEach(o => {
       var zone = (o.zone_code || '').toUpperCase();
       if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
-      var shopCode = (o.shop_code || '').toUpperCase();
-      if (!shopCode || shopCode === 'SCD') return;      
+     var code = shopKey.split(' ')[0].toUpperCase();
+     var customer = QB_CUSTOMERS[code] || QB_CUSTOMERS[shopKey] || shopKey;    
       // For wholesale, billing_party determines who pays
       if (o.delivery_type === 'wholesale' && o.billing_party) {
         var bp = String(o.billing_party);
@@ -253,8 +253,8 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         if (amount <= 0) return;
         var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
 
-        rows.push(toCSVRow([
-          firstLine ? invoiceNo : '',
+       rows.push(toCSVRow([
+          invoiceNo,
           firstLine ? customer : '',
           firstLine ? invoiceDate : '',
           firstLine ? invoiceDate : '',
