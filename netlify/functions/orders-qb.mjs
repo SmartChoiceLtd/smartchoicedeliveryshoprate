@@ -182,11 +182,12 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
     // Group by billing shop, then zone — sum shop amounts
     var shopGroups = {};
 
-    weekOrders.forEach(o => {
+  weekOrders.forEach(o => {
       var zone = (o.zone_code || '').toUpperCase();
       if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
-     var code = shopKey.split(' ')[0].toUpperCase();
-     var customer = QB_CUSTOMERS[code] || QB_CUSTOMERS[shopKey] || shopKey;    
+      var shopCode = (o.shop_code || '').toUpperCase().split(' ')[0];
+      if (!shopCode || shopCode === 'SCD') return;
+    
       // For wholesale, billing_party determines who pays
       if (o.delivery_type === 'wholesale' && o.billing_party) {
         var bp = String(o.billing_party);
