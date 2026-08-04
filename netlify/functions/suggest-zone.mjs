@@ -49,9 +49,14 @@ const TSA_COMMUNITIES = ['Alpine Park', 'Vermilion Hill', 'Versant', 'Timberline
 
 // C5 north border communities
 const C5_NORTH_COMMUNITIES = [
+  // North border
   'Glacier Ridge', 'Ambleton', 'Symons Valley Ranch', 'Moraine',
   'Livingston', 'Carrington', 'Keystone Hills', 'Homestead',
-  'Stoney', 'Stoney 4', 'Stoney Nakoda'
+  'Stoney', 'Stoney 4', 'Stoney Nakoda',
+  // Deep SE — north of Bow River
+  'Mahogany', 'Auburn Bay', 'Seton', 'Cranston', 'Chaparral',
+  'Legacy', 'Walden', 'Wolf Willow', 'Belmont', 'Rangeview',
+  'Cranford', 'Cranleigh', 'Cranbrook', 'Auburn'
 ];
 
 function isLikelyInCalgary(lat, lng) {
