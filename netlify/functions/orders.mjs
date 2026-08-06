@@ -89,7 +89,7 @@ export default async (req) => {
       shop_full:        body['Shop (with Group Name)']   || null,
       driver:           body['Driver']                   || body['driver']            || null,
       driver_pay: body.driver_pay || body['driver_pay'] || 0,
-      total_pieces:     body['Total Pieces']             || body['total_pieces']      || null,
+     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
       zone:             body['Zone']                     || body['zone']              || null,
       zone_full:        body['Zone (with Group Name)']   || null,
       delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
