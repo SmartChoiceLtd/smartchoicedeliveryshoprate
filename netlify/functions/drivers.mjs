@@ -49,6 +49,12 @@ export default async (req) => {
     await store.setJSON(code.toLowerCase(), updated);
     return json(updated);
   }
+  if (req.method === 'DELETE') {
+    const code = url.searchParams.get('code');
+    if (!code) return json({ error: 'code required' }, 400);
+    await store.delete(code.toLowerCase());
+    return json({ deleted: code });
+  }
 
   return json({ error: 'Method not allowed' }, 405);
 };
