@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver Data Update</title>
+<style>
+body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:20px;background:#FAF7F2;color:#2B2620;}
+h1{font-family:Georgia,serif;font-size:20px;color:#0C769E;}
+.btn{background:#0C769E;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;cursor:pointer;width:100%;margin-top:16px;}
+.btn:disabled{opacity:0.5;}
+.log{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:14px;margin-top:16px;font-size:12px;font-family:monospace;max-height:500px;overflow-y:auto;white-space:pre-wrap;}
+.progress{background:#E6DECF;border-radius:999px;height:8px;margin-top:12px;}
+.progress-bar{background:#0C769E;border-radius:999px;height:8px;width:0;transition:width 0.3s;}
+.stats{display:flex;gap:16px;margin-top:12px;font-size:13px;}
+.stat{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:8px 14px;text-align:center;}
+.stat-val{font-size:20px;font-weight:700;color:#0C769E;}
+</style>
+</head>
+<body>
+<h1>Driver Data Update</h1>
+<p style="color:#6B6256;font-size:13px;">Updates existing driver records with email, phone, hire date and vehicle. Adds new drivers if not found.</p>
+<button class="btn" id="updateBtn">Update All Drivers</button>
+<div class="progress" hidden id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="stats" id="statsDiv" hidden>
+  <div class="stat"><div class="stat-val" id="statUpdated">0</div>Updated</div>
+  <div class="stat"><div class="stat-val" id="statAdded">0</div>Added</div>
+  <div class="stat"><div class="stat-val" id="statFailed">0</div>Failed</div>
+</div>
+<div class="log" id="log" hidden></div>
+
+<script>
+var DRIVERS = [
+  { hire_date:'2021-12-07', code:'AH',     name:'Adam Hrankowski',    email:'ajhrankowski@gmail.com',      phone:'4038139657', vehicle:'MIDSIZE SUV' },
+  { hire_date:'2024-12-19', code:'ANG',    name:'Angie Szostak',      email:'Angiesdelivery@yahoo.ca',     phone:'5875746774', vehicle:'SEDAN' },
+  { hire_date:'2023-09-08', code:'NV',     name:'Nadia Vaillancourt', email:'Nadia.vaillancourt@gmail.com',phone:'4038525648', vehicle:'COMPACT' },
+  { hire_date:'2024-12-07', code:'Craig',  name:'Craig Langley',      email:'teardropyurt@gmail.com',      phone:'4035609166', vehicle:'SUV' },
+  { hire_date:'2023-02-10', code:'MF',     name:'Miriam Fallon',      email:'mfallon29@gmail.com',         phone:'4035618490', vehicle:'FULLSIZE SUV' },
+  { hire_date:'2023-05-12', code:'ishdorj',name:'Ishdorj Baarai',     email:'Ishdorj.b@yahoo.com',         phone:'5874298627', vehicle:'MINIVAN' },
+  { hire_date:'2025-02-13', code:'TOSIN',  name:'Tosin Oluwunmi',     email:'oluwunmisa@gmail.com',        phone:'8257600470', vehicle:'SEDAN' },
+  { hire_date:'2025-05-05', code:'Emme',   name:'Mariah Szostak',     email:'emszostak2025@gmail.com',     phone:'8259944403', vehicle:'SUV' },
+  { hire_date:'2023-02-11', code:'MFL',    name:'Melody Littel',      email:'Choir_duck@hotmail.com',      phone:'4039739165', vehicle:'SMALL SUV' },
+  { hire_date:'2025-09-01', code:'JUDY',   name:'Judy Tennant',       email:'judytennant1@gmail.com',      phone:'', vehicle:'SEDAN' },
+  { hire_date:'2025-12-18', code:'Rashid', name:'Rashid Yakubu',      email:'rashman207@yahoo.com',        phone:'4034666190', vehicle:'SEDAN' },
+  { hire_date:'2022-09-07', code:'KE',     name:'Kevin Michaud',      email:'kevinmichaud@yahoo.ca',       phone:'4038809822', vehicle:'FULLSIZE SUV' },
+  { hire_date:'2022-09-08', code:'DT',     name:'Dabria Tulak',       email:'dabriatulak@gmail.com',       phone:'', vehicle:'SEDAN' },
+  { hire_date:'2026-05-02', code:'ALEXEI', name:'Alexei Chernekoff',  email:'drumnucks@gmail.com',         phone:'5874349275', vehicle:'SMALL SUV' },
+  { hire_date:'2026-06-09', code:'Ravi',   name:'Ravinder Dhaliwal',  email:'ravidhaliwal1984@gmail.com',  phone:'4037140809', vehicle:'TRUCK' },
+];
+
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+document.getElementById('updateBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var log = document.getElementById('log');
+  var progressWrap = document.getElementById('progressWrap');
+  var progressBar = document.getElementById('progressBar');
+  var statsDiv = document.getElementById('statsDiv');
+  log.hidden = false;
+  progressWrap.hidden = false;
+  statsDiv.hidden = false;
+  log.textContent = 'Loading drivers from system...\n\n';
+
+  // Load existing drivers
+  var res = await fetch('/api/drivers');
+  var existing = await res.json();
+  log.textContent += 'Found ' + existing.length + ' existing drivers.\n\n';
+
+  var updated = 0, added = 0, failed = 0;
+
+  for (var i = 0; i < DRIVERS.length; i++) {
+    var d = DRIVERS[i];
+    progressBar.style.width = Math.round((i / DRIVERS.length) * 100) + '%';
+
+    // Find match by code (case insensitive)
+    var match = existing.find(function(e) {
+      return e.code && e.code.toUpperCase() === d.code.toUpperCase();
+    });
+
+    try {
+      if (match) {
+        // Update existing driver
+        var updateRes = await fetch('/api/drivers?code=' + encodeURIComponent(match.code), {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            name: d.name,
+            vehicle: d.vehicle,
+            email: d.email,
+            phone: d.phone,
+            hire_date: d.hire_date
+          })
+        });
+        if (updateRes.ok) {
+          updated++;
+          log.textContent += '✓ Updated: ' + d.code + ' ' + d.name + ' (' + d.email + ')\n';
+          document.getElementById('statUpdated').textContent = updated;
+        } else {
+          failed++;
+          log.textContent += '✗ Failed to update: ' + d.code + '\n';
+          document.getElementById('statFailed').textContent = failed;
+        }
+      } else {
+        // Add new driver
+        var addRes = await fetch('/api/drivers', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            code: d.code,
+            name: d.name,
+            vehicle: d.vehicle,
+            email: d.email,
+            phone: d.phone,
+            hire_date: d.hire_date,
+            active: true
+          })
+        });
+        if (addRes.ok) {
+          added++;
+          log.textContent += '+ Added: ' + d.code + ' ' + d.name + '\n';
+          document.getElementById('statAdded').textContent = added;
+        } else {
+          failed++;
+          log.textContent += '✗ Failed to add: ' + d.code + '\n';
+          document.getElementById('statFailed').textContent = failed;
+        }
+      }
+    } catch(e) {
+      failed++;
+      log.textContent += '✗ Error: ' + d.code + ' — ' + e.message + '\n';
+      document.getElementById('statFailed').textContent = failed;
+    }
+
+    log.scrollTop = log.scrollHeight;
+    await sleep(200);
+  }
+
+  progressBar.style.width = '100%';
+  log.textContent += '\nDone! ' + updated + ' updated, ' + added + ' added, ' + failed + ' failed.';
+  btn.textContent = 'Update Complete';
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
