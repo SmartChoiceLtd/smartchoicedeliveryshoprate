@@ -156,7 +156,13 @@ export default async (req) => {
       shop_code: shopCode,
       shop_full: raw.shop_full,
       driver: raw.driver,
-      driver_pay: raw.driver_pay || 0,
+      driver_pay: (function() {
+        if (raw.driver_pay) return parseFloat(raw.driver_pay);
+        const r = ratesData[zoneCode];
+        if (!r) return 0;
+        const pieces = parseInt(raw.total_pieces || 1);
+        return (r.drate || 0) + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
+      })(),
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
       zone_code: zoneCode,
@@ -179,8 +185,10 @@ export default async (req) => {
       return json({ error: 'Could not store order: ' + e.message }, 500);
     }
   }
-
-  return json({ error: 'Method not allowed' }, 405);
-};
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+    return json({ error: 'Method not allowed' }, 405);
+    };
 
 export const config = { path: '/api/orders' };
