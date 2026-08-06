@@ -131,6 +131,7 @@ function renderDrivers() {
         '<td style="display:flex;gap:6px;">' +
         '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
         '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
+        '<button class="btn-danger" onclick="deleteDriver(\'' + esc(d.code) + '\')" style="background:#666;">Delete</button>' +
         '</td></tr>';
     }).join('') +
     '</tbody></table>';
@@ -192,6 +193,14 @@ function editDriver(code) {
     if (idx >= 0) drivers[idx] = updated;
     renderDrivers();
   }).catch(function(){ alert('Could not update driver.'); });
+}
+  async function deleteDriver(code) {
+  if (!confirm('Permanently delete driver ' + code + '? This cannot be undone.')) return;
+  try {
+    await fetch('/api/drivers?code=' + encodeURIComponent(code), {method:'DELETE'});
+    drivers = drivers.filter(function(d){ return d.code !== code; });
+    renderDrivers();
+  } catch(e) { alert('Could not delete driver.'); }
 }
 
 async function loadDrivers() {
