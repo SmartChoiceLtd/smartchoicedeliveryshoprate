@@ -161,7 +161,7 @@ async function loadDrivers() {
 function renderDrivers() {
   var el = document.getElementById('driversList');
   if (!drivers.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No drivers yet.</p>'; return; }
- el.innerHTML = '<table><thead><tr><th>Code</th><th>Name</th><th>Vehicle</th><th>Email</th><th>Phone</th><th>Hire Date</th><th>Status</th><th>Link</th><th>Edit</th></tr></thead><tbody>' +
+el.innerHTML = '<table><thead><tr><th>Code</th><th>Name</th><th>Vehicle</th><th>Email</th><th>Phone</th><th>Hire Date</th><th>Status</th><th>Link</th><th>Edit</th></tr></thead><tbody>' +
     drivers.map(function(d) {
       return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
         '<td>' + esc(d.code) + '</td>' +
