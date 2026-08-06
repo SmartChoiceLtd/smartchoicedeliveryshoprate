@@ -161,12 +161,15 @@ async function loadDrivers() {
 function renderDrivers() {
   var el = document.getElementById('driversList');
   if (!drivers.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No drivers yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Code</th><th>Name</th><th>Vehicle</th><th>Status</th><th>Link</th><th></th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr>'<th>Code</th><th>Name</th><th>Vehicle</th><th>Email</th><th>Phone</th><th>Hire Date</th><th>Status</th><th>Link</th><th>Edit</th>'
     drivers.map(function(d) {
       return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
-        '<td><span class="driver-code">' + esc(d.code) + '</span></td>' +
-        '<td>' + esc(d.name) + '</td>' +
-        '<td>' + esc(d.vehicle) + '</td>' +
+        '<td>' + esc(d.code) + '</td>' +
+'<td>' + esc(d.name) + '</td>' +
+'<td>' + esc(d.vehicle||'') + '</td>' +
+'<td>' + esc(d.email||'') + '</td>' +
+'<td>' + esc(d.phone||'') + '</td>' +
+'<td>' + esc(d.hire_date||'') + '</td>' +
         '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
         '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
         '<td style="display:flex;gap:6px;">' +
@@ -221,16 +224,14 @@ function editDriver(code) {
   if (name === null) return;
   var vehicle = window.prompt('Edit vehicle:', d.vehicle || '');
   if (vehicle === null) return;
+  var email = window.prompt('Edit email:', d.email || '');
+  if (email === null) return;
+  var phone = window.prompt('Edit phone:', d.phone || '');
+  if (phone === null) return;
   fetch('/api/drivers?code=' + encodeURIComponent(code), {
     method: 'PUT',
     headers: {'content-type':'application/json'},
-    body: JSON.stringify({name: name.trim(), vehicle: vehicle.trim()})
-  }).then(function(r){ return r.json(); }).then(function(updated){
-    var idx = drivers.findIndex(function(x){ return x.code===code; });
-    if (idx >= 0) drivers[idx] = updated;
-    renderDrivers();
-  }).catch(function(){ alert('Could not update driver.'); });
-}
+    body: JSON.stringify({name: name.trim(), vehicle: vehicle.trim(), email: email.trim(), phone: phone.trim()})
 /* ---- SHOPS ---- */
 async function loadShops() {
   try {
