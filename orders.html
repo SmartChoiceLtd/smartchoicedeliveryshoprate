@@ -1,1 +1,226 @@
+<!DOCTYPE html> <html lang="en"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <title>Smart Choice Delivery — Orders</title> <style> :root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#7A5C00;--amber-soft:#FFF8E1;--radius:10px;} *{box-sizing:border-box;}html,body{height:100%;margin:0;} [hidden]{display:none !important;} body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;} h1,h2{font-family:Georgia,serif;font-weight:600;margin:0;} .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;} .topbar h1{font-size:18px;}.topbar a{font-size:13px;color:var(--accent);text-decoration:none;} .toolbar{padding:10px 24px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;} .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block;} .btn:hover{opacity:0.9;}.btn:disabled{opacity:0.5;cursor:default;} .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);} .btn-sm{padding:4px 10px;font-size:12px;} .btn-danger{background:transparent;color:#B8472B;border:1px solid #E3B3AE;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;} .btn-danger:hover{background:#FBEAEA;} .filter-input{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;} .week-nav{display:flex;align-items:center;gap:6px;font-size:13px;} .week-nav button{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;} .week-nav button:hover{border-color:var(--accent);color:var(--accent);} .week-label{font-weight:600;min-width:160px;text-align:center;font-size:13px;} .stats{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;} .stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--ink-soft);} .stat strong{color:var(--ink);font-size:15px;display:block;} .main{flex:1;overflow:auto;} table{width:100%;border-collapse:collapse;font-size:13px;} thead{position:sticky;top:0;background:var(--card);z-index:10;} th{padding:9px 10px;text-align:left;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);white-space:nowrap;} td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} tr:hover td{background:#F9F5F0;} .badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;} .badge-auto{background:var(--green-soft);color:var(--green);} .badge-manual{background:#F0F0F0;color:#555;} .badge-review{background:var(--amber-soft);color:var(--amber);} .badge-conflict{background:#FFE0E0;color:#7A2E22;} .badge-override{background:#E8EAF6;color:#3949AB;} .zone-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);} .loading{text-align:center;padding:60px;color:var(--ink-soft);} .empty{text-align:center;padding:60px;color:var(--ink-soft);} .error-msg{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px 24px;font-size:13px;} .td-actions{display:flex;gap:4px;white-space:nowrap;} .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;} .modal{background:var(--card);border-radius:var(--radius);max-width:480px;width:100%;padding:24px;} .modal h2{font-size:16px;margin-bottom:12px;} .modal label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:3px;margin-top:10px;} .modal input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;} .modal-actions{display:flex;gap:8px;margin-top:14px;} .suggest-hint{font-size:12px;color:var(--green);margin-top:4px;} </style> </head> <body> <div class="topbar"> <h1>Smart Choice Delivery — Orders</h1> <a href="/">&larr; Quote tool</a> <div class="stats"> <div class="stat"><strong id="statTotal">—</strong>Showing</div> <div class="stat"><strong id="statReview">—</strong>Needs review</div> <div class="stat"><strong id="statConflict">—</strong>Conflicts</div> </div> </div> <div class="toolbar"> <div class="week-nav"> <button id="prevWeek">&larr;</button> <span class="week-label" id="weekLabel">Loading...</span> <button id="nextWeek">&rarr;</button> <button class="btn btn-ghost btn-sm" id="allWeeks">All</button> </div> <input class="filter-input" id="filterInput" placeholder="Name, address, shop, driver..." style="width:200px;"> <select id="filterSource" class="filter-input" style="width:150px;"> <option value="">All sources</option> <option value="auto">Auto</option> <option value="manual">Manual</option> <option value="override">Override</option> <option value="needs_review">Needs review</option> <option value="conflict">Zone conflict</option> </select> <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button> <a class="btn btn-ghost btn-sm" href="/api/export?format=detail" download>Export detail</a> <a class="btn btn-ghost btn-sm" href="/api/export?format=pivot" download>Shop pivot</a> <a class="btn btn-ghost btn-sm" href="/api/export?format=driver" download>Driver pivot</a><button class="btn btn-ghost btn-sm" onclick="qbExport()">QB Export</button><button class="btn btn-ghost btn-sm" onclick="openReport('driver')">Driver Reports</button>
+<button class="btn btn-ghost btn-sm" onclick="openReport('shop')">Shop Reports</button></div> <div id="errorMsg" class="error-msg" hidden></div> <div class="main"> <div class="loading" id="loadingMsg">Loading orders&hellip;</div> <div class="empty" id="emptyMsg" hidden>No orders for this period.</div> <table id="ordersTable" hidden> <thead><tr> <th>Date</th><th>Order ID</th><th>Name</th><th>Address</th> <th>Shop</th><th>Driver</th><th>Pcs</th><th>Zone</th> <th>Source</th><th>Suggested</th><th>Status</th><th>Actions</th> </tr></thead> <tbody id="ordersBody"></tbody> </table> </div> <div class="modal-bg" id="overrideModal" hidden> <div class="modal"> <h2>Override zone</h2> <label>Order ID</label><input id="ovOrderId" readonly style="background:var(--bg);"> <label>Address</label><input id="ovAddress" readonly style="background:var(--bg);"> <label>Current zone</label><input id="ovCurrent" readonly style="background:var(--bg);"> <div class="suggest-hint" id="ovHint"></div> <label>New zone code</label><input id="ovNew" placeholder="e.g. C4, COC, BNF" style="text-transform:uppercase;"> <label>Note (optional)</label><input id="ovNote" placeholder="Reason for override"> <div class="modal-actions"> <button class="btn" id="ovSaveBtn">Save</button> <button class="btn btn-ghost" id="ovCancelBtn">Cancel</button> </div> </div> </div> <script> var allOrders = []; var currentOverrideId = null; var weekOffset = 0; var showAllWeeks = false;
 
+function getWeekBounds(offset) {
+var now = new Date();
+var day = now.getDay();
+var monday = new Date(now);
+monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+monday.setHours(0,0,0,0);
+var sunday = new Date(monday);
+sunday.setDate(monday.getDate() + 6);
+sunday.setHours(23,59,59,999);
+return { start: monday, end: sunday };
+}
+
+function formatWeekLabel(bounds) {
+var opts = { month:'short', day:'numeric' };
+return bounds.start.toLocaleDateString('en-CA', opts) + ' — ' + bounds.end.toLocaleDateString('en-CA', opts);
+}
+
+function updateWeekLabel() {
+var label = document.getElementById('weekLabel');
+if (showAllWeeks) { label.textContent = 'All dates'; return; }
+label.textContent = formatWeekLabel(getWeekBounds(weekOffset));
+}
+
+function parseOrderDate(o) {
+var raw = o.date || o.received_at;
+if (!raw) return new Date(0);
+var d = new Date(raw);
+if (!isNaN(d.getTime())) return d;
+var months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+var m = raw.match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+if (m) return new Date(parseInt(m[3]), months[m[2]] || 0, parseInt(m[1]));
+return new Date(0);
+}
+
+function escapeHtml(s) {
+if (s === null || s === undefined) return '';
+var d = document.createElement('div');
+d.textContent = String(s);
+return d.innerHTML;
+}
+
+function getDeliveryStatus(o) {
+if (!o.delivery_status) return '';
+if (Array.isArray(o.delivery_status)) return o.delivery_status[0] || '';
+return String(o.delivery_status).split(',')[0];
+}
+
+function getDeliveryStatusFull(o) {
+if (!o.delivery_status) return '';
+if (Array.isArray(o.delivery_status)) return o.delivery_status.join(', ');
+return String(o.delivery_status);
+}
+
+function sourceBadge(o) {
+if (o.zone_conflict) return '<span class="badge badge-conflict">Conflict</span>';
+var s = o.zone_source;
+if (s === 'auto') return '<span class="badge badge-auto">Auto</span>';
+if (s === 'override') return '<span class="badge badge-override">Override</span>';
+if (s === 'needs_review') return '<span class="badge badge-review">Review</span>';
+return '<span class="badge badge-manual">Manual</span>';
+}
+
+function applyFilters() {
+var text = document.getElementById('filterInput').value.toLowerCase();
+var src = document.getElementById('filterSource').value;
+var bounds = showAllWeeks ? null : getWeekBounds(weekOffset);
+
+var filtered = allOrders.filter(function(o) {
+if (bounds && !text) {
+var d = parseOrderDate(o);
+if (d < bounds.start || d > bounds.end) return false;
+}
+if (text) {
+var hay = [o.name, o.address, o.formatted_address, o.shop_code, o.shop_full, o.driver, o.zone_code, o.order_id]
+.filter(Boolean).join(' ').toLowerCase();
+if (hay.indexOf(text) === -1) return false;
+}
+if (src) {
+if (src === 'conflict') return !!o.zone_conflict;
+if (src !== o.zone_source) return false;
+}
+return true;
+});
+
+document.getElementById('statTotal').textContent = filtered.length;
+document.getElementById('statReview').textContent = filtered.filter(function(o){ return o.zone_source === 'needs_review'; }).length;
+document.getElementById('statConflict').textContent = filtered.filter(function(o){ return !!o.zone_conflict; }).length;
+
+if (!filtered.length) {
+document.getElementById('ordersTable').hidden = true;
+document.getElementById('emptyMsg').hidden = false;
+return;
+}
+document.getElementById('ordersTable').hidden = false;
+document.getElementById('emptyMsg').hidden = true;
+
+var rows = filtered.map(function(o) {
+try {
+var suggested = (o.zone_suggestion && o.zone_suggestion.suggested) ? o.zone_suggestion.suggested : '';
+var suggestedDisplay = (suggested && suggested !== o.zone_code)
+? '<span style="color:var(--ink-soft);font-size:11px;">' + escapeHtml(suggested) + '</span>' : '';
+var status = getDeliveryStatus(o);
+var statusFull = getDeliveryStatusFull(o);
+return '<tr>' +
+'<td>' + escapeHtml(o.date || (o.received_at || '').slice(0,10)) + '</td>' +
+'<td>' + escapeHtml(o.order_id) + '</td>' +
+'<td>' + escapeHtml(o.name) + '</td>' +
+'<td title="' + escapeHtml(o.formatted_address || o.address) + '">' + escapeHtml(o.formatted_address || o.address) + '</td>' +
+'<td>' + escapeHtml(o.shop_code) + '</td>' +
+'<td>' + escapeHtml(o.driver) + '</td>' +
+'<td>' + escapeHtml(o.total_pieces) + '</td>' +
+'<td><span class="zone-badge">' + escapeHtml(o.zone_code || '—') + '</span></td>' +
+'<td>' + sourceBadge(o) + '</td>' +
+'<td>' + suggestedDisplay + '</td>' +
+'<td title="' + escapeHtml(statusFull) + '">' + escapeHtml(status) + '</td>' +
+'<td><div class="td-actions">' +
+'<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>' +
+'<button class="btn-danger" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id || o.id) + '\')">Delete</button>' +
+'</div></td>' +
+'</tr>';
+} catch(e) {
+return '<tr><td colspan="12" style="color:red;font-size:12px;">Row error: ' + e.message + '</td></tr>';
+}
+});
+document.getElementById('ordersBody').innerHTML = rows.join('');
+}
+
+function loadOrders() {
+document.getElementById('loadingMsg').hidden = false;
+document.getElementById('errorMsg').hidden = true;
+document.getElementById('ordersTable').hidden = true;
+document.getElementById('emptyMsg').hidden = true;
+fetch('/api/orders').then(function(res) {
+if (!res.ok) throw new Error('Status ' + res.status);
+return res.json();
+}).then(function(data) {
+allOrders = data;
+document.getElementById('loadingMsg').hidden = true;
+applyFilters();
+}).catch(function(e) {
+document.getElementById('loadingMsg').hidden = true;
+var err = document.getElementById('errorMsg');
+err.textContent = 'Could not load orders: ' + e.message;
+err.hidden = false;
+});
+}
+
+function deleteOrder(id, label) {
+if (!confirm('Delete order "' + label + '"? This cannot be undone.')) return;
+fetch('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' })
+.then(function() {
+allOrders = allOrders.filter(function(o){ return o.id !== id; });
+applyFilters();
+})
+.catch(function(e) { alert('Could not delete: ' + e.message); });
+}
+
+function openOverride(id) {
+var order = allOrders.filter(function(o){ return o.id === id; })[0];
+if (!order) return;
+currentOverrideId = id;
+document.getElementById('ovOrderId').value = order.order_id || id;
+document.getElementById('ovAddress').value = order.formatted_address || order.address || '';
+document.getElementById('ovCurrent').value = order.zone_code || '';
+var hint = (order.zone_suggestion && order.zone_suggestion.suggested)
+? 'System suggests: ' + order.zone_suggestion.suggested + ' (' + order.zone_suggestion.confidence + ' — ' + order.zone_suggestion.message + ')'
+: '';
+document.getElementById('ovHint').textContent = hint;
+document.getElementById('ovNew').value = (order.zone_suggestion && order.zone_suggestion.suggested) ? order.zone_suggestion.suggested : '';
+document.getElementById('ovNote').value = '';
+document.getElementById('overrideModal').hidden = false;
+}
+
+document.getElementById('ovSaveBtn').addEventListener('click', function() {
+var newZone = document.getElementById('ovNew').value.trim().toUpperCase();
+var note = document.getElementById('ovNote').value.trim();
+if (!newZone) { alert('Enter a zone code.'); return; }
+var btn = document.getElementById('ovSaveBtn');
+btn.disabled = true; btn.textContent = 'Saving...';
+fetch('/api/orders/' + encodeURIComponent(currentOverrideId), {
+method: 'PUT',
+headers: { 'content-type': 'application/json' },
+body: JSON.stringify({ zone_code: newZone, zone_source: 'override', zone_override_note: note, zone_conflict: false })
+}).then(function(res) {
+if (!res.ok) throw new Error('Status ' + res.status);
+return res.json();
+}).then(function(updated) {
+var idx = allOrders.findIndex(function(o){ return o.id === currentOverrideId; });
+if (idx >= 0) allOrders[idx] = updated;
+document.getElementById('overrideModal').hidden = true;
+applyFilters();
+}).catch(function(e) { alert('Could not save: ' + e.message); })
+.finally(function() { btn.disabled = false; btn.textContent = 'Save'; });
+});
+
+document.getElementById('ovCancelBtn').addEventListener('click', function() {
+document.getElementById('overrideModal').hidden = true;
+});
+document.getElementById('overrideModal').addEventListener('click', function(e) {
+if (e.target === this) this.hidden = true;
+});
+document.getElementById('prevWeek').addEventListener('click', function() {
+showAllWeeks = false; weekOffset--; updateWeekLabel(); applyFilters();
+});
+document.getElementById('nextWeek').addEventListener('click', function() {
+showAllWeeks = false; weekOffset++; updateWeekLabel(); applyFilters();
+});
+document.getElementById('allWeeks').addEventListener('click', function() {
+showAllWeeks = true; updateWeekLabel(); applyFilters();
+});
+document.getElementById('filterInput').addEventListener('input', applyFilters);
+document.getElementById('filterSource').addEventListener('change', applyFilters);
+document.getElementById('refreshBtn').addEventListener('click', loadOrders);
+
+updateWeekLabel();
+loadOrders();
+function qbExport(){var weekEnd=prompt('Week ending date (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var startInv=prompt('Starting invoice number:','');if(!startInv)return;fetch('/api/qb-export?week_end='+weekEnd+'&start_invoice='+startInv).then(function(r){return r.blob();}).then(function(blob){var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='qb-invoices-'+weekEnd+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}).catch(function(e){alert('QB export failed: '+e.message);});}
+ function openReport(type){var weekEnd=prompt('Week ending (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var code=prompt('Code (or "all"):','all');if(code===null)return;window.open('/api/reports?type='+type+'&week_end='+weekEnd+'&code='+code,'_blank');} 
+</script>
+
+export const config = { path: '/api/export' }; 
+
+export const config = { path: '/api/export' }; 
