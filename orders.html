@@ -69,7 +69,7 @@ var src = document.getElementById('filterSource').value;
 var bounds = showAllWeeks ? null : getWeekBounds(weekOffset);
 
 var filtered = allOrders.filter(function(o) {
-if (bounds) {
+if (bounds && !text) {
 var d = parseOrderDate(o);
 if (d < bounds.start || d > bounds.end) return false;
 }
