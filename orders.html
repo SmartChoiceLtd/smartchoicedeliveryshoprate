@@ -150,8 +150,8 @@ cardsEl.hidden = false;
     + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
     + (bottomLine.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(bottomLine.join(' • ')) + '</div>' : '')
     + '<div style="display:flex;gap:8px;">'
-  '<button class="btn btn-ghost btn-sm" onclick="focusCard(this)">Focus</button>'
-+'<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
+  +'<button class="btn btn-ghost btn-sm" style="min-height:44px;min-width:60px;touch-action:manipulation;" onclick="focusCard(this)">Focus</button>'
+  +'<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
     + '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id||o.id) + ')">Delete</button>'
     + '</div>'
     + '</div>';
