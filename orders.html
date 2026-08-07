@@ -113,7 +113,15 @@ return '<div style="background:var(--card);border:1px solid var(--border);border
 + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
 + '</div>'
 + '<div style="font-size:13px;font-weight:600;">' + escapeHtml(o.name||'') + '</div>'
-+ '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>'
++'<div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">'
++ + escapeHtml(status||'')
++ (o.neighboured_to ? ' — ' + escapeHtml(o.neighboured_to) : '')
++ (o.delivery_status && Array.isArray(o.delivery_status) ? ' — ' + o.delivery_status.filter(function(s){ return ['Concierge/Reception','Mailroom','Loading Dock','Doorstep'].indexOf(s) >= 0; }).map(escapeHtml).join(', ') : '')
++ '</div>'
++ '<div style="font-size:12px;color:var(--ink-soft);">'
++ (o.accepted_by ? 'Accepted by: <strong>' + escapeHtml(o.accepted_by) + '</strong>' : '')
++ (o.delivery_time ? ' &bull; ' + escapeHtml(o.delivery_time) : '')
++ '</div>'
 + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px;">'
 + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;">' + escapeHtml(o.zone_code||'') + '</span>'
 + '<span>Driver: <strong>' + escapeHtml(o.driver||'') + '</strong></span>'
