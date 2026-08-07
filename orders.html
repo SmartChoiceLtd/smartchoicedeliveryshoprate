@@ -69,7 +69,11 @@ if (s === 'needs_review') return '<span class="badge badge-review">Review</span>
 return '<span class="badge badge-manual">Manual</span>';
 }
 function focusCard(btn) {
-  var el = btn.parentNode.parentNode;
+  var el = btn;
+  while (el && el.parentNode && el.parentNode.id !== 'ordersCards') {
+    el = el.parentNode;
+  }
+  if (!el) return;
   var cards = document.querySelectorAll('#ordersCards > div');
   var isFocused = el.getAttribute('data-focused') === '1';
   cards.forEach(function(c) {
