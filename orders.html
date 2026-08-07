@@ -103,37 +103,34 @@ cardsEl.id = 'ordersCards';
 document.getElementById('ordersTable').parentNode.insertBefore(cardsEl, document.getElementById('ordersTable'));
 }
 cardsEl.hidden = false;
-cardsEl.innerHTML = filtered.map(function(o) {
-var status = getDeliveryStatus(o);
-var pay = o.driver_pay ? '<span style="color:var(--green);font-weight:600;">$' + parseFloat(o.driver_pay).toFixed(2) + '</span>' : '';
-var conflict = o.zone_conflict ? '<span style="color:var(--warm);font-size:10px;font-weight:700;">CONFLICT</span>' : '';
-return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
-+ '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
-+ '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
-+ '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
-+ '</div>'
-+ '<div style="font-size:13px;font-weight:600;">' + escapeHtml(o.name||'') + '</div>'
-+'<div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">'
-+ + escapeHtml(status||'')
-+ (o.neighboured_to ? ' — ' + escapeHtml(o.neighboured_to) : '')
-+ (o.delivery_status && Array.isArray(o.delivery_status) ? ' — ' + o.delivery_status.filter(function(s){ return ['Concierge/Reception','Mailroom','Loading Dock','Doorstep'].indexOf(s) >= 0; }).map(escapeHtml).join(', ') : '')
-+ '</div>'
-+ '<div style="font-size:12px;color:var(--ink-soft);">'
-+ (o.accepted_by ? 'Accepted by: <strong>' + escapeHtml(o.accepted_by) + '</strong>' : '')
-+ (o.delivery_time ? ' &bull; ' + escapeHtml(o.delivery_time) : '')
-+ '</div>'
-+ '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px;">'
-+ '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;">' + escapeHtml(o.zone_code||'') + '</span>'
-+ '<span>Driver: <strong>' + escapeHtml(o.driver||'') + '</strong></span>'
-+ '<span>Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong></span>'
-+ pay + ' ' + conflict
-+ '</div>'
-+ '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(status||'') + '</div>'
-+ '<div style="display:flex;gap:8px;">'
-+ '<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
-+ '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id||o.id) + ')">Delete</button>'
-+ '</div>'
-+ '</div>';
+ cardsEl.innerHTML = filtered.map(function(o) {
+  var statusArr = Array.isArray(o.delivery_status) ? o.delivery_status : (o.delivery_status ? [o.delivery_status] : []);
+  var mainStatus = statusArr.filter(function(s){ return ['Direct to Address','Neighboured','Redirect','Undeliverable'].indexOf(s) >= 0; }).join(', ');
+  var subStatus = statusArr.filter(function(s){ return ['Direct to Address','Neighboured','Redirect','Undeliverable'].indexOf(s) < 0; }).join(', ');
+  var statusLine = mainStatus + (subStatus ? ' — ' + subStatus : '') + (o.neighboured_to ? ' — ' + o.neighboured_to : '');
+  var bottomLine = [];
+  if (o.accepted_by) bottomLine.push('Accepted: ' + o.accepted_by);
+  if (o.delivery_time) bottomLine.push(o.delivery_time);
+  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
+    + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+    + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
+    + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
+    + '</div>'
+    + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
+    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>'
+    + '<div style="font-size:12px;margin-bottom:4px;">'
+    + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
+    + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
+    + ' &bull; Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
+    + (o.zone_conflict ? ' <span style="color:var(--warm);font-weight:700;">CONFLICT</span>' : '')
+    + '</div>'
+    + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
+    + (bottomLine.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(bottomLine.join(' • ')) + '</div>' : '')
+    + '<div style="display:flex;gap:8px;">'
+    + '<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
+    + '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id||o.id) + ')">Delete</button>'
+    + '</div>'
+    + '</div>';
 }).join('');
 return;
 }
