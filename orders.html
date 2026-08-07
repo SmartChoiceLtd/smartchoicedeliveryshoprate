@@ -106,28 +106,27 @@ if (text) {
   cardsEl.hidden = false;
   cardsEl.innerHTML = filtered.map(function(o) {
     var status = getDeliveryStatus(o);
-    var conflict = o.zone_conflict ? '<span style="background:var(--warm-soft);color:var(--warm);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">CONFLICT</span>' : '';
-    var driverPay = o.driver_pay ? '$' + parseFloat(o.driver_pay).toFixed(2) : '';
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
-        '<div><span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>' +
-        '<span style="font-size:13px;color:var(--ink-soft);margin-left:8px;">' + escapeHtml(o.shop_full||'') + '</span></div>' +
-        '<div style="text-align:right;font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + '<br><strong>#' + escapeHtml(o.order_id||'') + '</strong></div>' +
-      '</div>' +
-      '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>' +
-      '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
-        '<span style="background:var(--accent-soft);color:var(--accent);padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;">' + escapeHtml(o.zone_code||'—') + '</span>' +
-        '<span style="font-size:12px;color:var(--ink-soft);">Driver: <strong>' + escapeHtml(o.driver||'') + '</strong></span>' +
-        '<span style="font-size:12px;color:var(--ink-soft);">Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong></span>' +
-        (driverPay ? '<span style="font-size:12px;color:var(--green);font-weight:600;">' + driverPay + '</span>' : '') +
-        conflict +
-      '</div>' +
-      '<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">' + escapeHtml(status||'') + '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:10px;">' +
-        '<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>' +
-        '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>' +
-      '</div></div>';
+    var conflict = o.zone_conflict ? '<span style="color:var(--warm);font-size:10px;font-weight:700;"> CONFLICT</span>' : '';
+    var pay = o.driver_pay ? ' <span style="color:var(--green);font-weight:600;">$' + parseFloat(o.driver_pay).toFixed(2) + '</span>' : '';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+        + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
+        + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:600;">' + escapeHtml(o.name||'') + '</div>'
+      + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin-bottom:6px;">'
+        + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;">' + escapeHtml(o.zone_code||'') + '</span>'
+        + ' Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
+        + ' Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
+        + pay + conflict
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(status||'') + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
+        + '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id||o.id) + ')">Delete</button>'
+      + '</div>'
+      + '</div>';
   }).join('');
   return;
 }
