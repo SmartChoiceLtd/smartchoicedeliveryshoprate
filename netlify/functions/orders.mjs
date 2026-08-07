@@ -99,7 +99,7 @@ export default async (req) => {
       delivery_time:    body['Delivery Time']            || null,
       contact_method:   body['Recipient Contact Method'] || null,
       neighboured_to:   body['Neighboured To']           || null,
-      accepted_by:      body['Delivery Accept By']       || null,
+      accepted_by:      body['Delivery Accepted By']       || null,
       comments:         body['Comments']                 || null,
     };
 
