@@ -67,15 +67,26 @@ export default async (req) => {
     } catch (e) {
       return json({ error: 'Could not load orders: ' + e.message }, 500);
     }
-  }
-
+  }  
   // Handle POST — receive Zoho webhook
-  if (req.method === 'POST') {
+  if
+   (req.method === 'POST') {
     const key = process.env.GOOGLE_MAPS_KEY;
-    let body;
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+   let body;
     try {
       body = await req.json();
     } catch (e) {
+      return json({ error: 'Invalid JSON payload' }, 400);
+    }
+
+    // Map Zoho field names to our internal structure
+    try {
+      body = await req.json();
+    } catch (e) {
+ 
       return json({ error: 'Invalid JSON payload' }, 400);
     }
 
@@ -185,9 +196,7 @@ export default async (req) => {
       return json({ error: 'Could not store order: ' + e.message }, 500);
     }
   }
-    const ratesStore = getStore('flower-rates');
-    let ratesData = {};
-    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+  
     return json({ error: 'Method not allowed' }, 405);
     };
 
