@@ -123,7 +123,8 @@ if (text) {
       + '</div>'
       + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(status||'') + '</div>'
       + '<div style="display:flex;gap:8px;">'
-        + '<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
+       '<button class="btn btn-ghost btn-sm" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>' +
+'<button class="btn-danger" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id || o.id) + ')">Delete</button>' +
         + '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(' + JSON.stringify(o.id) + ',' + JSON.stringify(o.order_id||o.id) + ')">Delete</button>'
       + '</div>'
       + '</div>';
