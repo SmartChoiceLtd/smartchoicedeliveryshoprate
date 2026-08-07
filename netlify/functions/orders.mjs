@@ -82,15 +82,7 @@ export default async (req) => {
       return json({ error: 'Invalid JSON payload' }, 400);
     }
 
-    // Map Zoho field names to our internal structure
-    try {
-      body = await req.json();
-    } catch (e) {
- 
-      return json({ error: 'Invalid JSON payload' }, 400);
-    }
-
-    // Map Zoho field names to our internal structure
+      // Map Zoho field names to our internal structure
     const raw = {
       date:             body['Date']                     || body['date']              || null,
       order_id:         body['Order ID']                 || body['order_id']          || null,
