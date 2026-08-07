@@ -94,9 +94,47 @@ document.getElementById('ordersTable').hidden = true;
 document.getElementById('emptyMsg').hidden = false;
 return;
 }
-document.getElementById('ordersTable').hidden = false;
 document.getElementById('emptyMsg').hidden = true;
-
+if (text) {
+  document.getElementById('ordersTable').hidden = true;
+  var cardsEl = document.getElementById('ordersCards');
+  if (!cardsEl) {
+    cardsEl = document.createElement('div');
+    cardsEl.id = 'ordersCards';
+    document.getElementById('ordersTable').parentNode.insertBefore(cardsEl, document.getElementById('ordersTable'));
+  }
+  cardsEl.hidden = false;
+  cardsEl.innerHTML = filtered.map(function(o) {
+    var status = getDeliveryStatus(o);
+    var conflict = o.zone_conflict ? '<span style="background:var(--warm-soft);color:var(--warm);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">CONFLICT</span>' : '';
+    var driverPay = o.driver_pay ? '$' + parseFloat(o.driver_pay).toFixed(2) : '';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+        '<div><span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>' +
+        '<span style="font-size:13px;color:var(--ink-soft);margin-left:8px;">' + escapeHtml(o.shop_full||'') + '</span></div>' +
+        '<div style="text-align:right;font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + '<br><strong>#' + escapeHtml(o.order_id||'') + '</strong></div>' +
+      '</div>' +
+      '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>' +
+      '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+        '<span style="background:var(--accent-soft);color:var(--accent);padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;">' + escapeHtml(o.zone_code||'—') + '</span>' +
+        '<span style="font-size:12px;color:var(--ink-soft);">Driver: <strong>' + escapeHtml(o.driver||'') + '</strong></span>' +
+        '<span style="font-size:12px;color:var(--ink-soft);">Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong></span>' +
+        (driverPay ? '<span style="font-size:12px;color:var(--green);font-weight:600;">' + driverPay + '</span>' : '') +
+        conflict +
+      '</div>' +
+      '<div style="margin-top:8px;font-size:12px;color:var(--ink-soft);">' + escapeHtml(status||'') + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:10px;">' +
+        '<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>' +
+        '<button class="btn-danger" style="font-size:12px;padding:4px 10px;" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>' +
+      '</div></div>';
+  }).join('');
+  return;
+}
+var cardsEl = document.getElementById('ordersCards');
+if (cardsEl) cardsEl.hidden = true;
+document.getElementById('ordersTable').hidden = false;
+var rows = filtered.map(function(o) {
 var rows = filtered.map(function(o) {
 try {
 var suggested = (o.zone_suggestion && o.zone_suggestion.suggested) ? o.zone_suggestion.suggested : '';
@@ -221,6 +259,4 @@ function qbExport(){var weekEnd=prompt('Week ending date (YYYY-MM-DD):',new Date
  function openReport(type){var weekEnd=prompt('Week ending (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var code=prompt('Code (or "all"):','all');if(code===null)return;window.open('/api/reports?type='+type+'&week_end='+weekEnd+'&code='+code,'_blank');} 
 </script>
 
-export const config = { path: '/api/export' }; 
 
-export const config = { path: '/api/export' }; 
