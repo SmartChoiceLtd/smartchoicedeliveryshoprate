@@ -291,6 +291,3 @@ function qbExport(){var weekEnd=prompt('Week ending date (YYYY-MM-DD):',new Date
  function openReport(type){var weekEnd=prompt('Week ending (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var code=prompt('Code (or "all"):','all');if(code===null)return;window.open('/api/reports?type='+type+'&week_end='+weekEnd+'&code='+code,'_blank');} 
 </script>
 
-export const config = { path: '/api/export' }; 
-
-export const config = { path: '/api/export' }; 
