@@ -269,7 +269,7 @@ function applyFilters() {
         + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;">' + escapeHtml(o.zone_code||'') + '</span>'
         + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
         + ' Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
-        + ' ' + pay + conflict
+        + ' ' + pay
         + '</div>'
         + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
         + (bottomParts.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + bottomParts.join(' • ') + '</div>' : '')
