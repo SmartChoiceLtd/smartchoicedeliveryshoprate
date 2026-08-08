@@ -62,14 +62,75 @@ if (s === 'override') return '<span class="badge badge-override">Override</span>
 if (s === 'needs_review') return '<span class="badge badge-review">Review</span>';
 return '<span class="badge badge-manual">Manual</span>';
 }
+function focusCard(btn) {
+  var el = btn;
+  while (el && el.parentNode && el.parentNode.id !== 'ordersCards') {
+    el = el.parentNode;
+  }
+  if (!el) return;
+  var cards = document.querySelectorAll('#ordersCards > div');
+  var isFocused = el.getAttribute('data-focused') === '1';
+  cards.forEach(function(c) {
+    c.style.display = '';
+    c.removeAttribute('data-focused');
+    c.style.border = '1px solid var(--border)';
+  });
+  if (!isFocused) {
+    cards.forEach(function(c) {
+      if (c !== el) c.style.display = 'none';
+    });
+    el.setAttribute('data-focused', '1');
+    el.style.border = '2px solid var(--accent)';
+  }
+}
 
+function renderCards(filtered) {
+  var cardsEl = document.getElementById('ordersCards');
+  if (!cardsEl) {
+    cardsEl = document.createElement('div');
+    cardsEl.id = 'ordersCards';
+    cardsEl.style.cssText = 'padding:12px 24px;';
+    document.getElementById('ordersTable').parentNode.insertBefore(cardsEl, document.getElementById('ordersTable'));
+  }
+  cardsEl.hidden = false;
+  cardsEl.innerHTML = filtered.map(function(o) {
+    var statusArr = Array.isArray(o.delivery_status) ? o.delivery_status : (o.delivery_status ? [String(o.delivery_status)] : []);
+    var mainStatuses = ['Direct to Address','Neighboured','Redirect','Undeliverable'];
+    var mainStatus = statusArr.filter(function(s){ return mainStatuses.indexOf(s) >= 0; }).join(', ');
+    var subStatus = statusArr.filter(function(s){ return mainStatuses.indexOf(s) < 0; }).join(', ');
+    var statusLine = mainStatus + (subStatus ? ' — ' + subStatus : '') + (o.neighboured_to ? ' — ' + escapeHtml(o.neighboured_to) : '');
+    var bottomParts = [];
+    if (o.accepted_by) bottomParts.push('Accepted: ' + escapeHtml(o.accepted_by));
+    if (o.delivery_time) bottomParts.push('Time: ' + escapeHtml(o.delivery_time));
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
+      + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
+      + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
+      + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>'
+      + '<div style="font-size:12px;margin-bottom:4px;">'
+      + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
+      + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
+      + ' &bull; Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
+      + '</div>'
+      + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
+      + (bottomParts.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + bottomParts.join(' &bull; ') + '</div>' : '')
+      + '<div style="display:flex;gap:8px;margin-top:8px;">'
+      + '<button class="btn btn-ghost btn-sm" onclick="focusCard(this)">Focus</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>'
+      + '<button class="btn-danger" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
 function applyFilters() {
 var text = document.getElementById('filterInput').value.toLowerCase();
 var src = document.getElementById('filterSource').value;
 var bounds = showAllWeeks ? null : getWeekBounds(weekOffset);
 
 var filtered = allOrders.filter(function(o) {
-if (bounds) {
+if (bounds && !text) {
 var d = parseOrderDate(o);
 if (d < bounds.start || d > bounds.end) return false;
 }
@@ -90,13 +151,20 @@ document.getElementById('statReview').textContent = filtered.filter(function(o){
 document.getElementById('statConflict').textContent = filtered.filter(function(o){ return !!o.zone_conflict; }).length;
 
 if (!filtered.length) {
+ 
 document.getElementById('ordersTable').hidden = true;
 document.getElementById('emptyMsg').hidden = false;
 return;
 }
-document.getElementById('ordersTable').hidden = false;
 document.getElementById('emptyMsg').hidden = true;
-
+if (text) {
+  document.getElementById('ordersTable').hidden = true;
+  renderCards(filtered);
+  return;
+}
+var cardsEl = document.getElementById('ordersCards');
+if (cardsEl) cardsEl.hidden = true;
+document.getElementById('ordersTable').hidden = false;
 var rows = filtered.map(function(o) {
 try {
 var suggested = (o.zone_suggestion && o.zone_suggestion.suggested) ? o.zone_suggestion.suggested : '';
