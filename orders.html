@@ -458,16 +458,4 @@ loadOrders();
 </script>
 </body>
 </html>
-HTMLEOF
-node -e "
-const fs = require('fs');
-const content = fs.readFileSync('/home/claude/flower-tool/orders.html', 'utf8');
-const matches = content.match(/<script>([\s\S]*?)<\/script>/g);
-if (matches) {
-  matches.forEach((m, i) => {
-    const js = m.replace(/<\/?script>/g, '');
-    try { new Function(js); console.log('Script OK'); }
-    catch(e) { console.error('Script ERROR:', e.message); }
-  });
-}
-"
+
