@@ -643,13 +643,12 @@ async function init() {
       document.getElementById('payPreview').hidden = true;
     });
 
-    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var status = this.dataset.status;
-        if (status === 'Undeliverable') {
-          selectedStatuses = ['Undeliverable'];
-          document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-          this.classList.add('selected');
+    document.getElementById('contactMethodGrid').addEventListener('click', function(e) {
+      var btn = e.target.closest('.status-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      btn.classList.toggle('selected');
+    });
         } else {
           var unIdx = selectedStatuses.indexOf('Undeliverable');
           if (unIdx >= 0) {
