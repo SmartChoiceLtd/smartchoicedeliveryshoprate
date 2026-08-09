@@ -684,15 +684,12 @@ async function init() {
     document.getElementById('fAcceptedBy').addEventListener('input', function() {
       document.getElementById('contactMethodField').hidden = !this.value.trim();
     });
-
-    document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         this.classList.toggle('selected');
       });
     });
-
+   
     document.getElementById('billingToggle').addEventListener('click', function(e) {
       var btn = e.target.closest('.toggle-btn');
       if (!btn) return;
