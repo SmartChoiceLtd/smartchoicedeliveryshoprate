@@ -125,8 +125,7 @@ export default async (req) => {
       } else {
         zoneSource = 'needs_review';
       }
-    } else if (enteredZoneCode) {
-      // Zone was entered manually — still run suggestion for comparison
+  } else if (enteredZoneCode) {
       if (raw.address && key) {
         const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
         zoneSuggestion = await suggestZone(
@@ -135,8 +134,31 @@ export default async (req) => {
           shopLoc?.lng || -114.0719,
           key
         );
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
+        } else {
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
+        }
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
       }
     }
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
+        } else {
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
+        }
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
+      }
+    }
+    
 
     // Flag if manual zone differs from suggestion
    const isWholesale = (raw.delivery_type === 'wholesale') || 
@@ -161,7 +183,7 @@ export default async (req) => {
       driver: raw.driver,
       driver_pay: (function() {
         if (raw.driver_pay) return parseFloat(raw.driver_pay);
-        const r = ratesData[zoneCode];
+        const r = ratesData ? ratesData[zoneCode] : null;
         if (!r) return 0;
         const pieces = parseInt(raw.total_pieces || 1);
         return (r.drate || 0) + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
