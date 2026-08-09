@@ -157,7 +157,7 @@ export default async (req) => {
       address: raw.address,
       formatted_address: zoneSuggestion?.formatted_address || raw.address,
       shop_code: shopCode,
-      shop_full: raw.shop_full,
+      shop_full: raw.shop_full || raw.shop || null,
       driver: raw.driver,
       driver_pay: (function() {
         if (raw.driver_pay) return parseFloat(raw.driver_pay);
