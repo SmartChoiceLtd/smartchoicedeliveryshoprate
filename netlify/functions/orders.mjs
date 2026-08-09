@@ -146,18 +146,7 @@ export default async (req) => {
         zoneSource = 'manual';
       }
     }
-        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
-          zoneCode = zoneSuggestion.suggested;
-          zoneSource = 'auto';
-        } else {
-          zoneCode = enteredZoneCode;
-          zoneSource = 'manual';
-        }
-      } else {
-        zoneCode = enteredZoneCode;
-        zoneSource = 'manual';
-      }
-    }
+  
     
 
     // Flag if manual zone differs from suggestion
