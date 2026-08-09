@@ -208,8 +208,9 @@ export default async (req) => {
       return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
-    }
-     return json({ error: 'Method not allowed' }, 405);
-    };
+   }
+  }
+  return json({ error: 'Method not allowed' }, 405);
+};
 
 export const config = { path: '/api/orders' };
