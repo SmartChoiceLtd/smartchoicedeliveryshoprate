@@ -136,10 +136,11 @@ cardsEl.hidden = false;
   var statusLine = mainStatus + (subStatus ? ' — ' + subStatus : '') + (o.neighboured_to ? ' — ' + o.neighboured_to : '');
   var bottomLine = [];
   if (o.accepted_by) bottomLine.push('Accepted: ' + o.accepted_by);
-  if (o.delivery_time) bottomLine.push('Time' + o.delivery_time);
+  if (o.delivery_time) bottomLine.push('Time: ' + o.delivery_time);
   return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
     + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
     + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
+    + '<span style="font-size:13px;color:var(--accent);margin-left:8px;font-weight:500;">' + escapeHtml(o.shop_full||o.shop||'') + '</span>'
     + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
     + '</div>'
     + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
@@ -152,12 +153,11 @@ cardsEl.hidden = false;
     + '</div>'
     + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
     + (bottomLine.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(bottomLine.join(' • ')) + '</div>' : '')
-    + '<div style="display:flex;gap:8px;">'
-  +'<button class="btn btn-ghost btn-sm" style="min-height:44px;min-width:60px;touch-action:manipulation;" onclick="focusCard(this)">Focus</button>'
- + '<button class="btn btn-ghost btn-sm" style="min-height:36px;" onclick="openOverride(' + JSON.stringify(o.id) + ')">Override</button>'
-    + + '<button class="btn-danger" style="min-height:36px;touch-action:manipulation;" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>'
+   + '<div style="display:flex;gap:8px;">'
+    + '<button class="btn btn-ghost btn-sm" style="min-height:44px;min-width:60px;touch-action:manipulation;" onclick="focusCard(this)">Focus</button>'
+    + '<button class="btn btn-ghost btn-sm" style="min-height:36px;" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>'
+    + '<button class="btn-danger" style="min-height:36px;touch-action:manipulation;" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>'
     + '</div>'
-    + '</div>';
 }).join('');
 return;
 }
