@@ -569,8 +569,8 @@ async function submitDelivery() {
     comments: document.getElementById('fComments').value.trim(),
     driver_pay: driverPay,
     contact_method: (function(){
-      var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
-      return sel ? sel.dataset.contact : '';
+      var sel = document.querySelectorAll('#contactMethodGrid .status-btn.selected');
+      return Array.from(sel).map(function(b){ return b.dataset.contact; }).join(', ');
     })(),
     billing_party: billingParty,
     wholesaler: document.getElementById('fWholesaler').value,
@@ -687,8 +687,9 @@ async function init() {
 
     document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-        this.classList.add('selected');
+        document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
       });
     });
 
