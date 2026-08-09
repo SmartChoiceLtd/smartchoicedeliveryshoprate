@@ -149,8 +149,7 @@ cardsEl.hidden = false;
     + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
     + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
     + ' &bull; Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
-    + (o.zone_conflict ? ' <span style="color:var(--warm);font-weight:700;">CONFLICT</span>' : '')
-    + '</div>'
+        + '</div>'
     + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
     + (bottomLine.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(bottomLine.join(' • ')) + '</div>' : '')
    + '<div style="display:flex;gap:8px;">'
