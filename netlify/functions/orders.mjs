@@ -209,7 +209,7 @@ export default async (req) => {
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
     }
-  }
+  
   
     return json({ error: 'Method not allowed' }, 405);
     };
