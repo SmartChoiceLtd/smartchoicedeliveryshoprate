@@ -107,7 +107,7 @@ function renderCards(filtered) {
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
       + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
       + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
-      + '<span style="font-size:12px;color:var(--ink-soft);margin-left:6px;">' + escapeHtml((o.shop_full||o.shop||'').split(' ').slice(1).join(' ')) + '</span>'
+     + '<span style="font-size:13px;color:var(--accent);margin-left:8px;font-weight:500;">' + escapeHtml((o.shop_full||o.shop||'').split(' ').slice(1).join(' ')) + '</span>'
       + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
       + '</div>'
       + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
