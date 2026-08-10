@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8">F
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -505,8 +505,10 @@ document.getElementById('billingQueryField').hidden = true;
 document.getElementById('directSubField').hidden = true;
 document.getElementById('redirectField').hidden = true;
 document.getElementById('undeliverableSubField').hidden = true;
-C
-document.querySelectorAll('#undeliverableSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+      });
+    });
+/* Shop search dropdown */
 document.getElementById('zoneResult').hidden = true;
 document.getElementById('zoneManual').hidden = true;
 document.getElementById('payPreview').hidden = true;
