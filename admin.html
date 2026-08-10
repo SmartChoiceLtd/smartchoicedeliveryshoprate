@@ -115,6 +115,7 @@ function showTab(name) {
     document.getElementById('tab-'+t).hidden = t !== name;
     document.querySelectorAll('.tab').forEach(function(b,i){
       b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
+      if (name === 'applications') loadApplications();
     });
   });
 }
@@ -384,4 +385,3 @@ async function loadApplications() {
       '</tbody></table>';
   } catch(e) { document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; }
 }
-loadApplications();
