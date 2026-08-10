@@ -371,11 +371,7 @@ loadRates();
 </script>
 </body>
 </html>
-HTMLEOF
-node -e "
-const fs = require('fs');
-const content = fs.readFileSync('/home/claude/flower-tool/admin.html', 'utf8');
-const matches = content.match(/<script>([\s\S]*?)<\/script>/g);
+<script>([\s\S]*?)<\/script>/g);
 if (matches) {
   matches.forEach((m, i) => {
     const js = m.replace(/<\/?script>/g, '');
