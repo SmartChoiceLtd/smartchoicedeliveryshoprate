@@ -114,7 +114,7 @@ function showTab(name) {
   ['drivers','shops','rates','applications'].forEach(function(t){
     document.getElementById('tab-'+t).hidden = t !== name;
     document.querySelectorAll('.tab').forEach(function(b,i){
-      b.classList.toggle('active', ['drivers','shops','rates'][i] === name);
+      b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
     });
   });
 }
