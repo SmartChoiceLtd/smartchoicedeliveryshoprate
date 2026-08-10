@@ -381,5 +381,6 @@ async function loadApplications() {
         '</tr>';
     }).join('') +
     '</tbody></table>';
+   catch(e) { document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; }
 }
 loadApplications();
