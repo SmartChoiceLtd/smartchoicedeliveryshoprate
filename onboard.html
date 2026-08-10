@@ -1,1 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Smart Choice Delivery — Driver Application</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
+*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;}
+.container{max-width:560px;margin:0 auto;padding:20px 16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 16px;color:var(--accent);}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field textarea{resize:vertical;min-height:80px;}
+.check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.check-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;color:var(--ink);}
+.check-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
+.btn{width:100%;padding:16px;background:var(--warm);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
+.btn:disabled{opacity:0.5;}
+.success{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:20px;border-radius:var(--radius);text-align:center;}
+.success h3{font-family:Georgia,serif;font-size:18px;margin:0 0 8px;}
+.error-msg{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+[hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Smart Choice Delivery — Driver Application</h1>
+</div>
+<div class="container">
+  <div id="formSection">
+    <div id="errorMsg" class="error-msg" hidden></div>
+    <div class="card">
+      <h2>Personal Information</h2>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="fName" placeholder="First and last name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="fEmail" placeholder="your@email.com" inputmode="email">
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input type="tel" id="fPhone" placeholder="403-000-0000" inputmode="tel">
+      </div>
+    </div>
+ 
+    <div class="card">
+      <h2>Availability — Days</h2>
+      <div class="check-grid" id="daysGrid">
+        <button class="check-btn" data-day="Monday">Monday</button>
+        <button class="check-btn" data-day="Tuesday">Tuesday</button>
+        <button class="check-btn" data-day="Wednesday">Wednesday</button>
+        <button class="check-btn" data-day="Thursday">Thursday</button>
+        <button class="check-btn" data-day="Friday">Friday</button>
+        <button class="check-btn" data-day="Saturday">Saturday</button>
+        <button class="check-btn" data-day="Sunday">Sunday</button>
+      </div>
+    </div>
+ 
+    <div class="card">
+      <h2>Availability — Time</h2>
+      <div class="check-grid" id="timeGrid">
+        <button class="check-btn" data-time="All Day">All Day</button>
+        <button class="check-btn" data-time="Morning">Morning</button>
+        <button class="check-btn" data-time="Afternoon">Afternoon</button>
+        <button class="check-btn" data-time="Evening">Evening</button>
+        <button class="check-btn" data-time="Other">Other</button>
+      </div>
+    </div>
+ 
+    <div class="card">
+      <h2>Vehicle & References</h2>
+      <div class="field">
+        <label>Vehicle Type</label>
+        <select id="fVehicle">
+          <option value="">Select vehicle...</option>
+          <option>Compact</option>
+          <option>Sedan</option>
+          <option>Small SUV</option>
+          <option>Midsize SUV</option>
+          <option>Fullsize SUV</option>
+          <option>Minivan</option>
+          <option>Truck</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Referred By</label>
+        <input type="text" id="fReferredBy" placeholder="Who referred you?">
+      </div>
+      <div class="field">
+        <label>Comments</label>
+        <textarea id="fComments" placeholder="Anything else you'd like us to know..."></textarea>
+      </div>
+    </div>
+ 
+    <button class="btn" id="submitBtn">Submit Application</button>
+  </div>
+ 
+  <div id="successSection" hidden>
+    <div class="success">
+      <h3>Application Received!</h3>
+      <p>Thank you for applying to Smart Choice Delivery. We'll be in touch soon.</p>
+    </div>
+  </div>
+</div>
+ 
+<script>
+var selectedDays = [];
+var selectedTimes = [];
+ 
+var now = new Date();
+document.getElementById('fDate').value = now.toISOString().slice(0,10);
+ 
+document.getElementById('daysGrid').querySelectorAll('.check-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    this.classList.toggle('selected');
+    var day = this.dataset.day;
+    var idx = selectedDays.indexOf(day);
+    if (idx >= 0) selectedDays.splice(idx, 1);
+    else selectedDays.push(day);
+  });
+});
+ 
+document.getElementById('timeGrid').querySelectorAll('.check-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    this.classList.toggle('selected');
+    var time = this.dataset.time;
+    var idx = selectedTimes.indexOf(time);
+    if (idx >= 0) selectedTimes.splice(idx, 1);
+    else selectedTimes.push(time);
+  });
+});
+ 
+document.getElementById('submitBtn').addEventListener('click', async function() {
+  var btn = this;
+  var errEl = document.getElementById('errorMsg');
+  errEl.hidden = true;
+ 
+  var name = document.getElementById('fName').value.trim();
+  var email = document.getElementById('fEmail').value.trim();
+  var phone = document.getElementById('fPhone').value.trim();
+  var vehicle = document.getElementById('fVehicle').value;
+ 
+  if (!name) { errEl.textContent = 'Please enter your full name.'; errEl.hidden = false; return; }
+  if (!email) { errEl.textContent = 'Please enter your email.'; errEl.hidden = false; return; }
+  if (!phone) { errEl.textContent = 'Please enter your phone number.'; errEl.hidden = false; return; }
+  if (!vehicle) { errEl.textContent = 'Please select your vehicle type.'; errEl.hidden = false; return; }
+  if (!selectedDays.length) { errEl.textContent = 'Please select at least one day of availability.'; errEl.hidden = false; return; }
+ 
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+ 
+  var payload = {
+    date: document.getElementById('fDate').value,
+    name: name,
+    email: email,
+    phone: phone,
+    days_available: selectedDays.join(', '),
+    time_available: selectedTimes.join(', '),
+    vehicle: vehicle,
+    referred_by: document.getElementById('fReferredBy').value.trim(),
+    comments: document.getElementById('fComments').value.trim(),
+    source: 'onboard_form',
+    submitted_at: new Date().toISOString()
+  };
+ 
+  try {
+    var res = await fetch('/api/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Status ' + res.status);
+    document.getElementById('formSection').hidden = true;
+    document.getElementById('successSection').hidden = false;
+  } catch(e) {
+    errEl.textContent = 'Could not submit. Please try again or call us directly.';
+    errEl.hidden = false;
+    btn.disabled = false;
+    btn.textContent = 'Submit Application';
+  }
+});
+</script>
+</body>
+</html>
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
