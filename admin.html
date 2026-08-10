@@ -111,7 +111,7 @@ function esc(s){ if(!s)return ''; var d=document.createElement('div'); d.textCon
 var drivers = [], shops = [], rates = {};
 
 function showTab(name) {
-  ['drivers','shops','rates'].forEach(function(t){
+  ['drivers','shops','rates','applications'].forEach(function(t){
     document.getElementById('tab-'+t).hidden = t !== name;
     document.querySelectorAll('.tab').forEach(function(b,i){
       b.classList.toggle('active', ['drivers','shops','rates'][i] === name);
