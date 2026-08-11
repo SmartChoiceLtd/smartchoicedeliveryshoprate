@@ -62,23 +62,23 @@ async function sendAcknowledgement(app) {
             <p>We provide primary in-house delivery service for 10 shops in Calgary, backup service for 20+ additional shops, and service for specialty bakery and gift basket shops.</p>
             <table style="width:100%;border-collapse:collapse;font-size:14px;margin:12px 0;">
               <tr style="background:#F4DCC9;">
-                <td style="padding:8px 12px;font-weight:700;color:#B8472B;width:40%;">Hours</td>
+                <td style="padding:8px 12px;font-weight:700;color:#0C769E;width:40%;">Hours</td>
                 <td style="padding:8px 12px;">Days start at 7am, typically until 6pm. Most drivers start between 9-10am.</td>
               </tr>
               <tr>
-                <td style="padding:8px 12px;font-weight:700;color:#B8472B;">Contractor Status</td>
+                <td style="padding:8px 12px;font-weight:700;color:#0C769E;">Contractor Status</td>
                 <td style="padding:8px 12px;">Independent contractor — work as much or as little as you want.</td>
               </tr>
               <tr style="background:#F4DCC9;">
-                <td style="padding:8px 12px;font-weight:700;color:#B8472B;">Pay Per Delivery</td>
+                <td style="padding:8px 12px;font-weight:700;color:#0C769E;">Pay Per Delivery</td>
                 <td style="padding:8px 12px;">Minimum average $8/delivery. Many drivers average closer to $10. Gas is included in the delivery payment.</td>
               </tr>
               <tr>
-                <td style="padding:8px 12px;font-weight:700;color:#B8472B;">Specialty Deliveries</td>
+                <td style="padding:8px 12px;font-weight:700;color:#0C769E;">Specialty Deliveries</td>
                 <td style="padding:8px 12px;">Wholesale, out of town, weddings and events range $9–$50.</td>
               </tr>
               <tr style="background:#F4DCC9;">
-                <td style="padding:8px 12px;font-weight:700;color:#B8472B;">Daily Volume</td>
+                <td style="padding:8px 12px;font-weight:700;color:#0C769E;">Daily Volume</td>
                 <td style="padding:8px 12px;">Typically 10–20 deliveries per day. During peak periods (Christmas, Valentine's, Mother's Day) experienced drivers do 30+ per shift.</td>
               </tr>
               <tr>
