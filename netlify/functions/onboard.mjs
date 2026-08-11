@@ -14,7 +14,7 @@ async function sendAcknowledgement(app) {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: 'applications@smartchoicedelivery.ca',
+      from: 'applications@send.smartchoicedelivery.ca',,
       to: app.email,
       bcc: 'kevinmichaud@yahoo.ca',
       subject: 'Smart Choice Delivery — Application Received',
