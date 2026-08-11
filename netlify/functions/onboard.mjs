@@ -40,10 +40,9 @@ async function sendAcknowledgement(app) {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: 'applications@send.smartchoicedelivery.ca',
+     from: 'applications@smartchoicedelivery.ca',
       to: app.email,
-      bcc: 'kevinmichaud@yahoo.ca',
-      subject: 'Smart Choice Delivery — Thank You For Your Interest',
+            subject: 'Smart Choice Delivery — Thank You For Your Interest',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;background:#FAF7F2;">
           <div style="background:#0C769E;padding:20px 24px;border-bottom:4px solid #B8472B;">
