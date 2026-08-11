@@ -55,7 +55,7 @@ async function sendAcknowledgement(app) {
               <p style="margin:4px 0 0;font-size:13px;color:#2B2620;">${t.comment}</p>
               <p style="margin:4px 0 0;font-size:13px;"><strong>Dates:</strong> ${t.dates} &nbsp;|&nbsp; <strong>Positions Available:</strong> ${t.positions}</p>
             </div>
-            <h3 style="color:#0C769E;border-bottom:2px solid #0C769E;padding-bottom:6px;">About the Opportunity</h3>
+            <h3 style="color:##B8472B;border-bottom:2px solid ##B8472B;padding-bottom:6px;">About the Opportunity</h3>
             <p>We provide primary in-house delivery service for 10 shops in Calgary, backup service for 20+ additional shops, and service for specialty bakery and gift basket shops.</p>
             <table style="width:100%;border-collapse:collapse;font-size:14px;margin:12px 0;">
               <tr style="background:#F4DCC9;">
