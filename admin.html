@@ -441,12 +441,4 @@ loadRates();
 </script>
 </body>
 </html>
-<script>([\s\S]*?)<\/script>/g);
-if (matches) {
-  matches.forEach((m, i) => {
-    const js = m.replace(/<\/?script>/g, '');
-    try { new Function(js); console.log('Script OK'); }
-    catch(e) { console.error('ERROR:', e.message); }
-  });
-}
-"
+
