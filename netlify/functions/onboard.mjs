@@ -134,7 +134,12 @@ export default async (req) => {
     const store = getStore('driver-applications');
     const app = { id, ...body };
     await store.setJSON(id, app);
-    try { await sendAcknowledgement(app); } catch(e) { console.error('Email failed:', e.message); }
+   try { 
+  await sendAcknowledgement(app); 
+  console.log('Email sent to:', app.email);
+} catch(e) { 
+  console.error('Email failed:', e.message, JSON.stringify(e));
+}
     return json({ success: true, id }, 201);
   }
 
