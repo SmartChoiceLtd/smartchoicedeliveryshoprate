@@ -111,7 +111,8 @@ export default async (req) => {
   }
 
   // GET/PUT email template
-  if (req.url.includes('/template')) {
+   const urlObj = new URL(req.url);
+  if (urlObj.searchParams.get('type') === 'template') {
     const store = getStore('email-templates');
     if (req.method === 'GET') {
       try {
