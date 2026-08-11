@@ -31,7 +31,7 @@ async function getTemplate() {
   }
 }
 
-async function sendAcknowledgement(app) {
+async function application(app) {
   const key = process.env.RESEND_API_KEY;
   if (!key) return;
   const t = await getTemplate();
@@ -40,7 +40,7 @@ async function sendAcknowledgement(app) {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-     from: 'applications@smartchoicedelivery.ca',
+     from: 'applications.send@smartchoicedelivery.ca',
       to: app.email,
             subject: 'Smart Choice Delivery — Thank You For Your Interest',
       html: `
@@ -134,7 +134,7 @@ export default async (req) => {
     const app = { id, ...body };
     await store.setJSON(id, app);
    try { 
-  await sendAcknowledgement(app); 
+  await application(app); 
   console.log('Email sent to:', app.email);
 } catch(e) { 
   console.error('Email failed:', e.message, JSON.stringify(e));
