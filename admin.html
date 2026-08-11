@@ -365,7 +365,7 @@ function loadApplications() {
 }
  
 function loadTemplate() {
-  fetch('/api/onboard/template').then(function(res){ return res.json(); }).then(function(t){
+  fetch('/api/onboard?type=template').then(function(res){ return res.json(); }).then(function(t){
     document.getElementById('tSeason').value = t.season || '';
     document.getElementById('tDates').value = t.dates || '';
     document.getElementById('tPositions').value = t.positions || '';
@@ -376,7 +376,7 @@ function loadTemplate() {
 document.getElementById('saveTemplateBtn').addEventListener('click', function() {
   var btn = this;
   btn.disabled = true; btn.textContent = 'Saving...';
-  fetch('/api/onboard/template', {
+  fetch('/api/onboard?/template', {
     method: 'PUT',
     headers: {'content-type':'application/json'},
     body: JSON.stringify({
