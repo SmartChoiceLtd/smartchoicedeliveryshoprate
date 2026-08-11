@@ -16,7 +16,7 @@ async function sendAcknowledgement(app) {
     body: JSON.stringify({
       from: 'applications@send.smartchoicedelivery.ca',,
       to: app.email,
-      bcc: 'kevinmichaud@yahoo.ca',
+      bcc: 
       subject: 'Smart Choice Delivery — Application Received',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#2B2620;">
