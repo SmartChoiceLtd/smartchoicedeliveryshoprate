@@ -38,7 +38,7 @@ async function sendAcknowledgement(app) {
   const first = firstName(app.name);
   try {
     const data = await resend.emails.send({
-      from: 'applications@send.smartchoicedelivery.ca',
+      from: 'applications@smartchoicedelivery.ca',
       to: app.email,
       subject: 'Smart Choice Delivery — Application Received',
       html: `
