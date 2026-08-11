@@ -99,7 +99,19 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
   <!-- APPLICATIONS TAB -->
   <div id="tab-applications" hidden>
     <div class="section">
-      <h2>Driver Applications</h2>
+      <h2>Email Template — Seasonal Header</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Updates the seasonal section sent with every application acknowledgement.</p>
+      <div class="field-row">
+        <div class="field"><label>Season</label><input type="text" id="tSeason" placeholder="Mother's Day 2026"></div>
+        <div class="field"><label>Dates</label><input type="text" id="tDates" placeholder="May 8-10, 2026"></div>
+        <div class="field"><label>Positions Available</label><input type="text" id="tPositions" placeholder="5"></div>
+      </div>
+      <div class="field"><label>Opening Comment</label><input type="text" id="tComment" placeholder="We have positions available..."></div>
+      <button class="btn btn-sm" id="saveTemplateBtn">Save Template</button>
+      <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
+    </div>
+    <div class="section">
+      <h2>Applications</h2>
       <div id="applicationsList" class="loading">Loading...</div>
     </div>
   </div>
@@ -135,6 +147,37 @@ async function loadApplications() {
       '</tbody></table>';
   } catch(e) { document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; }
 }
+async function loadTemplate() {
+  try {
+    var res = await fetch('/api/onboard/template');
+    var t = await res.json();
+    document.getElementById('tSeason').value = t.season || '';
+    document.getElementById('tDates').value = t.dates || '';
+    document.getElementById('tPositions').value = t.positions || '';
+    document.getElementById('tComment').value = t.comment || '';
+  } catch(e) {}
+}
+
+document.getElementById('saveTemplateBtn').addEventListener('click', function() {
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/api/onboard/template', {
+    method: 'PUT',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({
+      season: document.getElementById('tSeason').value.trim(),
+      dates: document.getElementById('tDates').value.trim(),
+      positions: document.getElementById('tPositions').value.trim(),
+      comment: document.getElementById('tComment').value.trim()
+    })
+  }).then(function(){ 
+    document.getElementById('templateMsg').hidden = false;
+    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
+  }).catch(function(){ alert('Could not save template.'); })
+  .finally(function(){ btn.disabled = false; btn.textContent = 'Save Template'; });
+});
+
+ 
 function showTab(name) {
   ['drivers','shops','rates','applications'].forEach(function(t){
     document.getElementById('tab-'+t).hidden = t !== name;
@@ -142,8 +185,35 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(function(b,i){
     b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
   });
-  if (name === 'applications') loadApplications();
+  async function loadTemplate() {
+  try {
+    var res = await fetch('/api/onboard/template');
+    var t = await res.json();
+    document.getElementById('tSeason').value = t.season || '';
+    document.getElementById('tDates').value = t.dates || '';
+    document.getElementById('tPositions').value = t.positions || '';
+    document.getElementById('tComment').value = t.comment || '';
+  } catch(e) {}
 }
+
+document.getElementById('saveTemplateBtn').addEventListener('click', function() {
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/api/onboard/template', {
+    method: 'PUT',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({
+      season: document.getElementById('tSeason').value.trim(),
+      dates: document.getElementById('tDates').value.trim(),
+      positions: document.getElementById('tPositions').value.trim(),
+      comment: document.getElementById('tComment').value.trim()
+    })
+  }).then(function(){ 
+    document.getElementById('templateMsg').hidden = false;
+    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
+  }).catch(function(){ alert('Could not save template.'); })
+  .finally(function(){ btn.disabled = false; btn.textContent = 'Save Template'; });
+});
 /* ===== DRIVERS ===== */
 function renderDrivers() {
   var el = document.getElementById('driversList');
