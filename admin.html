@@ -32,7 +32,7 @@
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px;}
 th{background:var(--accent);color:#fff;padding:8px 10px;text-align:left;font-size:12px;}
 td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
-tr.inactive td{color:var(--ink-soft);background:#fafafa;}
+tr.inactive td{color:var(--ink-soft);}
 .star-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:0 4px;}
 .copy-link{background:var(--accent-soft);color:var(--accent);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;}
 .rate-input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;}
@@ -51,7 +51,7 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
   <button class="tab" onclick="showTab('applications')">Applications</button>
 </div>
 <div class="content">
-
+ 
   <!-- DRIVERS TAB -->
   <div id="tab-drivers">
     <div class="section">
@@ -69,7 +69,7 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
       <div id="driversList" class="loading">Loading...</div>
     </div>
   </div>
-
+ 
   <!-- SHOPS TAB -->
   <div id="tab-shops" hidden>
     <div class="section">
@@ -87,7 +87,7 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
       <div id="shopsList" class="loading">Loading...</div>
     </div>
   </div>
-
+ 
   <!-- RATES TAB -->
   <div id="tab-rates" hidden>
     <div class="section">
@@ -96,6 +96,7 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
       <div id="ratesTable" class="loading">Loading...</div>
     </div>
   </div>
+ 
   <!-- APPLICATIONS TAB -->
   <div id="tab-applications" hidden>
     <div class="section">
@@ -115,60 +116,12 @@ tr.inactive td{color:var(--ink-soft);background:#fafafa;}
       <div id="applicationsList" class="loading">Loading...</div>
     </div>
   </div>
-</div>
+ 
 </div>
 <script>
 function esc(s){ if(!s)return ''; var d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
-
+ 
 var drivers = [], shops = [], rates = {};
-
-async function loadApplications() {
-  try {
-    var res = await fetch('/api/onboard');
-    var apps = await res.json();
-    var el = document.getElementById('applicationsList');
-    if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
-    el.innerHTML = '<table><thead><tr>' +
-      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th>' +
-      '</tr></thead><tbody>' +
-      apps.map(function(a) {
-        return '<tr>' +
-          '<td>' + esc(a.date||'') + '</td>' +
-          '<td><strong>' + esc(a.name||'') + '</strong></td>' +
-          '<td>' + esc(a.email||'') + '</td>' +
-          '<td>' + esc(a.phone||'') + '</td>' +
-          '<td>' + esc(a.days_available||'') + '</td>' +
-          '<td>' + esc(a.time_available||'') + '</td>' +
-          '<td>' + esc(a.vehicle||'') + '</td>' +
-          '<td>' + esc(a.referred_by||'') + '</td>' +
-          '<td>' + esc(a.comments||'') + '</td>' +
-          '</tr>';
-      }).join('') +
-      '</tbody></table>';
-  } catch(e) { document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; }
-}
-document.getElementById('saveTemplateBtn').addEventListener('click', function() {
-  var btn = this;
-  btn.disabled = true; btn.textContent = 'Saving...';
-  fetch('/api/onboard/template', {
-    method: 'PUT',
-    headers: {'content-type':'application/json'},
-    body: JSON.stringify({
-      season: document.getElementById('tSeason').value.trim(),
-      dates: document.getElementById('tDates').value.trim(),
-      positions: document.getElementById('tPositions').value.trim(),
-      comment: document.getElementById('tComment').value.trim()
-    })
-  }).then(function(){ 
-    document.getElementById('templateMsg').hidden = false;
-    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
-  }).then(function(){
-    btn.disabled = false; btn.textContent = 'Save Template';
-  }).catch(function(){ 
-    btn.disabled = false; btn.textContent = 'Save Template';
-    alert('Could not save template.'); 
-  });
-
  
 function showTab(name) {
   ['drivers','shops','rates','applications'].forEach(function(t){
@@ -177,24 +130,9 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(function(b,i){
     b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
   });
-document.getElementById('saveTemplateBtn').addEventListener('click', function() {
-  var btn = this;
-  btn.disabled = true; btn.textContent = 'Saving...';
-  fetch('/api/onboard/template', {
-    method: 'PUT',
-    headers: {'content-type':'application/json'},
-    body: JSON.stringify({
-      season: document.getElementById('tSeason').value.trim(),
-      dates: document.getElementById('tDates').value.trim(),
-      positions: document.getElementById('tPositions').value.trim(),
-      comment: document.getElementById('tComment').value.trim()
-    })
-  }).then(function(){ 
-    document.getElementById('templateMsg').hidden = false;
-    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
-  }).catch(function(){ alert('Could not save template.'); })
-  .finally(function(){ btn.disabled = false; btn.textContent = 'Save Template'; });
-});
+  if (name === 'applications') { loadApplications(); loadTemplate(); }
+}
+ 
 /* ===== DRIVERS ===== */
 function renderDrivers() {
   var el = document.getElementById('driversList');
@@ -215,21 +153,12 @@ function renderDrivers() {
         '<td style="display:flex;gap:6px;">' +
         '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
         '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
-        '<button class="btn-danger" onclick="deleteDriver(\'' + esc(d.code) + '\')" style="background:#666;">Delete</button>' +
+        '<button class="btn-danger" style="background:#666;" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
         '</td></tr>';
     }).join('') +
     '</tbody></table>';
 }
- async function loadTemplate() {
-  try {
-    var res = await fetch('/api/onboard/template');
-    var t = await res.json();
-    document.getElementById('tSeason').value = t.season || '';
-    document.getElementById('tDates').value = t.dates || '';
-    document.getElementById('tPositions').value = t.positions || '';
-    document.getElementById('tComment').value = t.comment || '';
-  } catch(e) {}
-}
+ 
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
   var name = document.getElementById('newDriverName').value.trim();
@@ -250,13 +179,13 @@ document.getElementById('addDriverBtn').addEventListener('click', async function
   } catch(e) { msgEl.className='error-msg'; msgEl.textContent='Error: ' + e.message; msgEl.hidden=false; }
   finally { this.disabled=false; this.textContent='Add Driver'; }
 });
-
+ 
 function copyDriverLink(code) {
   var url = location.origin + '/driver/' + code.toLowerCase();
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ alert('Copied: ' + url); });
   else window.prompt('Copy link:', url);
 }
-
+ 
 async function toggleDriver(code, active) {
   try {
     await fetch('/api/drivers?code=' + encodeURIComponent(code), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({active}) });
@@ -265,7 +194,7 @@ async function toggleDriver(code, active) {
     renderDrivers();
   } catch(e) { alert('Could not update driver.'); }
 }
-
+ 
 function editDriver(code) {
   var d = drivers.find(function(x){ return x.code===code; });
   if (!d) return;
@@ -287,7 +216,8 @@ function editDriver(code) {
     renderDrivers();
   }).catch(function(){ alert('Could not update driver.'); });
 }
-  async function deleteDriver(code) {
+ 
+async function deleteDriver(code) {
   if (!confirm('Permanently delete driver ' + code + '? This cannot be undone.')) return;
   try {
     await fetch('/api/drivers?code=' + encodeURIComponent(code), {method:'DELETE'});
@@ -295,13 +225,13 @@ function editDriver(code) {
     renderDrivers();
   } catch(e) { alert('Could not delete driver.'); }
 }
-
+ 
 async function loadDrivers() {
   var res = await fetch('/api/drivers');
   drivers = await res.json();
   renderDrivers();
 }
-
+ 
 /* ===== SHOPS ===== */
 function renderShops() {
   var el = document.getElementById('shopsList');
@@ -321,7 +251,7 @@ function renderShops() {
     }).join('') +
     '</tbody></table>';
 }
-
+ 
 document.getElementById('addShopBtn').addEventListener('click', async function() {
   var code = document.getElementById('newShopCode').value.trim().toUpperCase();
   var name = document.getElementById('newShopName').value.trim().toUpperCase();
@@ -333,13 +263,7 @@ document.getElementById('addShopBtn').addEventListener('click', async function()
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = {
-      name: code + ' ' + name,
-      address: geo.formatted,
-      lat: geo.lat, lng: geo.lng,
-      zonePrices:{C1:10,C2:12,C3:13,C4:14,C5:15,OUT1:25,OUT2:35,OUT3:55,OUT4:75},
-      communityZones:{}, townPrices:{}
-    };
+    var payload = { name: code + ' ' + name, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices:{C1:10,C2:12,C3:13,C4:14,C5:15,OUT1:25,OUT2:35,OUT3:55,OUT4:75}, communityZones:{}, townPrices:{} };
     var res = await fetch('/api/shops', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
     if (!res.ok) throw new Error('Could not create shop');
     var shop = await res.json();
@@ -353,18 +277,15 @@ document.getElementById('addShopBtn').addEventListener('click', async function()
   } catch(e) { msgEl.className='error-msg'; msgEl.textContent='Error: ' + e.message; msgEl.hidden=false; }
   finally { this.disabled=false; this.textContent='Add Shop'; }
 });
-
+ 
 async function toggleStar(shopId) {
   var shop = shops.find(function(s){ return s.id===shopId; });
   if (!shop) return;
   shop.featured = !shop.featured;
-  await fetch('/api/shops/' + encodeURIComponent(shopId), {
-    method:'PUT', headers:{'content-type':'application/json'},
-    body:JSON.stringify({featured:shop.featured})
-  });
+  await fetch('/api/shops/' + encodeURIComponent(shopId), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({featured:shop.featured}) });
   renderShops();
 }
-
+ 
 async function editShop(shopId) {
   var shop = shops.find(function(s){ return s.id===shopId; });
   if (!shop) return;
@@ -376,30 +297,25 @@ async function editShop(shopId) {
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode address');
-    await fetch('/api/shops/' + encodeURIComponent(shopId), {
-      method:'PUT', headers:{'content-type':'application/json'},
-      body:JSON.stringify({name:name.trim(), address:geo.formatted, lat:geo.lat, lng:geo.lng})
-    });
+    await fetch('/api/shops/' + encodeURIComponent(shopId), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({name:name.trim(), address:geo.formatted, lat:geo.lat, lng:geo.lng}) });
     shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng;
     renderShops();
     alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
 }
-
+ 
 async function loadShops() {
   var res = await fetch('/api/shops');
   shops = await res.json();
   renderShops();
 }
-
+ 
 /* ===== RATES ===== */
 function renderRates() {
   var el = document.getElementById('ratesTable');
   var keys = Object.keys(rates).sort();
   if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr>' +
-    '<th>Zone</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th>' +
-    '</tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Zone</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
     keys.map(function(zone) {
       var r = rates[zone];
       function inp(field) {
@@ -409,21 +325,76 @@ function renderRates() {
     }).join('') +
     '</tbody></table>';
 }
-
+ 
 async function updateRate(zone, field, value) {
   if (!rates[zone]) rates[zone] = {};
   rates[zone][field] = parseFloat(value) || 0;
-  try {
-    await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
-  } catch(e) { alert('Could not save rate.'); }
+  try { await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) }); }
+  catch(e) { alert('Could not save rate.'); }
 }
-
+ 
 async function loadRates() {
   var res = await fetch('/api/rates');
   rates = await res.json();
   renderRates();
 }
-
+ 
+/* ===== APPLICATIONS ===== */
+function loadApplications() {
+  fetch('/api/onboard').then(function(res){ return res.json(); }).then(function(apps){
+    var el = document.getElementById('applicationsList');
+    if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
+    el.innerHTML = '<table><thead><tr>' +
+      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th>' +
+      '</tr></thead><tbody>' +
+      apps.map(function(a) {
+        return '<tr>' +
+          '<td>' + esc(a.date||'') + '</td>' +
+          '<td><strong>' + esc(a.name||'') + '</strong></td>' +
+          '<td>' + esc(a.email||'') + '</td>' +
+          '<td>' + esc(a.phone||'') + '</td>' +
+          '<td>' + esc(a.days_available||'') + '</td>' +
+          '<td>' + esc(a.time_available||'') + '</td>' +
+          '<td>' + esc(a.vehicle||'') + '</td>' +
+          '<td>' + esc(a.referred_by||'') + '</td>' +
+          '<td>' + esc(a.comments||'') + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table>';
+  }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
+}
+ 
+function loadTemplate() {
+  fetch('/api/onboard/template').then(function(res){ return res.json(); }).then(function(t){
+    document.getElementById('tSeason').value = t.season || '';
+    document.getElementById('tDates').value = t.dates || '';
+    document.getElementById('tPositions').value = t.positions || '';
+    document.getElementById('tComment').value = t.comment || '';
+  }).catch(function(){});
+}
+ 
+document.getElementById('saveTemplateBtn').addEventListener('click', function() {
+  var btn = this;
+  btn.disabled = true; btn.textContent = 'Saving...';
+  fetch('/api/onboard/template', {
+    method: 'PUT',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({
+      season: document.getElementById('tSeason').value.trim(),
+      dates: document.getElementById('tDates').value.trim(),
+      positions: document.getElementById('tPositions').value.trim(),
+      comment: document.getElementById('tComment').value.trim()
+    })
+  }).then(function(){
+    document.getElementById('templateMsg').hidden = false;
+    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
+    btn.disabled = false; btn.textContent = 'Save Template';
+  }).catch(function(){
+    alert('Could not save template.');
+    btn.disabled = false; btn.textContent = 'Save Template';
+  });
+});
+ 
 /* ===== INIT ===== */
 loadDrivers();
 loadShops();
@@ -431,4 +402,108 @@ loadRates();
 </script>
 </body>
 </html>
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
