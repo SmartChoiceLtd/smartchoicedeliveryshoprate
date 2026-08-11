@@ -8,7 +8,7 @@ function json(data, status = 200) {
 }
 
 async function sendAcknowledgement(app) {
-  const key = process.env.RESEND_API_KEY;
+  const key = process.env.RESEND_API_KEy;
   if (!key) return;
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
