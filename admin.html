@@ -147,17 +147,6 @@ async function loadApplications() {
       '</tbody></table>';
   } catch(e) { document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; }
 }
-async function loadTemplate() {
-  try {
-    var res = await fetch('/api/onboard/template');
-    var t = await res.json();
-    document.getElementById('tSeason').value = t.season || '';
-    document.getElementById('tDates').value = t.dates || '';
-    document.getElementById('tPositions').value = t.positions || '';
-    document.getElementById('tComment').value = t.comment || '';
-  } catch(e) {}
-}
-
 document.getElementById('saveTemplateBtn').addEventListener('click', function() {
   var btn = this;
   btn.disabled = true; btn.textContent = 'Saving...';
@@ -188,17 +177,6 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(function(b,i){
     b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
   });
-  async function loadTemplate() {
-  try {
-    var res = await fetch('/api/onboard/template');
-    var t = await res.json();
-    document.getElementById('tSeason').value = t.season || '';
-    document.getElementById('tDates').value = t.dates || '';
-    document.getElementById('tPositions').value = t.positions || '';
-    document.getElementById('tComment').value = t.comment || '';
-  } catch(e) {}
-}
-
 document.getElementById('saveTemplateBtn').addEventListener('click', function() {
   var btn = this;
   btn.disabled = true; btn.textContent = 'Saving...';
@@ -242,7 +220,16 @@ function renderDrivers() {
     }).join('') +
     '</tbody></table>';
 }
-
+ async function loadTemplate() {
+  try {
+    var res = await fetch('/api/onboard/template');
+    var t = await res.json();
+    document.getElementById('tSeason').value = t.season || '';
+    document.getElementById('tDates').value = t.dates || '';
+    document.getElementById('tPositions').value = t.positions || '';
+    document.getElementById('tComment').value = t.comment || '';
+  } catch(e) {}
+}
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
   var name = document.getElementById('newDriverName').value.trim();
