@@ -173,9 +173,12 @@ document.getElementById('saveTemplateBtn').addEventListener('click', function() 
   }).then(function(){ 
     document.getElementById('templateMsg').hidden = false;
     setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
-  }).catch(function(){ alert('Could not save template.'); })
-  .finally(function(){ btn.disabled = false; btn.textContent = 'Save Template'; });
-});
+  }).then(function(){
+    btn.disabled = false; btn.textContent = 'Save Template';
+  }).catch(function(){ 
+    btn.disabled = false; btn.textContent = 'Save Template';
+    alert('Could not save template.'); 
+  });
 
  
 function showTab(name) {
