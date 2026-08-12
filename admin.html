@@ -348,17 +348,19 @@ function loadApplications() {
       '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
       '</tr></thead><tbody>' +
       apps.map(function(a) {
-       return '<tr>' +
+        return '<tr>' +
           '<td>' + esc(a.date||'') + '</td>' +
           '<td><strong>' + esc(a.name||'') + '</strong></td>' +
           '<td>' + esc(a.email||'') + '</td>' +
-          'td>' + esc(a.phone||'') + '</td>' +
+          '<td>' + esc(a.phone||'') + '</td>' +
           '<td>' + esc(a.days_available||'') + '</td>' +
           '<td>' + esc(a.time_available||'') + '</td>' +
           '<td>' + esc(a.vehicle||'') + '</td>' +
           '<td>' + esc(a.referred_by||'') + '</td>' +
           '<td>' + esc(a.comments||'') + '</td>' +
-         }).join('') +
+          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" onclick="hireApplicant(' + JSON.stringify(a.name) + ',' + JSON.stringify(a.email) + ',' + JSON.stringify(a.phone) + ',' + JSON.stringify(a.vehicle) + ')">Hire</button></td>' +
+          '</tr>';
+      }).join('') +
       '</tbody></table>';
   }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
 }
