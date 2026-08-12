@@ -358,10 +358,8 @@ function loadApplications() {
           '<td>' + esc(a.vehicle||'') + '</td>' +
           ''<td>' + esc(a.comments||'') + '</td>' +
           '<td><button class="btn-danger"...>Hire</button></td>' +
-          '<td>' + esc(a.comments||'') + '</td>' +
-          '<td><button class="btn-danger"...>Hire</button></td>' +
           '</tr>';  
-          
+      
       }).join('') +
       '</tbody></table>';
   }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
