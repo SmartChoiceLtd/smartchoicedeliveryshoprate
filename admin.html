@@ -159,14 +159,10 @@ function renderDrivers() {
     '</tbody></table>';
 }
 
-async function hireApplicant(btn) {
-  var name = btn.getAttribute('data-name');
-  var email = btn.getAttribute('data-email');
-  var phone = btn.getAttribute('data-phone');
-  var vehicle = btn.getAttribute('data-vehicle');
+async function hireApplicant(name, email, phone, vehicle) {
   var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
   if (!hireDate) return;
-  var code = window.prompt('Driver code:', name.split(' ')[0].toUpperCase());
+  var code = window.prompt('Driver code:', (name||'').split(' ')[0].toUpperCase());
   if (!code) return;
   code = code.toUpperCase();
   try {
@@ -178,10 +174,10 @@ async function hireApplicant(btn) {
     if (!res.ok) throw new Error('Could not create driver');
     var driver = await res.json();
     drivers.push(driver);
-    alert('Driver ' + code + ' — ' + name + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
+    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
     showTab('drivers');
   } catch(e) { alert('Could not hire: ' + e.message); }
-}  
+}
  
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
@@ -371,7 +367,7 @@ function loadApplications() {
     el.innerHTML = '<table><thead><tr>' +
       '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
       '</tr></thead><tbody>' +
-      apps.map(function(a) {
+      apps.map(function(a, i) {
         return '<tr>' +
           '<td>' + esc(a.date||'') + '</td>' +
           '<td><strong>' + esc(a.name||'') + '</strong></td>' +
@@ -382,10 +378,16 @@ function loadApplications() {
           '<td>' + esc(a.vehicle||'') + '</td>' +
           '<td>' + esc(a.referred_by||'') + '</td>' +
           '<td>' + esc(a.comments||'') + '</td>' +
-          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" data-name="' + esc(a.name||'') + '" data-email="' + esc(a.email||'') + '" data-phone="' + esc(a.phone||'') + '" data-vehicle="' + esc(a.vehicle||'') + '" onclick="hireApplicant(this)">Hire</button></td>' +
+          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" data-idx="' + i + '">Hire</button></td>' +
           '</tr>';
       }).join('') +
       '</tbody></table>';
+    el.querySelectorAll('[data-idx]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var a = apps[parseInt(this.getAttribute('data-idx'))];
+        hireApplicant(a.name, a.email, a.phone, a.vehicle);
+      });
+    });
   }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
 }
  
