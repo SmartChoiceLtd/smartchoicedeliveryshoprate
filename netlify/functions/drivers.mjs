@@ -26,10 +26,13 @@ export default async (req) => {
     try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
     if (!body.code || !body.name) return json({ error: 'code and name required' }, 400);
     const key = body.code.toLowerCase();
-    const driver = {
+   const driver = {
       code: body.code.toUpperCase(),
       name: body.name,
       vehicle: body.vehicle || '',
+      email: body.email || '',
+      phone: body.phone || '',
+      hire_date: body.hire_date || '',
       active: true,
       created_at: new Date().toISOString()
     };
