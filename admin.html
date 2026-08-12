@@ -358,7 +358,7 @@ function loadApplications() {
           '<td>' + esc(a.vehicle||'') + '</td>' +
           '<td>' + esc(a.referred_by||'') + '</td>' +
           '<td>' + esc(a.comments||'') + '</td>' +
-          (a.vehicle) + ')">Hire</button></td>' +          }).join('') +
+         }).join('') +
       '</tbody></table>';
   }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
 }
