@@ -382,7 +382,7 @@ function loadApplications() {
           '<td>' + esc(a.vehicle||'') + '</td>' +
           '<td>' + esc(a.referred_by||'') + '</td>' +
           '<td>' + esc(a.comments||'') + '</td>' +
-          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" onclick="hireApplicant(' + JSON.stringify(a.name) + ',' + JSON.stringify(a.email) + ',' + JSON.stringify(a.phone) + ',' + JSON.stringify(a.vehicle) + ')">Hire</button></td>' +
+          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" data-name="' + esc(a.name||'') + '" data-email="' + esc(a.email||'') + '" data-phone="' + esc(a.phone||'') + '" data-vehicle="' + esc(a.vehicle||'') + '" onclick="hireApplicant(this)">Hire</button></td>' +
           '</tr>';
       }).join('') +
       '</tbody></table>';
