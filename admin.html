@@ -158,6 +158,25 @@ function renderDrivers() {
     }).join('') +
     '</tbody></table>';
 }
+  async function hireApplicant(name, email, phone, vehicle) {
+  var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if (!hireDate) return;
+  var code = window.prompt('Driver code:', name.split(' ')[0].toUpperCase());
+  if (!code) return;
+  code = code.toUpperCase();
+  try {
+    var res = await fetch('/api/drivers', {
+      method: 'POST',
+      headers: {'content-type':'application/json'},
+      body: JSON.stringify({code, name, email, phone, vehicle, hire_date: hireDate, active: true})
+    });
+    if (!res.ok) throw new Error('Could not create driver');
+    var driver = await res.json();
+    drivers.push(driver);
+    alert('Driver ' + code + ' — ' + name + ' added successfully!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
+    showTab('drivers');
+  } catch(e) { alert('Could not hire: ' + e.message); }
+}
  
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
