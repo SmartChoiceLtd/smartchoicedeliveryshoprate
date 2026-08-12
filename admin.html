@@ -49,6 +49,7 @@ tr.inactive td{color:var(--ink-soft);}
   <button class="tab" onclick="showTab('shops')">Shops</button>
   <button class="tab" onclick="showTab('rates')">Rate Table</button>
   <button class="tab" onclick="showTab('applications')">Applications</button>
+  <button class="tab" onclick="showTab('gdpi')">GDPI</button>
 </div>
 <div class="content">
  
@@ -112,23 +113,41 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
     </div>
     <div class="section">
-      <h2>Applications</h2>
-      <div id="applicationsList" class="loading">Loading...</div>
+  <!-- GDPI TAB -->
+  <div id="tab-gdpi" hidden>
+    <div class="section">
+      <h2>GDPI — Fuel Premium Calculator</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 16px;">Calculate the weekly fuel premium per zone. Formula: (Current − Base) × 0.11 × Zone KM = GDPI</p>
+      <div class="field-row">
+        <div class="field"><label>Base Price ($/L)</label><input type="number" id="gdpiBase" value="1.50" step="0.01" style="max-width:120px;"></div>
+        <div class="field"><label>Current Weekly Average ($/L)</label><input type="number" id="gdpiCurrent" placeholder="1.85" step="0.01" style="max-width:120px;"></div>
+        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-sm" id="calcGdpiBtn">Calculate</button></div>
+      </div>
+      <div id="gdpiResults" hidden style="margin-top:16px;">
+        <div style="background:var(--accent-soft);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
+          <strong>Difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km: <span id="gdpiPerKm"></span></strong>
+        </div>
+        <table><thead><tr><th>Zone</th><th>KM</th><th>New GDPI</th><th>Current GDPI</th><th>Apply</th></tr></thead>
+        <tbody id="gdpiTableBody"></tbody></table>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-sm" id="applyAllGdpiBtn">Apply All to Rate Table</button>
+          <span style="font-size:12px;color:var(--ink-soft);align-self:center;">Updates GDPI for all zones</span>
+        </div>
+        <div id="gdpiApplyMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">GDPI rates updated.</div>
+      </div>
     </div>
   </div>
- 
-</div>
 <script>
 function esc(s){ if(!s)return ''; var d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
  
 var drivers = [], shops = [], rates = {};
  
 function showTab(name) {
-  ['drivers','shops','rates','applications'].forEach(function(t){
+  ['drivers','shops','rates','applications','gdpi'].forEach(function(t){
     document.getElementById('tab-'+t).hidden = t !== name;
   });
   document.querySelectorAll('.tab').forEach(function(b,i){
-    b.classList.toggle('active', ['drivers','shops','rates','applications'][i] === name);
+    b.classList.toggle('active', ['drivers','shops','rates','applications','gdpi'][i] === name);
   });
   if (name === 'applications') { loadApplications(); loadTemplate(); }
 }
@@ -421,6 +440,61 @@ document.getElementById('saveTemplateBtn').addEventListener('click', function() 
     alert('Could not save template.');
     btn.disabled = false; btn.textContent = 'Save Template';
   });
+});
+  /* ===== GDPI ===== */
+var ZONE_KM = {
+  C1:5, C2:12, C3:17, C4:23, C5:30,
+  TSA:28, DEW:30, HPT:25, RVS:28, RVN:40,
+  AIR:40, COC:45, CHE:25, OKO:38, EVA:25, BRG:45,
+  MDF:35, STR:50, HRV:55, CAN:120, BNF:140
+};
+
+document.getElementById('calcGdpiBtn').addEventListener('click', function() {
+  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+  var current = parseFloat(document.getElementById('gdpiCurrent').value);
+  if (!current) { alert('Enter current gas price.'); return; }
+  var diff = current - base;
+  var perKm = diff * 0.11;
+  document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
+  document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
+  var tbody = document.getElementById('gdpiTableBody');
+  tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
+    var km = ZONE_KM[zone];
+    var newGdpi = Math.round(perKm * km * 100) / 100;
+    var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : '—';
+    return '<tr>' +
+      '<td><strong>' + zone + '</strong></td>' +
+      '<td>' + km + ' km</td>' +
+      '<td style="color:var(--accent);font-weight:600;">$' + newGdpi.toFixed(2) + '</td>' +
+      '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
+      '<td><button class="btn-sm btn" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('gdpiResults').hidden = false;
+});
+
+async function applySingleGdpi(zone, value) {
+  if (!rates[zone]) rates[zone] = {};
+  rates[zone].gdpi = value;
+  await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
+  renderRates();
+  document.getElementById('gdpiApplyMsg').hidden = false;
+  setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
+}
+
+document.getElementById('applyAllGdpiBtn').addEventListener('click', async function() {
+  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+  var current = parseFloat(document.getElementById('gdpiCurrent').value);
+  if (!current) return;
+  var perKm = (current - base) * 0.11;
+  Object.keys(ZONE_KM).forEach(function(zone) {
+    if (!rates[zone]) rates[zone] = {};
+    rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+  });
+  await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
+  renderRates();
+  document.getElementById('gdpiApplyMsg').hidden = false;
+  setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
 });
  
 /* ===== INIT ===== */
