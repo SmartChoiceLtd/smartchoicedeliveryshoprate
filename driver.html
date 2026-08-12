@@ -685,11 +685,11 @@ async function init() {
       document.getElementById('contactMethodField').hidden = !this.value.trim();
     });
 
-    document.getElementById('contactMethodGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-        this.classList.add('selected');
-      });
+    document.getElementById('contactMethodGrid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.status-btn');
+  if (!btn) return;
+  btn.classList.toggle('selected');
+});
     });
 
     document.getElementById('billingToggle').addEventListener('click', function(e) {
