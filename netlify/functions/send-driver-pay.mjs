@@ -5,3 +5,4 @@ const filterCode = (body.driver_code || '').toUpperCase();
 
   for (const driver of driversToSend) {
     const code = (driver.code || '').toUpperCase();
+  }
