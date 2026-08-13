@@ -452,7 +452,8 @@ var ZONE_KM = {
 };
 
 var calcBtn = document.getElementById('calcGdpiBtn');
-if (calcBtn) calcBtn.addEventListener('click', function() {
+if (calcBtn) {
+  calcBtn.addEventListener('click', function() {
   var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
   var current = parseFloat(document.getElementById('gdpiCurrent').value);
   if (!current) { alert('Enter current gas price.'); return; }
@@ -460,7 +461,7 @@ if (calcBtn) calcBtn.addEventListener('click', function() {
   var perKm = diff * 0.11;
   document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
   document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
-  var tbody = document.getElementById('gdpiTableBody');
+ var tbody = document.getElementById('gdpiTableBody');
   tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
     var km = ZONE_KM[zone];
     var newGdpi = Math.round(perKm * km * 100) / 100;
@@ -474,7 +475,8 @@ if (calcBtn) calcBtn.addEventListener('click', function() {
       '</tr>';
   }).join('');
   document.getElementById('gdpiResults').hidden = false;
-});
+  });
+}
 
 async function applySingleGdpi(zone, value) {
   if (!rates[zone]) rates[zone] = {};
@@ -486,15 +488,16 @@ async function applySingleGdpi(zone, value) {
 }
 
 var applyBtn = document.getElementById('applyAllGdpiBtn');
-if (applyBtn) applyBtn.addEventListener('click', async function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) return;
-  var perKm = (current - base) * 0.11;
-  Object.keys(ZONE_KM).forEach(function(zone) {
-    if (!rates[zone]) rates[zone] = {};
-    rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+if (applyBtn) {
+  applyBtn.addEventListener('click', async function() {
+    // ...forEach...
+    await fetch('/api/rates', ...);
+    renderRates();
+    document.getElementById('gdpiApplyMsg').hidden = false;
+    setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
   });
+}
+  
   await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
   renderRates();
   document.getElementById('gdpiApplyMsg').hidden = false;
