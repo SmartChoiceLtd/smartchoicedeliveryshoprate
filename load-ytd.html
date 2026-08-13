@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load YTD Starting Balances</title>
+<style>
+body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:20px;background:#FAF7F2;color:#2B2620;}
+h1{font-family:Georgia,serif;font-size:20px;color:#0C769E;}
+.btn{background:#0C769E;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;cursor:pointer;width:100%;margin-top:16px;}
+.btn:disabled{opacity:0.5;}
+.log{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:14px;margin-top:16px;font-size:12px;font-family:monospace;max-height:500px;overflow-y:auto;white-space:pre-wrap;}
+.progress{background:#E6DECF;border-radius:999px;height:8px;margin-top:12px;}
+.progress-bar{background:#0C769E;border-radius:999px;height:8px;width:0;transition:width 0.3s;}
+</style>
+</head>
+<body>
+<h1>Load YTD Starting Balances</h1>
+<p style="color:#6B6256;font-size:13px;">Loads historical YTD delivery counts and pay totals (from Dec 29 2025) into each active driver record. Run once only.</p>
+<button class="btn" id="loadBtn">Load YTD Data</button>
+<div class="progress" hidden id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+<div class="log" id="log" hidden></div>
+<script>
+var YTD_DATA = {
+  "AH":      { ytd_start_deliveries: 420,  ytd_start_pay: 3425.05, ytd_start_date: "2025-12-29" },
+  "ALEXEI":  { ytd_start_deliveries: 1046, ytd_start_pay: 7465.90, ytd_start_date: "2025-12-29" },
+  "ANG":     { ytd_start_deliveries: 1380, ytd_start_pay: 11367.80, ytd_start_date: "2025-12-29" },
+  "Craig":   { ytd_start_deliveries: 645,  ytd_start_pay: 5142.45, ytd_start_date: "2025-12-29" },
+  "DT":      { ytd_start_deliveries: 27,   ytd_start_pay: 263.75, ytd_start_date: "2025-12-29" },
+  "Emme":    { ytd_start_deliveries: 3397, ytd_start_pay: 25941.25, ytd_start_date: "2025-12-29" },
+  "JUDY":    { ytd_start_deliveries: 58,   ytd_start_pay: 555.00, ytd_start_date: "2025-12-29" },
+  "KE":      { ytd_start_deliveries: 1893, ytd_start_pay: 12125.80, ytd_start_date: "2025-12-29" },
+  "MF":      { ytd_start_deliveries: 176,  ytd_start_pay: 1452.20, ytd_start_date: "2025-12-29" },
+  "MFL":     { ytd_start_deliveries: 654,  ytd_start_pay: 4125.55, ytd_start_date: "2025-12-29" },
+  "NV":      { ytd_start_deliveries: 4744, ytd_start_pay: 29081.85, ytd_start_date: "2025-12-29" },
+  "Rashid":  { ytd_start_deliveries: 310,  ytd_start_pay: 2161.75, ytd_start_date: "2025-12-29" },
+  "Ravi":    { ytd_start_deliveries: 697,  ytd_start_pay: 4962.85, ytd_start_date: "2025-12-29" },
+  "TOSIN":   { ytd_start_deliveries: 543,  ytd_start_pay: 4164.00, ytd_start_date: "2025-12-29" },
+  "ishdorj": { ytd_start_deliveries: 148,  ytd_start_pay: 1239.25, ytd_start_date: "2025-12-29" }
+};
+ 
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+ 
+document.getElementById('loadBtn').addEventListener('click', async function() {
+  var btn = this;
+  btn.disabled = true;
+  var log = document.getElementById('log');
+  var progressWrap = document.getElementById('progressWrap');
+  var progressBar = document.getElementById('progressBar');
+  log.hidden = false;
+  progressWrap.hidden = false;
+  log.textContent = 'Loading drivers from system...\n\n';
+ 
+  var res = await fetch('/api/drivers');
+  var existing = await res.json();
+  log.textContent += 'Found ' + existing.length + ' drivers in system.\n\n';
+ 
+  var codes = Object.keys(YTD_DATA);
+  var updated = 0, notFound = 0;
+ 
+  for (var i = 0; i < codes.length; i++) {
+    var code = codes[i];
+    var ytd = YTD_DATA[code];
+    progressBar.style.width = Math.round((i / codes.length) * 100) + '%';
+ 
+    var match = existing.find(function(e) {
+      return e.code && e.code.toLowerCase() === code.toLowerCase();
+    });
+ 
+    if (!match) {
+      log.textContent += '? Not found: ' + code + '\n';
+      notFound++;
+      continue;
+    }
+ 
+    try {
+      var updateRes = await fetch('/api/drivers?code=' + encodeURIComponent(match.code), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(ytd)
+      });
+      if (updateRes.ok) {
+        updated++;
+        log.textContent += '✓ ' + code + ' — ' + ytd.ytd_start_deliveries + ' deliveries, $' + ytd.ytd_start_pay.toFixed(2) + '\n';
+      } else {
+        log.textContent += '✗ Failed: ' + code + '\n';
+      }
+    } catch(e) {
+      log.textContent += '✗ Error: ' + code + ' — ' + e.message + '\n';
+    }
+ 
+    log.scrollTop = log.scrollHeight;
+    await sleep(200);
+  }
+ 
+  progressBar.style.width = '100%';
+  log.textContent += '\nDone! ' + updated + ' updated, ' + notFound + ' not found.';
+  btn.textContent = 'Complete';
+});
+</script>
+</body>
+</html>
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
