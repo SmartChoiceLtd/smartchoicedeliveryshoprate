@@ -239,7 +239,18 @@ document.getElementById('ovNew').value = (order.zone_suggestion && order.zone_su
 document.getElementById('ovNote').value = '';
 document.getElementById('overrideModal').hidden = false;
 }
-
+function sendDriverPay() {
+  var weekEnd = prompt('Week ending (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if (!weekEnd) return;
+  if (!confirm('Send pay emails to all drivers with deliveries for week ending ' + weekEnd + '?')) return;
+  fetch('/api/send-driver-pay', {
+    method: 'POST',
+    headers: {'content-type':'application/json'},
+    body: JSON.stringify({week_end: weekEnd})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    alert('Done! ' + d.emails_sent.length + ' emails sent.\n' + d.emails_sent.map(function(e){ return e.driver + ': ' + e.status; }).join('\n'));
+  }).catch(function(e){ alert('Failed: ' + e.message); });
+}
 document.getElementById('ovSaveBtn').addEventListener('click', function() {
 var newZone = document.getElementById('ovNew').value.trim().toUpperCase();
 var note = document.getElementById('ovNote').value.trim();
