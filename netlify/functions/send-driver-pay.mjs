@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs';
+mport { getStore } from '@netlify/blobs';
 import { Resend } from 'resend';
 
 function json(data, status = 200) {
@@ -193,20 +193,15 @@ export default async (req) => {
   const { blobs: driverBlobs } = await driversStore.list();
   const drivers = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
   const activeDrivers = drivers.filter(d => d && d.active && d.email);
-  
+
   // Load rates
   const ratesStore = getStore('flower-rates');
   let rates = {};
   try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
-  const filterCode = (body.driver_code || '').toUpperCase();
-  const driversToSend = filterCode === 'ALL' || !filterCode
-    ? activeDrivers
-    : activeDrivers.filter(d => (d.code || '').toUpperCase() === filterCode);
-
   // Send emails
   const results = [];
-  for (const driver of driversToSend) {
+  for (const driver of activeDrivers) {
     const code = (driver.code || '').toUpperCase();
     const orders = byDriver[code] || [];
     if (!orders.length) continue;
