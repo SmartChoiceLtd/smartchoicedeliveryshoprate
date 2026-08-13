@@ -143,7 +143,7 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   `;
 
   const result = await resend.emails.send({
-    from: 'pay@send.smartchoicedelivery.ca',
+    from: 'pay@smartchoicedelivery.ca',
     to: driver.email,
     subject: `Smart Choice Delivery — Pay Statement Week Ending ${weekEnd}`,
     html
@@ -189,19 +189,20 @@ export default async (req) => {
   });
 
   // Load drivers
-  const driversStore = getStore('flower-drivers');
-  const { blobs: driverBlobs } = await driversStore.list();
-  const drivers = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
-  const activeDrivers = drivers.filter(d => d && d.active && d.email);
-
+  
   // Load rates
   const ratesStore = getStore('flower-rates');
   let rates = {};
   try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
+  const filterCode = (body.driver_code || '').toUpperCase();
+  const driversToSend = filterCode === 'ALL' || !filterCode
+    ? activeDrivers
+    : activeDrivers.filter(d => (d.code || '').toUpperCase() === filterCode);
+
   // Send emails
   const results = [];
-  for (const driver of activeDrivers) {
+  for (const driver of driversToSend) {
     const code = (driver.code || '').toUpperCase();
     const orders = byDriver[code] || [];
     if (!orders.length) continue;
