@@ -11,21 +11,24 @@
 .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:16px;}
 .topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
 .topbar a{color:var(--accent);font-size:13px;text-decoration:none;}
-.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--card);padding:0 20px;}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--card);padding:0 20px;flex-wrap:wrap;}
 .tab{padding:12px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px;}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-.content{max-width:1100px;margin:0 auto;padding:24px 20px;}
+.content{max-width:1200px;margin:0 auto;padding:24px 20px;}
 .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
 .section h2{font-family:Georgia,serif;font-size:16px;margin:0 0 16px;}
 .field{margin-bottom:12px;}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;}
 .field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);}
-.field-row{display:flex;gap:10px;}
-.field-row .field{flex:1;}
+.field-row{display:flex;gap:10px;flex-wrap:wrap;}
+.field-row .field{flex:1;min-width:120px;}
 .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;}
 .btn:disabled{opacity:0.5;}
 .btn-sm{padding:6px 12px;font-size:12px;}
-.btn-danger{background:var(--warm);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;}
+.btn-warm{background:var(--warm);}
+.btn-green{background:var(--green);}
+.btn-grey{background:#666;}
+.btn-danger{color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:var(--warm);}
 .success-msg{color:var(--green);background:var(--green-soft);border:1px solid #A8CFA8;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
 .error-msg{color:var(--warm);background:var(--warm-soft);border:1px solid #E3B3AE;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
 .loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
@@ -36,6 +39,7 @@ tr.inactive td{color:var(--ink-soft);}
 .star-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:0 4px;}
 .copy-link{background:var(--accent-soft);color:var(--accent);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;}
 .rate-input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;}
+.gdpi-highlight{color:var(--accent);font-weight:600;}
 </style>
 </head>
 <body>
@@ -48,12 +52,11 @@ tr.inactive td{color:var(--ink-soft);}
   <button class="tab active" onclick="showTab('drivers')">Drivers</button>
   <button class="tab" onclick="showTab('shops')">Shops</button>
   <button class="tab" onclick="showTab('rates')">Rate Table</button>
-  <button class="tab" onclick="showTab('applications')">Applications</button>
   <button class="tab" onclick="showTab('gdpi')">GDPI</button>
+  <button class="tab" onclick="showTab('applications')">Applications</button>
 </div>
 <div class="content">
- 
-  <!-- DRIVERS TAB -->
+
   <div id="tab-drivers">
     <div class="section">
       <h2>Add Driver</h2>
@@ -70,8 +73,7 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="driversList" class="loading">Loading...</div>
     </div>
   </div>
- 
-  <!-- SHOPS TAB -->
+
   <div id="tab-shops" hidden>
     <div class="section">
       <h2>Add Shop</h2>
@@ -88,8 +90,7 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="shopsList" class="loading">Loading...</div>
     </div>
   </div>
- 
-  <!-- RATES TAB -->
+
   <div id="tab-rates" hidden>
     <div class="section">
       <h2>Rate Table</h2>
@@ -97,12 +98,37 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="ratesTable" class="loading">Loading...</div>
     </div>
   </div>
- 
-  <!-- APPLICATIONS TAB -->
+
+  <div id="tab-gdpi" hidden>
+    <div class="section">
+      <h2>GDPI — Fuel Premium Calculator</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 16px;">Formula: (Current price − Base price) &times; 0.11 &times; Zone km = GDPI per delivery</p>
+      <div class="field-row">
+        <div class="field"><label>Base Price ($/L)</label><input type="number" id="gdpiBase" value="1.50" step="0.01" style="max-width:130px;"></div>
+        <div class="field"><label>Current Weekly Average ($/L)</label><input type="number" id="gdpiCurrent" placeholder="1.85" step="0.01" style="max-width:130px;"></div>
+        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-sm" id="calcGdpiBtn">Calculate</button></div>
+      </div>
+      <div id="gdpiResults" hidden style="margin-top:16px;">
+        <div style="background:var(--accent-soft);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
+          <strong>Price difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km premium: <span id="gdpiPerKm"></span></strong>
+        </div>
+        <table>
+          <thead><tr><th>Zone</th><th>Distance (km)</th><th>New GDPI</th><th>Current GDPI</th><th>Apply</th></tr></thead>
+          <tbody id="gdpiTableBody"></tbody>
+        </table>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-sm" id="applyAllGdpiBtn">Apply All to Rate Table</button>
+          <span style="font-size:12px;color:var(--ink-soft);">Updates GDPI for all zones shown</span>
+        </div>
+        <div id="gdpiApplyMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">GDPI rates updated.</div>
+      </div>
+    </div>
+  </div>
+
   <div id="tab-applications" hidden>
     <div class="section">
       <h2>Email Template — Seasonal Header</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Updates the seasonal section sent with every application acknowledgement.</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Updates the seasonal section in the application acknowledgement email.</p>
       <div class="field-row">
         <div class="field"><label>Season</label><input type="text" id="tSeason" placeholder="Mother's Day 2026"></div>
         <div class="field"><label>Dates</label><input type="text" id="tDates" placeholder="May 8-10, 2026"></div>
@@ -113,45 +139,32 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
     </div>
     <div class="section">
-  <!-- GDPI TAB -->
-  <div id="tab-gdpi" hidden>
-    <div class="section">
-      <h2>GDPI — Fuel Premium Calculator</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 16px;">Calculate the weekly fuel premium per zone. Formula: (Current − Base) × 0.11 × Zone KM = GDPI</p>
-      <div class="field-row">
-        <div class="field"><label>Base Price ($/L)</label><input type="number" id="gdpiBase" value="1.50" step="0.01" style="max-width:120px;"></div>
-        <div class="field"><label>Current Weekly Average ($/L)</label><input type="number" id="gdpiCurrent" placeholder="1.85" step="0.01" style="max-width:120px;"></div>
-        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-sm" id="calcGdpiBtn">Calculate</button></div>
-      </div>
-      <div id="gdpiResults" hidden style="margin-top:16px;">
-        <div style="background:var(--accent-soft);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
-          <strong>Difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km: <span id="gdpiPerKm"></span></strong>
-        </div>
-        <table><thead><tr><th>Zone</th><th>KM</th><th>New GDPI</th><th>Current GDPI</th><th>Apply</th></tr></thead>
-        <tbody id="gdpiTableBody"></tbody></table>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-          <button class="btn btn-sm" id="applyAllGdpiBtn">Apply All to Rate Table</button>
-          <span style="font-size:12px;color:var(--ink-soft);align-self:center;">Updates GDPI for all zones</span>
-        </div>
-        <div id="gdpiApplyMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">GDPI rates updated.</div>
-      </div>
+      <h2>Applications</h2>
+      <div id="applicationsList" class="loading">Loading...</div>
     </div>
   </div>
+
+</div>
 <script>
-function esc(s){ if(!s)return ''; var d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
- 
+function esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
 var drivers = [], shops = [], rates = {};
- 
+
 function showTab(name) {
-  ['drivers','shops','rates','applications','gdpi'].forEach(function(t){
-    document.getElementById('tab-'+t).hidden = t !== name;
+  ['drivers','shops','rates','gdpi','applications'].forEach(function(t) {
+    document.getElementById('tab-' + t).hidden = t !== name;
   });
-  document.querySelectorAll('.tab').forEach(function(b,i){
-    b.classList.toggle('active', ['drivers','shops','rates','applications','gdpi'][i] === name);
+  document.querySelectorAll('.tab').forEach(function(b, i) {
+    b.classList.toggle('active', ['drivers','shops','rates','gdpi','applications'][i] === name);
   });
   if (name === 'applications') { loadApplications(); loadTemplate(); }
 }
- 
+
 /* ===== DRIVERS ===== */
 function renderDrivers() {
   var el = document.getElementById('driversList');
@@ -163,121 +176,95 @@ function renderDrivers() {
       return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
         '<td><strong>' + esc(d.code) + '</strong></td>' +
         '<td>' + esc(d.name) + '</td>' +
-        '<td>' + esc(d.vehicle||'') + '</td>' +
-        '<td>' + esc(d.email||'') + '</td>' +
-        '<td>' + esc(d.phone||'') + '</td>' +
-        '<td>' + esc(d.hire_date||'') + '</td>' +
+        '<td>' + esc(d.vehicle || '') + '</td>' +
+        '<td>' + esc(d.email || '') + '</td>' +
+        '<td>' + esc(d.phone || '') + '</td>' +
+        '<td>' + esc(d.hire_date || '') + '</td>' +
         '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
         '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
-        '<td style="display:flex;gap:6px;">' +
+        '<td style="display:flex;gap:4px;">' +
         '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
         '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
-        '<button class="btn-danger" style="background:#666;" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
+        '<button class="btn-danger btn-grey" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
         '</td></tr>';
     }).join('') +
     '</tbody></table>';
 }
 
-async function hireApplicant(name, email, phone, vehicle) {
-  var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
-  if (!hireDate) return;
-  var code = window.prompt('Driver code:', (name||'').split(' ')[0].toUpperCase());
-  if (!code) return;
-  code = code.toUpperCase();
-  try {
-    var res = await fetch('/api/drivers', {
-      method: 'POST',
-      headers: {'content-type':'application/json'},
-      body: JSON.stringify({code, name, email, phone, vehicle, hire_date: hireDate, active: true})
-    });
-    if (!res.ok) throw new Error('Could not create driver');
-    var driver = await res.json();
-    drivers.push(driver);
-    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
-    showTab('drivers');
-  } catch(e) { alert('Could not hire: ' + e.message); }
-}
- 
 document.getElementById('addDriverBtn').addEventListener('click', async function() {
   var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
   var name = document.getElementById('newDriverName').value.trim();
   var vehicle = document.getElementById('newDriverVehicle').value.trim();
   var msgEl = document.getElementById('addDriverMsg');
-  if (!code || !name) { msgEl.className='error-msg'; msgEl.textContent='Code and name required.'; msgEl.hidden=false; return; }
+  if (!code || !name) { msgEl.className = 'error-msg'; msgEl.textContent = 'Code and name required.'; msgEl.hidden = false; return; }
   this.disabled = true; this.textContent = 'Adding...';
   try {
-    var res = await fetch('/api/drivers', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({code,name,vehicle,active:true}) });
+    var res = await fetch('/api/drivers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code, name: name, vehicle: vehicle, active: true }) });
     var driver = await res.json();
     drivers.push(driver);
     renderDrivers();
     document.getElementById('newDriverCode').value = '';
     document.getElementById('newDriverName').value = '';
     document.getElementById('newDriverVehicle').value = '';
-    msgEl.className='success-msg'; msgEl.textContent='Driver added. Link: ' + location.origin + '/driver/' + code.toLowerCase();
+    msgEl.className = 'success-msg';
+    msgEl.textContent = 'Driver added. Link: ' + location.origin + '/driver/' + code.toLowerCase();
     msgEl.hidden = false;
-  } catch(e) { msgEl.className='error-msg'; msgEl.textContent='Error: ' + e.message; msgEl.hidden=false; }
-  finally { this.disabled=false; this.textContent='Add Driver'; }
+  } catch(e) { msgEl.className = 'error-msg'; msgEl.textContent = 'Error: ' + e.message; msgEl.hidden = false; }
+  finally { this.disabled = false; this.textContent = 'Add Driver'; }
 });
- 
+
 function copyDriverLink(code) {
   var url = location.origin + '/driver/' + code.toLowerCase();
-  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ alert('Copied: ' + url); });
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function() { alert('Copied: ' + url); });
   else window.prompt('Copy link:', url);
 }
- 
+
 async function toggleDriver(code, active) {
   try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({active}) });
-    var d = drivers.find(function(x){ return x.code===code; });
+    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ active: active }) });
+    var d = drivers.find(function(x) { return x.code === code; });
     if (d) d.active = active;
     renderDrivers();
   } catch(e) { alert('Could not update driver.'); }
 }
- 
+
 function editDriver(code) {
-  var d = drivers.find(function(x){ return x.code===code; });
+  var d = drivers.find(function(x) { return x.code === code; });
   if (!d) return;
-  var name = window.prompt('Edit name:', d.name);
-  if (name === null) return;
-  var vehicle = window.prompt('Edit vehicle:', d.vehicle || '');
-  if (vehicle === null) return;
-  var email = window.prompt('Edit email:', d.email || '');
-  if (email === null) return;
-  var phone = window.prompt('Edit phone:', d.phone || '');
-  if (phone === null) return;
+  var name = window.prompt('Edit name:', d.name); if (name === null) return;
+  var vehicle = window.prompt('Edit vehicle:', d.vehicle || ''); if (vehicle === null) return;
+  var email = window.prompt('Edit email:', d.email || ''); if (email === null) return;
+  var phone = window.prompt('Edit phone:', d.phone || ''); if (phone === null) return;
   fetch('/api/drivers?code=' + encodeURIComponent(code), {
-    method: 'PUT',
-    headers: {'content-type':'application/json'},
-    body: JSON.stringify({name:name.trim(), vehicle:vehicle.trim(), email:email.trim(), phone:phone.trim()})
-  }).then(function(r){ return r.json(); }).then(function(updated){
-    var idx = drivers.findIndex(function(x){ return x.code===code; });
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: name.trim(), vehicle: vehicle.trim(), email: email.trim(), phone: phone.trim() })
+  }).then(function(r) { return r.json(); }).then(function(updated) {
+    var idx = drivers.findIndex(function(x) { return x.code === code; });
     if (idx >= 0) drivers[idx] = updated;
     renderDrivers();
-  }).catch(function(){ alert('Could not update driver.'); });
+  }).catch(function() { alert('Could not update driver.'); });
 }
- 
+
 async function deleteDriver(code) {
   if (!confirm('Permanently delete driver ' + code + '? This cannot be undone.')) return;
   try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), {method:'DELETE'});
-    drivers = drivers.filter(function(d){ return d.code !== code; });
+    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'DELETE' });
+    drivers = drivers.filter(function(d) { return d.code !== code; });
     renderDrivers();
   } catch(e) { alert('Could not delete driver.'); }
 }
- 
+
 async function loadDrivers() {
   var res = await fetch('/api/drivers');
   drivers = await res.json();
   renderDrivers();
 }
- 
+
 /* ===== SHOPS ===== */
 function renderShops() {
   var el = document.getElementById('shopsList');
   if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr>' +
-    '<th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Edit</th>' +
-    '</tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Edit</th></tr></thead><tbody>' +
     shops.map(function(s) {
       var code = s.name ? s.name.split(' ')[0] : '';
       return '<tr>' +
@@ -287,23 +274,22 @@ function renderShops() {
         '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
         '<td><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button></td>' +
         '</tr>';
-    }).join('') +
-    '</tbody></table>';
+    }).join('') + '</tbody></table>';
 }
- 
+
 document.getElementById('addShopBtn').addEventListener('click', async function() {
   var code = document.getElementById('newShopCode').value.trim().toUpperCase();
   var name = document.getElementById('newShopName').value.trim().toUpperCase();
   var address = document.getElementById('newShopAddress').value.trim();
   var msgEl = document.getElementById('addShopMsg');
-  if (!code || !name || !address) { msgEl.className='error-msg'; msgEl.textContent='All fields required.'; msgEl.hidden=false; return; }
+  if (!code || !name || !address) { msgEl.className = 'error-msg'; msgEl.textContent = 'All fields required.'; msgEl.hidden = false; return; }
   this.disabled = true; this.textContent = 'Adding...';
   try {
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = { name: code + ' ' + name, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices:{C1:10,C2:12,C3:13,C4:14,C5:15,OUT1:25,OUT2:35,OUT3:55,OUT4:75}, communityZones:{}, townPrices:{} };
-    var res = await fetch('/api/shops', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+    var payload = { name: code + ' ' + name, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: { C1: 10, C2: 12, C3: 13, C4: 14, C5: 15 }, communityZones: {}, townPrices: {} };
+    var res = await fetch('/api/shops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error('Could not create shop');
     var shop = await res.json();
     shops.push(shop);
@@ -311,44 +297,40 @@ document.getElementById('addShopBtn').addEventListener('click', async function()
     document.getElementById('newShopCode').value = '';
     document.getElementById('newShopName').value = '';
     document.getElementById('newShopAddress').value = '';
-    msgEl.className='success-msg'; msgEl.textContent='Shop added: ' + shop.name + ' — ' + geo.formatted;
-    msgEl.hidden = false;
-  } catch(e) { msgEl.className='error-msg'; msgEl.textContent='Error: ' + e.message; msgEl.hidden=false; }
-  finally { this.disabled=false; this.textContent='Add Shop'; }
+    msgEl.className = 'success-msg'; msgEl.textContent = 'Shop added: ' + shop.name; msgEl.hidden = false;
+  } catch(e) { msgEl.className = 'error-msg'; msgEl.textContent = 'Error: ' + e.message; msgEl.hidden = false; }
+  finally { this.disabled = false; this.textContent = 'Add Shop'; }
 });
- 
+
 async function toggleStar(shopId) {
-  var shop = shops.find(function(s){ return s.id===shopId; });
+  var shop = shops.find(function(s) { return s.id === shopId; });
   if (!shop) return;
   shop.featured = !shop.featured;
-  await fetch('/api/shops/' + encodeURIComponent(shopId), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({featured:shop.featured}) });
+  await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ featured: shop.featured }) });
   renderShops();
 }
- 
+
 async function editShop(shopId) {
-  var shop = shops.find(function(s){ return s.id===shopId; });
+  var shop = shops.find(function(s) { return s.id === shopId; });
   if (!shop) return;
-  var name = window.prompt('Shop name:', shop.name);
-  if (name === null) return;
-  var address = window.prompt('Shop address (include city):', shop.address);
-  if (address === null) return;
+  var name = window.prompt('Shop name:', shop.name); if (name === null) return;
+  var address = window.prompt('Shop address:', shop.address); if (address === null) return;
   try {
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
-    if (!geo.lat) throw new Error('Could not geocode address');
-    await fetch('/api/shops/' + encodeURIComponent(shopId), { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify({name:name.trim(), address:geo.formatted, lat:geo.lat, lng:geo.lng}) });
+    if (!geo.lat) throw new Error('Could not geocode');
+    await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng }) });
     shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng;
-    renderShops();
-    alert('Updated: ' + geo.formatted);
+    renderShops(); alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
 }
- 
+
 async function loadShops() {
   var res = await fetch('/api/shops');
   shops = await res.json();
   renderShops();
 }
- 
+
 /* ===== RATES ===== */
 function renderRates() {
   var el = document.getElementById('ratesTable');
@@ -358,154 +340,166 @@ function renderRates() {
     keys.map(function(zone) {
       var r = rates[zone];
       function inp(field) {
-        return '<input class="rate-input" type="number" step="0.25" value="' + (r[field]||0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
+        return '<input class="rate-input" type="number" step="0.25" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
       }
       return '<tr><td><strong>' + zone + '</strong></td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
-    }).join('') +
-    '</tbody></table>';
+    }).join('') + '</tbody></table>';
 }
- 
+
 async function updateRate(zone, field, value) {
   if (!rates[zone]) rates[zone] = {};
   rates[zone][field] = parseFloat(value) || 0;
-  try { await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) }); }
+  try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
   catch(e) { alert('Could not save rate.'); }
 }
- 
+
 async function loadRates() {
   var res = await fetch('/api/rates');
   rates = await res.json();
   renderRates();
 }
- 
+
+/* ===== GDPI ===== */
+var ZONE_KM = {
+  C1: 5, C2: 12, C3: 17, C4: 23, C5: 30,
+  TSA: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
+  AIR: 40, COC: 45, CHE: 25, OKO: 38, EVA: 25, BRG: 45,
+  MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140
+};
+
+async function applySingleGdpi(zone, value) {
+  if (!rates[zone]) rates[zone] = {};
+  rates[zone].gdpi = value;
+  await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
+  renderRates();
+  document.getElementById('gdpiApplyMsg').hidden = false;
+  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
+}
+
+document.getElementById('calcGdpiBtn').addEventListener('click', function() {
+  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+  var current = parseFloat(document.getElementById('gdpiCurrent').value);
+  if (!current) { alert('Enter current gas price.'); return; }
+  var diff = current - base;
+  var perKm = diff * 0.11;
+  document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
+  document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
+  var tbody = document.getElementById('gdpiTableBody');
+  tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
+    var km = ZONE_KM[zone];
+    var newGdpi = Math.round(perKm * km * 100) / 100;
+    var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
+    return '<tr>' +
+      '<td><strong>' + zone + '</strong></td>' +
+      '<td>' + km + ' km</td>' +
+      '<td class="gdpi-highlight">$' + newGdpi.toFixed(2) + '</td>' +
+      '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
+      '<td><button class="btn btn-sm" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('gdpiResults').hidden = false;
+});
+
+document.getElementById('applyAllGdpiBtn').addEventListener('click', function() {
+  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+  var current = parseFloat(document.getElementById('gdpiCurrent').value);
+  if (!current) return;
+  var perKm = (current - base) * 0.11;
+  Object.keys(ZONE_KM).forEach(function(zone) {
+    if (!rates[zone]) rates[zone] = {};
+    rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+  });
+  fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) })
+    .then(function() { renderRates(); });
+  document.getElementById('gdpiApplyMsg').hidden = false;
+  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
+});
+
 /* ===== APPLICATIONS ===== */
 function loadApplications() {
-  fetch('/api/onboard').then(function(res){ return res.json(); }).then(function(apps){
-    var el = document.getElementById('applicationsList');
-    if (!el) return;
-    if (!apps.length) {
+  var el = document.getElementById('applicationsList');
+  if (!el) return;
+  fetch('/api/onboard').then(function(res) { return res.json(); }).then(function(apps) {
     if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
     el.innerHTML = '<table><thead><tr>' +
       '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
       '</tr></thead><tbody>' +
       apps.map(function(a, i) {
         return '<tr>' +
-          '<td>' + esc(a.date||'') + '</td>' +
-          '<td><strong>' + esc(a.name||'') + '</strong></td>' +
-          '<td>' + esc(a.email||'') + '</td>' +
-          '<td>' + esc(a.phone||'') + '</td>' +
-          '<td>' + esc(a.days_available||'') + '</td>' +
-          '<td>' + esc(a.time_available||'') + '</td>' +
-          '<td>' + esc(a.vehicle||'') + '</td>' +
-          '<td>' + esc(a.referred_by||'') + '</td>' +
-          '<td>' + esc(a.comments||'') + '</td>' +
-          '<td><button class="btn-danger" style="background:var(--green);font-size:11px;" data-idx="' + i + '">Hire</button></td>' +
+          '<td>' + esc(a.date || '') + '</td>' +
+          '<td><strong>' + esc(a.name || '') + '</strong></td>' +
+          '<td>' + esc(a.email || '') + '</td>' +
+          '<td>' + esc(a.phone || '') + '</td>' +
+          '<td>' + esc(a.days_available || '') + '</td>' +
+          '<td>' + esc(a.time_available || '') + '</td>' +
+          '<td>' + esc(a.vehicle || '') + '</td>' +
+          '<td>' + esc(a.referred_by || '') + '</td>' +
+          '<td>' + esc(a.comments || '') + '</td>' +
+          '<td><button class="btn-danger btn-green" data-idx="' + i + '">Hire</button></td>' +
           '</tr>';
-      }).join('') +
-      '</tbody></table>';
+      }).join('') + '</tbody></table>';
     el.querySelectorAll('[data-idx]').forEach(function(btn) {
-     btn.addEventListener('click', function() {
- var a = apps[parseInt(this.getAttribute('data-idx'))];
-  console.log(a.name, a.email, a.phone, a.vehicle);
-  hireApplicant(a.name, a.email, a.phone, a.vehicle);
+      btn.addEventListener('click', function() {
+        var a = apps[parseInt(this.getAttribute('data-idx'))];
+        hireApplicant(a.name, a.email, a.phone, a.vehicle);
+      });
     });
-  }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
+  }).catch(function() {
+    var el2 = document.getElementById('applicationsList');
+    if (el2) el2.innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>';
+  });
 }
- 
+
+async function hireApplicant(name, email, phone, vehicle) {
+  var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+  if (!hireDate) return;
+  var code = window.prompt('Driver code:', (name || '').split(' ')[0].toUpperCase());
+  if (!code) return;
+  code = code.toUpperCase();
+  try {
+    var res = await fetch('/api/drivers', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: code, name: name, email: email, phone: phone, vehicle: vehicle, hire_date: hireDate, active: true })
+    });
+    if (!res.ok) throw new Error('Could not create driver');
+    var driver = await res.json();
+    drivers.push(driver);
+    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
+    showTab('drivers');
+  } catch(e) { alert('Could not hire: ' + e.message); }
+}
+
 function loadTemplate() {
-  fetch('/api/onboard?type=template').then(function(res){ return res.json(); }).then(function(t){
+  fetch('/api/onboard?type=template').then(function(res) { return res.json(); }).then(function(t) {
     document.getElementById('tSeason').value = t.season || '';
     document.getElementById('tDates').value = t.dates || '';
     document.getElementById('tPositions').value = t.positions || '';
     document.getElementById('tComment').value = t.comment || '';
-  }).catch(function(){});
+  }).catch(function() {});
 }
- 
+
 document.getElementById('saveTemplateBtn').addEventListener('click', function() {
   var btn = this;
   btn.disabled = true; btn.textContent = 'Saving...';
   fetch('/api/onboard?type=template', {
-    method: 'PUT',
-    headers: {'content-type':'application/json'},
+    method: 'PUT', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       season: document.getElementById('tSeason').value.trim(),
       dates: document.getElementById('tDates').value.trim(),
       positions: document.getElementById('tPositions').value.trim(),
       comment: document.getElementById('tComment').value.trim()
     })
-  }).then(function(){
+  }).then(function() {
     document.getElementById('templateMsg').hidden = false;
-    setTimeout(function(){ document.getElementById('templateMsg').hidden = true; }, 3000);
-    btn.disabled = false; btn.textContent = 'Save Template';
-  }).catch(function(){
-    alert('Could not save template.');
-    btn.disabled = false; btn.textContent = 'Save Template';
-  });
+    setTimeout(function() { document.getElementById('templateMsg').hidden = true; }, 3000);
+  }).catch(function() { alert('Could not save template.'); })
+  .finally(function() { btn.disabled = false; btn.textContent = 'Save Template'; });
 });
-  /* ===== GDPI ===== */
-  var ZONE_KM = {
-  C1:5, C2:12, C3:17, C4:23, C5:30,
-  TSA:28, DEW:30, HPT:25, RVS:28, RVN:40,
-  AIR:40, COC:45, CHE:25, OKO:38, EVA:25, BRG:45,
-  MDF:35, STR:50, HRV:55, CAN:120, BNF:140
-};
 
-function initGdpi() {
-  var calcBtn = document.getElementById('calcGdpiBtn');
-  var applyAllBtn = document.getElementById('applyAllGdpiBtn');
-  if (!calcBtn) return;
-
-  calcBtn.addEventListener('click', function() {
-    var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-    var current = parseFloat(document.getElementById('gdpiCurrent').value);
-    if (!current) { alert('Enter current gas price.'); return; }
-    var diff = current - base;
-    var perKm = diff * 0.11;
-    document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
-    document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
-    var tbody = document.getElementById('gdpiTableBody');
-    tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
-      var km = ZONE_KM[zone];
-      var newGdpi = Math.round(perKm * km * 100) / 100;
-      var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + km + ' km</td>' +
-        '<td style="color:#0C769E;font-weight:600;">$' + newGdpi.toFixed(2) + '</td>' +
-        '<td style="color:#6B6256;">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
-        '<td><button onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td></tr>';
-    }).join('');
-    document.getElementById('gdpiResults').hidden = false;
-  });
-
-  applyAllBtn.addEventListener('click', function() {
-    var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-    var current = parseFloat(document.getElementById('gdpiCurrent').value);
-    if (!current) return;
-    var perKm = (current - base) * 0.11;
-    Object.keys(ZONE_KM).forEach(function(zone) {
-      if (!rates[zone]) rates[zone] = {};
-      rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
-    });
-    fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) })
-      .then(function(){ renderRates(); });
-    document.getElementById('gdpiApplyMsg').hidden = false;
-    setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-  });
-}
-
-async function applySingleGdpi(zone, value) {
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone].gdpi = value;
-  await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
-  renderRates();
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-} 
-/* ===== INIT ===== */ 
+/* ===== INIT ===== */
 loadDrivers();
 loadShops();
 loadRates();
-initGdpi();
 </script>
 </body>
 </html>
- 
