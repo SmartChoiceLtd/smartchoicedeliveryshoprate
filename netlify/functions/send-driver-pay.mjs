@@ -11,3 +11,8 @@ for (const driver of driversToSend) {
       console.error('Pay email failed:', driver.name, e.message);
     }
   }
+
+  return json({ success: true, week_end, emails_sent: results });
+};
+
+export const config = { path: '/api/send-driver-pay' };
