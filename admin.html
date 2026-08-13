@@ -444,6 +444,7 @@ document.getElementById('saveTemplateBtn').addEventListener('click', function() 
   });
 });
   /* ===== GDPI ===== */
+/* ===== GDPI ===== */
 var ZONE_KM = {
   C1:5, C2:12, C3:17, C4:23, C5:30,
   TSA:28, DEW:30, HPT:25, RVS:28, RVN:40,
@@ -451,30 +452,45 @@ var ZONE_KM = {
   MDF:35, STR:50, HRV:55, CAN:120, BNF:140
 };
 
-var calcBtn = document.getElementById('calcGdpiBtn');
-if (calcBtn) {
+function initGdpi() {
+  var calcBtn = document.getElementById('calcGdpiBtn');
+  var applyAllBtn = document.getElementById('applyAllGdpiBtn');
+  if (!calcBtn) return;
+
   calcBtn.addEventListener('click', function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) { alert('Enter current gas price.'); return; }
-  var diff = current - base;
-  var perKm = diff * 0.11;
-  document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
-  document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
- var tbody = document.getElementById('gdpiTableBody');
-  tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
-    var km = ZONE_KM[zone];
-    var newGdpi = Math.round(perKm * km * 100) / 100;
-    var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : '—';
-    return '<tr>' +
-      '<td><strong>' + zone + '</strong></td>' +
-      '<td>' + km + ' km</td>' +
-      '<td style="color:var(--accent);font-weight:600;">$' + newGdpi.toFixed(2) + '</td>' +
-      '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
-      '<td><button class="btn-sm btn" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
-      '</tr>';
-  }).join('');
-  document.getElementById('gdpiResults').hidden = false;
+    var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+    var current = parseFloat(document.getElementById('gdpiCurrent').value);
+    if (!current) { alert('Enter current gas price.'); return; }
+    var diff = current - base;
+    var perKm = diff * 0.11;
+    document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
+    document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
+    var tbody = document.getElementById('gdpiTableBody');
+    tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
+      var km = ZONE_KM[zone];
+      var newGdpi = Math.round(perKm * km * 100) / 100;
+      var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
+      return '<tr><td><strong>' + zone + '</strong></td><td>' + km + ' km</td>' +
+        '<td style="color:#0C769E;font-weight:600;">$' + newGdpi.toFixed(2) + '</td>' +
+        '<td style="color:#6B6256;">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
+        '<td><button onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td></tr>';
+    }).join('');
+    document.getElementById('gdpiResults').hidden = false;
+  });
+
+  applyAllBtn.addEventListener('click', function() {
+    var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
+    var current = parseFloat(document.getElementById('gdpiCurrent').value);
+    if (!current) return;
+    var perKm = (current - base) * 0.11;
+    Object.keys(ZONE_KM).forEach(function(zone) {
+      if (!rates[zone]) rates[zone] = {};
+      rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+    });
+    fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) })
+      .then(function(){ renderRates(); });
+    document.getElementById('gdpiApplyMsg').hidden = false;
+    setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
   });
 }
 
@@ -485,29 +501,12 @@ async function applySingleGdpi(zone, value) {
   renderRates();
   document.getElementById('gdpiApplyMsg').hidden = false;
   setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-}
-
-var applyBtn = document.getElementById('applyAllGdpiBtn');
-if (applyBtn) {
-  applyBtn.addEventListener('click', async function() {
-    // ...forEach...
-    await fetch('/api/rates', ...);
-    renderRates();
-    document.getElementById('gdpiApplyMsg').hidden = false;
-    setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-  });
-}
-  
-  await fetch('/api/rates', { method:'PUT', headers:{'content-type':'application/json'}, body:JSON.stringify(rates) });
-  renderRates();
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function(){ document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-});
- 
+} 
 /* ===== INIT ===== */
 loadDrivers();
 loadShops();
 loadRates();
+loadGdpi():
 </script>
 </body>
 </html>
