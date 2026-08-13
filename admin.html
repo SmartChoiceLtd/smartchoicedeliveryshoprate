@@ -113,7 +113,7 @@ tr.inactive td{color:var(--ink-soft);}
           <strong>Price difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km premium: <span id="gdpiPerKm"></span></strong>
         </div>
         <table>
-          <thead><tr><th>Zone</th><th>Distance (km)</th><th>New GDPI</th><th>Current GDPI</th><th>Apply</th></tr></thead>
+         <thead><tr><th>Zone</th><th>Distance (km)</th><th>Driver GDPI</th><th>Shop GDPI (×1.33)</th><th>Current GDPI</th><th>Apply</th></tr></thead>
           <tbody id="gdpiTableBody"></tbody>
         </table>
         <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
@@ -393,6 +393,7 @@ document.getElementById('calcGdpiBtn').addEventListener('click', function() {
       '<td><strong>' + zone + '</strong></td>' +
       '<td>' + km + ' km</td>' +
       '<td class="gdpi-highlight">$' + newGdpi.toFixed(2) + '</td>' +
+      '<td style="color:var(--warm);font-weight:600;">$' + (newGdpi * 1.33).toFixed(2) + '</td>' +
       '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
       '<td><button class="btn btn-sm" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
       '</tr>';
