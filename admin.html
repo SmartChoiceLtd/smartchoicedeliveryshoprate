@@ -383,6 +383,7 @@ function loadApplications() {
   fetch('/api/onboard').then(function(res){ return res.json(); }).then(function(apps){
     var el = document.getElementById('applicationsList');
     if (!el) return;
+    if (!apps.length) {
     if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
     el.innerHTML = '<table><thead><tr>' +
       '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
