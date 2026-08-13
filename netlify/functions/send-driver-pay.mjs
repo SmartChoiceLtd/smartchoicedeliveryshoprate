@@ -189,6 +189,10 @@ export default async (req) => {
   });
 
   // Load drivers
+  const driversStore = getStore('flower-drivers');
+  const { blobs: driverBlobs } = await driversStore.list();
+  const drivers = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
+  const activeDrivers = drivers.filter(d => d && d.active && d.email);
   
   // Load rates
   const ratesStore = getStore('flower-rates');
