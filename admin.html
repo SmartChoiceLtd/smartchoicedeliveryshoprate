@@ -405,9 +405,10 @@ function loadApplications() {
       '</tbody></table>';
     el.querySelectorAll('[data-idx]').forEach(function(btn) {
      btn.addEventListener('click', function() {
-  var a = apps[parseInt(this.getAttribute('data-idx'))];
+ var a = apps[parseInt(this.getAttribute('data-idx'))];
   console.log(a.name, a.email, a.phone, a.vehicle);
   hireApplicant(a.name, a.email, a.phone, a.vehicle);
+    });
   }).catch(function(){ document.getElementById('applicationsList').innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>'; });
 }
  
