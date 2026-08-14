@@ -672,7 +672,17 @@ async function init() {
     });
 
     document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
+        var doorstepSelected = document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+        document.getElementById('fPhoto').closest('.field').style.border = doorstepSelected ? '2px solid var(--warm)' : '';
+        if (doorstepSelected) {
+          document.getElementById('fPhoto').closest('.field').scrollIntoView({behavior:'smooth'});
+          document.getElementById('fPhoto').setAttribute('required','required');
+        } else {
+          document.getElementById('fPhoto').removeAttribute('required');
+        }
+      });
     });
 
     document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
