@@ -581,6 +581,13 @@ async function submitDelivery() {
     var res = await fetch('/api/orders', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
     });
+    var resData = await res.json();
+    if (resData.queued) {
+      document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
+      document.getElementById('app').hidden = true;
+      document.getElementById('successScreen').hidden = false;
+      return;
+    }
     if (!res.ok) throw new Error('Status ' + res.status);
     document.getElementById('successDetail').textContent = selectedZone + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
     document.getElementById('app').hidden = true;
