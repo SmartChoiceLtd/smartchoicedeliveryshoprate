@@ -230,7 +230,8 @@
       </div>
       <div class="field">
         <label id="photoLabel">Photo (optional)</label>
-        <input type="file" id="fPhoto" accept="image/*" capture="environment">
+      <input type="file" id="fPhoto" accept="image/*" capture="environment">
+      <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
       </div>
     </div>
 
@@ -674,11 +675,12 @@ async function init() {
     document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         this.classList.toggle('selected');
-        var doorstepSelected = document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
-        document.getElementById('fPhoto').closest('.field').style.border = doorstepSelected ? '2px solid var(--warm)' : '';
+       var doorstepSelected = document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+        document.getElementById('photoLabel').textContent = doorstepSelected ? 'Photo (required)' : 'Photo (optional)';
+        document.getElementById('photoRequired').hidden = !doorstepSelected;
         if (doorstepSelected) {
-          document.getElementById('fPhoto').closest('.field').scrollIntoView({behavior:'smooth'});
-          document.getElementById('fPhoto').setAttribute('required','required');
+          document.getElementById('fPhoto').setAttribute('required', 'required');
+          document.getElementById('fPhoto').click();
         } else {
           document.getElementById('fPhoto').removeAttribute('required');
         }
