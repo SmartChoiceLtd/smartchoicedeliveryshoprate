@@ -74,13 +74,14 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   }).join('');
 
   const firstName = (driver.name || '').split(' ')[0];
-  const driverLink = `https://quotes.smartchoicedelivery.ca/driver-summary/${(driver.code || '').toLowerCase()}`;
+  
+  const driverLink = `https://smartchoicedeliveryshoprate.netlify.app/api/reports?type=driver&week_end=${weekEnd}&code=${(driver.code || '').toLowerCase()}`;
 
   const html = `
-<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100%;">
+<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100% !important;min-width:280px;">
 
   <!-- Header -->
-  <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;">
+ <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;width:100% !important;box-sizing:border-box;">
     <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:20px;">Smart Choice Delivery</h1>
     <p style="color:#D6EEF7;margin:4px 0 0;font-size:12px;">Driver Pay Statement</p>
   </div>
