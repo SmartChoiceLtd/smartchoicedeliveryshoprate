@@ -462,9 +462,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
         ${escapeHtml(dest.address)}<br>
         ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
       </div>
-      <div class="quote-actions">
+      <<div class="quote-actions">
         <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
         <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
+        <button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>
       </div>
     </div>`;
 
@@ -477,6 +478,23 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     const w=window.open('','_blank','width=520,height=460');
     w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
+  });
+  document.getElementById('saveZoneBtn').addEventListener('click', async function() {
+    var community = dest.address.split(',')[0].trim();
+    var shopId = shop.id;
+    try {
+      var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          communityZones: Object.assign({}, shop.communityZones || {}, { [community]: zoneCode })
+        })
+      });
+      if (res.ok) {
+        shop.communityZones = Object.assign({}, shop.communityZones || {}, { [community]: zoneCode });
+        alert('Default zone ' + zoneCode + ' saved for ' + community);
+      }
+    } catch(e) { alert('Could not save: ' + e.message); }
   });
 }
 
