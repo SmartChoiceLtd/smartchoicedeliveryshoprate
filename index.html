@@ -350,6 +350,7 @@ function selectShop(id){
   if(state.map) drawTownPins();
 }
 function enterLookupView(shop){
+  seedCommunityZones(shop);
   state.shops=[shop];state.selectedShopId=shop.id;
   document.getElementById('shopsPanel').hidden=true;
   document.getElementById('pricingPanel').hidden=true;
