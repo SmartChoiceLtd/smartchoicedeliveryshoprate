@@ -164,7 +164,7 @@ const NAMED_TOWNS=[
 ];
 
 // Wholesale config
-const WS_INTOWN_BASE=16;   // first piece, in-town wholesale
+const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
 const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
 
 function outerBandForDistance(km){
@@ -208,7 +208,7 @@ async function geocodeAddress(address){const r=await fetch('/api/geocode?address
 async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
 /* shop model */
-function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
+function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
 function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
 function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
 function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
