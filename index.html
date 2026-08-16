@@ -148,14 +148,14 @@
 </div>
 <script>
 function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
-const CALGARY_ZONES=['C1','C2','C3','C4'];
+const CALGARY_ZONES=['C1','C2','C3','C4','C5'];
 const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
 // Zones selectable when overriding an individual community's zone (border
 // communities whose delivery radius bleeds into the city need C5 / border
 // zone codes available, not just the standard C1-C4 bands).
 const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN'];
 const ZONE_LABELS={
-  C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',
+  C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',C5:'City limit edge',
   OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
 };
 const ZONE_COLORS={
