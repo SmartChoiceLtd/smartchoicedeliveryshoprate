@@ -285,17 +285,30 @@ function setBillingDefault(code) {
   });
 }
 
+function getAllNonWholesaleZones() {
+  return Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); }).sort();
+}
+
 function getNeighbourZones(code) {
   if (deliveryType === 'wholesale') {
     return Object.keys(rates).filter(isWholesaleZone).sort();
   }
   var city = ['C1','C2','C3','C4','C5'];
   var idx = city.indexOf(code);
+  var base;
   if (idx >= 0) {
     var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
-    return n.concat(['WPU','TSU']);
+    base = n.concat(['TSU','TSA']);
+  } else {
+    base = [code];
   }
-  return [code,'C4','C5','DEW','RVS','MDF'];
+  // Always include every other zone currently in the rate table so a driver
+  // can manually pick any valid zone, not just a hardcoded subset. New zones
+  // added in admin (OUT1-4, HAR, etc.) show up here automatically, no code
+  // change needed. "base" (closest/most relevant) zones are listed first.
+  var all = getAllNonWholesaleZones();
+  var rest = all.filter(function(z) { return base.indexOf(z) < 0; });
+  return base.concat(rest);
 }
 
 function getWholesaleZoneForShop(shop) {
@@ -330,7 +343,7 @@ function buildZoneButtons(suggested) {
   if (deliveryType === 'wholesale') {
     list = ['WPU', 'WPH'];
   } else {
-    list = suggested ? getNeighbourZones(suggested) : ['C3','C4','C5','WPU','DEW','RVS','MDF','OKO','COC'];
+    list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
   }
   var container = document.getElementById('zoneButtons');
   container.innerHTML = '';
@@ -780,15 +793,3 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
-Footer
-© 2026 GitHub, Inc.
-Footer navigation
-Terms
-Privacy
-Security
-Status
-Community
-Docs
-Contact
-Manage cookies
-Do not share my personal information
