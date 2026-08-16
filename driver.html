@@ -2,601 +2,897 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Panel — Smart Choice Delivery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SCD Driver">
+<meta name="theme-color" content="#0C769E">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>Smart Choice Delivery</title>
 <style>
 :root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
 *{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-[hidden]{display:none!important;}
-.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:16px;}
+[hidden]{display:none !important;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
 .topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
-.topbar a{color:var(--accent);font-size:13px;text-decoration:none;}
-.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--card);padding:0 20px;flex-wrap:wrap;}
-.tab{padding:12px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px;}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-.content{max-width:1200px;margin:0 auto;padding:24px 20px;}
-.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
-.section h2{font-family:Georgia,serif;font-size:16px;margin:0 0 16px;}
-.field{margin-bottom:12px;}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;}
-.field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);}
-.field-row{display:flex;gap:10px;flex-wrap:wrap;}
-.field-row .field{flex:1;min-width:120px;}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;}
-.btn:disabled{opacity:0.5;}
-.btn-sm{padding:6px 12px;font-size:12px;}
-.btn-warm{background:var(--warm);}
-.btn-green{background:var(--green);}
-.btn-grey{background:#666;}
-.btn-danger{color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:var(--warm);}
-.success-msg{color:var(--green);background:var(--green-soft);border:1px solid #A8CFA8;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
-.error-msg{color:var(--warm);background:var(--warm-soft);border:1px solid #E3B3AE;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
-.loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px;}
-th{background:var(--accent);color:#fff;padding:8px 10px;text-align:left;font-size:12px;}
-td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
-tr.inactive td{color:var(--ink-soft);}
-.star-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:0 4px;}
-.copy-link{background:var(--accent-soft);color:var(--accent);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;}
-.rate-input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;}
-.gdpi-highlight{color:var(--accent);font-weight:600;}
+.driver-badge{background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}
+.container{max-width:540px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+.card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 14px;}
+.toggle-row{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.toggle-btn{flex:1;padding:10px;font-size:14px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
+.toggle-btn.active{background:var(--accent);color:#fff;font-weight:700;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field textarea{resize:vertical;min-height:70px;}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+.zone-result{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;}
+.zone-code{font-size:20px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
+.zone-desc{font-size:12px;color:var(--ink-soft);}
+.zone-loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
+.pay-preview{background:var(--green-soft);border:1px solid #A8CFA8;border-radius:10px;padding:12px 14px;margin-top:10px;}
+.pay-amount{font-size:22px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
+.pay-breakdown{font-size:12px;color:var(--green);margin-top:2px;}
+.zone-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.zone-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;}
+.zone-btn:hover{border-color:var(--accent);color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.status-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;}
+.status-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
+.btn{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.btn:disabled{opacity:0.5;cursor:default;}
+.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);}
+.error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+.success{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:16px;border-radius:10px;text-align:center;}
+.success h3{font-family:Georgia,serif;font-size:18px;margin:0 0 6px;}
+.loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.shop-search-wrap{position:relative;}
+.shop-dd{position:absolute;z-index:200;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);display:none;}
+.shop-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+.shop-dd-item:last-child{border-bottom:none;}
+.shop-dd-item:hover{background:var(--accent-soft);}
+.shop-dd-header{padding:5px 12px;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;background:var(--bg);}
+#submitBtn{background:var(--warm);}
 </style>
 </head>
 <body>
-<div class="topbar">
-  <h1>Admin Panel</h1>
-  <a href="/">Quote tool</a>
-  <a href="/orders">Orders</a>
+
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading...</p>
 </div>
-<div class="tabs">
-  <button class="tab active" onclick="showTab('drivers')">Drivers</button>
-  <button class="tab" onclick="showTab('shops')">Shops</button>
-  <button class="tab" onclick="showTab('rates')">Rate Table</button>
-  <button class="tab" onclick="showTab('gdpi')">GDPI</button>
-  <button class="tab" onclick="showTab('applications')">Applications</button>
+
+<div id="notFound" hidden>
+  <div class="container" style="padding-top:40px;text-align:center;">
+    <p style="color:var(--ink-soft);">Driver link not found. Check your link or contact your dispatcher.</p>
+  </div>
 </div>
-<div class="content">
 
-  <div id="tab-drivers">
-    <div class="section">
-      <h2>Add Driver</h2>
-      <div class="field-row">
-        <div class="field"><label>Driver Code</label><input type="text" id="newDriverCode" placeholder="KE" maxlength="10" style="text-transform:uppercase;"></div>
-        <div class="field"><label>Full Name</label><input type="text" id="newDriverName" placeholder="Kevin Michaud"></div>
-        <div class="field"><label>Vehicle</label><input type="text" id="newDriverVehicle" placeholder="SUV"></div>
-      </div>
-      <button class="btn" id="addDriverBtn">Add Driver</button>
-      <div id="addDriverMsg" hidden></div>
-    </div>
-    <div class="section">
-      <h2>Drivers</h2>
-      <div id="driversList" class="loading">Loading...</div>
-    </div>
+<div id="app" hidden>
+  <div class="topbar">
+    <h1>Smart Choice Delivery</h1>
+    <span class="driver-badge" id="driverBadge"></span>
   </div>
+  <div class="container">
+    <div id="errorMsg" class="error" hidden></div>
 
-  <div id="tab-shops" hidden>
-    <div class="section">
-      <h2>Add Shop</h2>
-      <div class="field-row">
-        <div class="field"><label>Shop Code</label><input type="text" id="newShopCode" placeholder="KF" maxlength="6" style="text-transform:uppercase;"></div>
-        <div class="field"><label>Shop Name</label><input type="text" id="newShopName" placeholder="KENSINGTON FLOWERS"></div>
-      </div>
-      <div class="field"><label>Address</label><input type="text" id="newShopAddress" placeholder="1145 Kensington Cres NW Calgary AB"></div>
-      <button class="btn" id="addShopBtn">Add Shop</button>
-      <div id="addShopMsg" hidden></div>
+    <div class="toggle-row" id="deliveryTypeToggle">
+      <button class="toggle-btn active" data-type="store">Store to Door</button>
+      <button class="toggle-btn" data-type="wholesale">Wholesale</button>
     </div>
-    <div class="section">
-      <h2>Shops <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">(star to feature in driver form)</span></h2>
-      <div id="shopsList" class="loading">Loading...</div>
-    </div>
-  </div>
 
-  <div id="tab-rates" hidden>
-    <div class="section">
-      <h2>Add Zone</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Add a new zone code (e.g. OUT1, HAR) so it appears in the table below for rate entry. Starts at $0 across the board — fill in rates after adding.</p>
+    <div class="card">
+      <h2>Delivery Details</h2>
       <div class="field-row">
-        <div class="field" style="max-width:160px;"><label>Zone Code</label><input type="text" id="newZoneCode" placeholder="OUT1" maxlength="10" style="text-transform:uppercase;"></div>
-        <div class="field" style="display:flex;align-items:flex-end;max-width:160px;"><button class="btn btn-sm" id="addZoneBtn">Add Zone</button></div>
-      </div>
-      <div id="addZoneMsg" hidden></div>
-    </div>
-    <div class="section">
-      <h2>Rate Table</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Changes save automatically. GDPI = fuel premium per delivery.</p>
-      <div id="ratesTable" class="loading">Loading...</div>
-    </div>
-  </div>
-
-  <div id="tab-gdpi" hidden>
-    <div class="section">
-      <h2>GDPI — Fuel Premium Calculator</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 16px;">Formula: (Current price − Base price) &times; 0.11 &times; Zone km = GDPI per delivery &nbsp;|&nbsp; <a href="https://fuelinsights.gasbuddy.com/Home/CAN/AB/Calgary" target="_blank" style="color:var(--accent);">Check Calgary Gas Price →</a></p>
-      <div class="field-row">
-        <div class="field"><label>Base Price ($/L)</label><input type="number" id="gdpiBase" value="1.50" step="0.01" style="max-width:130px;"></div>
-        <div class="field"><label>Current Weekly Average ($/L)</label><input type="number" id="gdpiCurrent" placeholder="1.85" step="0.01" style="max-width:130px;"></div>
-        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-sm" id="calcGdpiBtn">Calculate</button></div>
-      </div>
-      <div id="gdpiResults" hidden style="margin-top:16px;">
-        <div style="background:var(--accent-soft);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
-          <strong>Price difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km premium: <span id="gdpiPerKm"></span></strong>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="fDate">
         </div>
-        <table>
-         <thead><tr><th>Zone</th><th>Distance (km)</th><th>Driver GDPI</th><th>Shop GDPI (×1.33)</th><th>Current GDPI</th><th>Apply</th></tr></thead>
-          <tbody id="gdpiTableBody"></tbody>
-        </table>
-        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-sm" id="applyAllGdpiBtn">Apply All to Rate Table</button>
-          <span style="font-size:12px;color:var(--ink-soft);">Updates GDPI for all zones shown</span>
+        <div class="field">
+          <label>Order ID</label>
+          <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
-        <div id="gdpiApplyMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">GDPI rates updated.</div>
       </div>
-    </div>
-  </div>
-
-  <div id="tab-applications" hidden>
-    <div class="section">
-      <h2>Email Template — Seasonal Header</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Updates the seasonal section in the application acknowledgement email.</p>
+      <div class="field">
+        <label>Event Type</label>
+        <select id="fEventType">
+          <option value="">None</option>
+          <option value="SPEC">Special Event</option>
+          <option value="WED">Wedding</option>
+          <option value="FUN">Funeral</option>
+        </select>
+        <p id="eventTypeNote" hidden style="font-size:11px;color:var(--ink-soft);margin:4px 0 0;"></p>
+      </div>
+      <div class="field" id="wholesalerField" hidden>
+        <label>Pick Up From (Wholesaler)</label>
+        <select id="fWholesaler">
+          <option value="">Select wholesaler...</option>
+          <option value="AM">AM AMAZING FLORAL WHOLESALE</option>
+          <option value="AT">AT ATLANTIC</option>
+          <option value="BA">BA BERNARD ANDERSON</option>
+          <option value="FC">FC FLOWER CENTER</option>
+          <option value="FS">FS FLORISTS SUPPLY</option>
+          <option value="SV">SV SAVANAH</option>
+          <option value="QF">QF QFRESH LOGISTICS</option>
+          <option value="SB">SB SBE WHOLESALE</option>
+        </select>
+      </div>
+      <div class="field" id="billingQueryField" hidden>
+        <label>Invoice To</label>
+        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT &amp; FS default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
+        <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
+          <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
+          <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="shopLabel">Shop</label>
+        <div class="shop-search-wrap">
+          <input type="text" id="fShopSearch" placeholder="Search shop..." autocomplete="off">
+          <input type="hidden" id="fShop">
+          <div class="shop-dd" id="fShopDropdown"></div>
+        </div>
+      </div>
+      <div class="field" id="recipientNameField">
+        <label>Recipient Name</label>
+        <input type="text" id="fName" placeholder="Name or company">
+      </div>
+      <div class="field">
+        <label>Delivery Address</label>
+        <input type="text" id="fAddress" placeholder="Start typing address...">
+        <div id="zoneResult" hidden>
+          <div class="zone-result">
+            <div>
+              <div class="zone-code" id="zoneCode">-</div>
+              <div class="zone-desc" id="zoneDesc"></div>
+            </div>
+            <button onclick="overrideZone()" style="font-size:12px;color:var(--ink-soft);background:none;border:none;cursor:pointer;text-decoration:underline;">Change</button>
+          </div>
+          <div class="pay-preview" id="payPreview" hidden>
+            <div class="pay-amount" id="payAmount"></div>
+            <div class="pay-breakdown" id="payBreakdown"></div>
+          </div>
+        </div>
+        <div id="zoneLoading" class="zone-loading" hidden>Looking up zone...</div>
+        <div id="zoneManual" hidden>
+          <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 6px;">Select zone:</p>
+          <div class="zone-buttons" id="zoneButtons"></div>
+        </div>
+      </div>
       <div class="field-row">
-        <div class="field"><label>Season</label><input type="text" id="tSeason" placeholder="Mother's Day 2026"></div>
-        <div class="field"><label>Dates</label><input type="text" id="tDates" placeholder="May 8-10, 2026"></div>
-        <div class="field"><label>Positions Available</label><input type="text" id="tPositions" placeholder="5"></div>
+        <div class="field">
+          <label>Total Pieces</label>
+          <input type="number" id="fPieces" min="1" value="1">
+        </div>
+        <div class="field">
+          <label>Delivery Time</label>
+          <input type="time" id="fTime">
+        </div>
       </div>
-      <div class="field"><label>Opening Comment</label><input type="text" id="tComment" placeholder="We have positions available..."></div>
-      <button class="btn btn-sm" id="saveTemplateBtn">Save Template</button>
-      <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
     </div>
-    <div class="section">
-      <h2>Applications</h2>
-      <div id="applicationsList" class="loading">Loading...</div>
-    </div>
-  </div>
 
+    <div class="card" id="statusCard">
+      <h2>Delivery Status</h2>
+      <div class="status-grid" id="statusGrid">
+        <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
+        <button class="status-btn" data-status="Neighboured">Neighboured</button>
+        <button class="status-btn" data-status="Redirect">Redirect</button>
+        <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
+      </div>
+      <div id="directSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="directSubGrid">
+          <button class="status-btn" data-sub="Concierge/Reception">Concierge</button>
+          <button class="status-btn" data-sub="Mailroom">Mailroom</button>
+          <button class="status-btn" data-sub="Loading Dock">Loading Dock</button>
+          <button class="status-btn" data-sub="Doorstep">Doorstep</button>
+        </div>
+      </div>
+      <div class="field" id="neighbouredToField" hidden style="margin-top:10px;">
+        <label>Neighboured To</label>
+        <input type="text" id="fNeighbouredTo" placeholder="Left with...">
+      </div>
+      <div class="field" id="redirectField" hidden style="margin-top:10px;">
+        <label>Redirect Details</label>
+        <input type="text" id="fRedirectDetail" placeholder="Redirected to...">
+      </div>
+      <div id="undeliverableSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="undeliverableSubGrid">
+          <button class="status-btn" data-unsub="Incorrect Address">Incorrect Address</button>
+          <button class="status-btn" data-unsub="Incorrect Contact Info">Incorrect Contact Info</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Accepted By</label>
+        <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+      <div class="field" id="contactMethodField" hidden style="margin-top:10px;">
+        <label>Recipient Contact Method</label>
+        <div class="status-grid" id="contactMethodGrid">
+          <button class="status-btn" data-contact="In Person">In Person</button>
+          <button class="status-btn" data-contact="Direct By Phone">Direct By Phone</button>
+          <button class="status-btn" data-contact="Voicemail">Voicemail</button>
+          <button class="status-btn" data-contact="Text">Text</button>
+          <button class="status-btn" data-contact="Door Tag">Door Tag</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="wholesaleStatusCard" hidden>
+      <h2>Delivery Confirmation</h2>
+      <div class="field">
+        <label>Accepted By</label>
+        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Notes &amp; Photo</h2>
+      <div class="field">
+        <label>Comments</label>
+        <textarea id="fComments" placeholder="Additional details..."></textarea>
+      </div>
+      <div class="field">
+        <label id="photoLabel">Photo (optional)</label>
+      <input type="file" id="fPhoto" accept="image/*" capture="environment">
+      <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn">Submit Delivery</button>
+    <button class="btn btn-secondary" id="summaryBtn">View Today's Summary</button>
+  </div>
 </div>
+
+<div id="successScreen" hidden>
+  <div class="container" style="padding-top:40px;">
+    <div class="success">
+      <h3>Delivery Submitted</h3>
+      <p id="successDetail"></p>
+    </div>
+    <button class="btn" style="margin-top:16px;" id="nextBtn">Next Delivery</button>
+    <button class="btn btn-secondary" id="summaryBtn2">View Today's Summary</button>
+  </div>
+</div>
+
 <script>
-function esc(s) {
-  if (!s) return '';
-  var d = document.createElement('div');
-  d.textContent = String(s);
-  return d.innerHTML;
+var driverCode = '';
+var driverName = '';
+var rates = {};
+var shops = [];
+var selectedZone = '';
+var eventType = '';
+var selectedStatuses = [];
+var formattedAddress = '';
+var deliveryType = 'store';
+
+// Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
+// SPEC/WED/FUN rate from the rate table directly. Anything else (border
+// communities, RVS/RVN, OUT1-4, etc.) is "out of town": pay is the
+// underlying zone's own drate+gdpi as base, with the per-extra-piece rate
+// overridden to the event's rate. The effective code shown/recorded
+// (WEDO/FUNO) exists mainly for tracking/reporting, not as its own flat
+// rate-table entry. Special Event has no out-of-town variant, so it always
+// uses the flat SPEC rate regardless of location.
+var EVENT_TYPES = {
+  SPEC: { label: 'Special Event', inTownCode: 'SPEC', outTownCode: null,    outTownExtraRate: null },
+  WED:  { label: 'Wedding',       inTownCode: 'WED',  outTownCode: 'WEDO', outTownExtraRate: 5 },
+  FUN:  { label: 'Funeral',       inTownCode: 'FUN',  outTownCode: 'FUNO', outTownExtraRate: 3 }
+};
+var IN_TOWN_ZONES = ['C1','C2','C3','C4','C5'];
+
+function isInTownZone(code) {
+  return IN_TOWN_ZONES.indexOf(code) >= 0;
 }
 
-var drivers = [], shops = [], rates = {};
-
-/* ===== GENERIC ADD-ROW UTILITY =====
-   Reusable for any "Add X" control, now or in the future (Drivers, Shops,
-   Rates/Zones, or any new table added later). Handles field validation,
-   button disable/loading state, and success/error messaging so each new
-   table only needs to define its fields + a save function.
-
-   opts = {
-     buttonId:   id of the button that triggers the add
-     msgId:      id of the message <div> to show success/error in
-     fields: [
-       { id: 'newFooCode', required: true, uppercase: true, label: 'Code' },
-       ...
-     ],
-     onSave:     async function(values) -> returns the new record, or throws Error
-     onSuccess:  function(record, values) -> update local array/state + re-render
-     successText: string OR function(record, values) -> string
-     savingText: optional button label while saving (default 'Saving...')
-     idleText:    optional button label when idle (default: button's current text)
-     clearFieldsAfter: default true
-   }
-*/
-function wireAddRowControl(opts) {
-  var btn = document.getElementById(opts.buttonId);
-  var msgEl = document.getElementById(opts.msgId);
-  var idleText = opts.idleText || btn.textContent;
-  btn.addEventListener('click', async function() {
-    var values = {};
-    for (var i = 0; i < opts.fields.length; i++) {
-      var f = opts.fields[i];
-      var el = document.getElementById(f.id);
-      var v = el.value.trim();
-      if (f.uppercase) v = v.toUpperCase();
-      if (f.required && !v) {
-        msgEl.className = 'error-msg';
-        msgEl.textContent = (f.label || f.id) + ' is required.';
-        msgEl.hidden = false;
-        return;
-      }
-      values[f.id] = v;
-    }
-    btn.disabled = true;
-    btn.textContent = opts.savingText || 'Saving...';
-    try {
-      var record = await opts.onSave(values);
-      if (opts.onSuccess) opts.onSuccess(record, values);
-      if (opts.clearFieldsAfter !== false) {
-        opts.fields.forEach(function(f) { document.getElementById(f.id).value = ''; });
-      }
-      msgEl.className = 'success-msg';
-      msgEl.textContent = typeof opts.successText === 'function' ? opts.successText(record, values) : (opts.successText || 'Added.');
-      msgEl.hidden = false;
-    } catch (e) {
-      msgEl.className = 'error-msg';
-      msgEl.textContent = 'Error: ' + e.message;
-      msgEl.hidden = false;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = idleText;
-    }
-  });
+// Returns the effective zone code to display/record/pay against, given the
+// currently selected geographic zone and event type. If no event type is
+// set, this is just a passthrough to the geographic zone.
+function getEffectiveZone() {
+  if (!eventType || !selectedZone || !EVENT_TYPES[eventType]) {
+    return { code: selectedZone, isEventOverride: false, baseZone: selectedZone };
+  }
+  var ev = EVENT_TYPES[eventType];
+  if (isInTownZone(selectedZone) || !ev.outTownCode) {
+    return { code: ev.inTownCode, isEventOverride: true, baseZone: selectedZone };
+  }
+  return { code: ev.outTownCode, isEventOverride: true, baseZone: selectedZone };
 }
 
-function showTab(name) {
-  ['drivers','shops','rates','gdpi','applications'].forEach(function(t) {
-    document.getElementById('tab-' + t).hidden = t !== name;
-  })
-  document.querySelectorAll('.tab').forEach(function(b, i) {
-    b.classList.toggle('active', ['drivers','shops','rates','gdpi','applications'][i] === name);
-  });
-  if (name === 'applications') { loadApplications(); loadTemplate(); }
+// Computes {base, extra, gdpi, total} pay for the current selection,
+// applying the event-type overlay if applicable.
+function computePay() {
+  if (!selectedZone) return null;
+  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
+  var eff = getEffectiveZone();
+  var base, extra, gdpi;
+  if (eff.isEventOverride && eff.code === (EVENT_TYPES[eventType] || {}).outTownCode) {
+    // Out-of-town event: base pay comes from the underlying geographic
+    // zone's own rate, but the extra-piece rate is overridden to the
+    // event's rate.
+    var zr = rates[selectedZone] || {};
+    var ev = EVENT_TYPES[eventType];
+    base = zr.drate || 0;
+    gdpi = zr.gdpi || 0;
+    extra = (pieces - 1) * (ev.outTownExtraRate || 0);
+  } else {
+    // Flat rate (in-town event code, or no event type at all) - straight
+    // lookup from the rate table.
+    var r = rates[eff.code] || {};
+    base = r.drate || 0;
+    extra = (pieces - 1) * (r.dratex || 0);
+    gdpi = r.gdpi || 0;
+  }
+  var byPremium = 0;
+  if (deliveryType === 'wholesale') {
+    var shopId = document.getElementById('fShop').value;
+    var receivingShop = shops.find(function(s){ return s.id === shopId; });
+    if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
+  }
+  return { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, total: base + extra + gdpi + byPremium, pieces: pieces };
 }
 
-/* ===== DRIVERS ===== */
-function renderDrivers() {
-  var el = document.getElementById('driversList');
-  if (!drivers.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No drivers yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr>' +
-    '<th>Code</th><th>Name</th><th>Vehicle</th><th>Email</th><th>Phone</th><th>Hire Date</th><th>Status</th><th>Link</th><th>Actions</th>' +
-    '</tr></thead><tbody>' +
-    drivers.map(function(d) {
-      return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
-        '<td><strong>' + esc(d.code) + '</strong></td>' +
-        '<td>' + esc(d.name) + '</td>' +
-        '<td>' + esc(d.vehicle || '') + '</td>' +
-        '<td>' + esc(d.email || '') + '</td>' +
-        '<td>' + esc(d.phone || '') + '</td>' +
-        '<td>' + esc(d.hire_date || '') + '</td>' +
-        '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
-        '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
-        '<td style="display:flex;gap:4px;">' +
-        '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
-        '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
-        '<button class="btn-danger btn-grey" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
-        '</td></tr>';
-    }).join('') +
-    '</tbody></table>';
+var pathParts = location.pathname.split('/').filter(Boolean);
+var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+
+function showNotFound() {
+  document.getElementById('loadingScreen').hidden = true;
+  document.getElementById('notFound').hidden = false;
 }
 
-wireAddRowControl({
-  buttonId: 'addDriverBtn',
-  msgId: 'addDriverMsg',
-  fields: [
-    { id: 'newDriverCode', required: true, uppercase: true, label: 'Driver code' },
-    { id: 'newDriverName', required: true, label: 'Name' },
-    { id: 'newDriverVehicle', required: false }
-  ],
-  savingText: 'Adding...',
-  onSave: async function(v) {
-    var res = await fetch('/api/drivers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v.newDriverCode, name: v.newDriverName, vehicle: v.newDriverVehicle, active: true }) });
-    if (!res.ok) throw new Error('Could not add driver');
-    return res.json();
-  },
-  onSuccess: function(driver) {
-    drivers.push(driver);
-    renderDrivers();
-  },
-  successText: function(driver) { return 'Driver added. Link: ' + location.origin + '/driver/' + driver.code.toLowerCase(); }
-});
-
-function copyDriverLink(code) {
-  var url = location.origin + '/driver/' + code.toLowerCase();
-  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function() { alert('Copied: ' + url); });
-  else window.prompt('Copy link:', url);
+function isWholesaleZone(code) {
+  return code && code.toUpperCase().startsWith('W');
 }
 
-async function toggleDriver(code, active) {
-  try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ active: active }) });
-    var d = drivers.find(function(x) { return x.code === code; });
-    if (d) d.active = active;
-    renderDrivers();
-  } catch(e) { alert('Could not update driver.'); }
-}
-
-function editDriver(code) {
-  var d = drivers.find(function(x) { return x.code === code; });
-  if (!d) return;
-  var name = window.prompt('Edit name:', d.name); if (name === null) return;
-  var vehicle = window.prompt('Edit vehicle:', d.vehicle || ''); if (vehicle === null) return;
-  var email = window.prompt('Edit email:', d.email || ''); if (email === null) return;
-  var phone = window.prompt('Edit phone:', d.phone || ''); if (phone === null) return;
-  fetch('/api/drivers?code=' + encodeURIComponent(code), {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), vehicle: vehicle.trim(), email: email.trim(), phone: phone.trim() })
-  }).then(function(r) { return r.json(); }).then(function(updated) {
-    var idx = drivers.findIndex(function(x) { return x.code === code; });
-    if (idx >= 0) drivers[idx] = updated;
-    renderDrivers();
-  }).catch(function() { alert('Could not update driver.'); });
-}
-
-async function deleteDriver(code) {
-  if (!confirm('Permanently delete driver ' + code + '? This cannot be undone.')) return;
-  try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'DELETE' });
-    drivers = drivers.filter(function(d) { return d.code !== code; });
-    renderDrivers();
-  } catch(e) { alert('Could not delete driver.'); }
-}
-
-async function loadDrivers() {
-  var res = await fetch('/api/drivers');
-  drivers = await res.json();
-  renderDrivers();
-}
-
-/* ===== SHOPS ===== */
-function renderShops() {
-  var el = document.getElementById('shopsList');
-  if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Edit</th></tr></thead><tbody>' +
-    shops.map(function(s) {
-      var code = s.name ? s.name.split(' ')[0] : '';
-      return '<tr>' +
-        '<td><button class="star-btn" onclick="toggleStar(\'' + esc(s.id) + '\')">' + (s.featured ? '★' : '☆') + '</button></td>' +
-        '<td><strong>' + esc(code) + '</strong></td>' +
-        '<td>' + esc(s.name) + '</td>' +
-        '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
-        '<td><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button></td>' +
-        '</tr>';
-    }).join('') + '</tbody></table>';
-}
-
-wireAddRowControl({
-  buttonId: 'addShopBtn',
-  msgId: 'addShopMsg',
-  fields: [
-    { id: 'newShopCode', required: true, uppercase: true, label: 'Shop code' },
-    { id: 'newShopName', required: true, uppercase: true, label: 'Shop name' },
-    { id: 'newShopAddress', required: true, label: 'Address' }
-  ],
-  savingText: 'Adding...',
-  onSave: async function(v) {
-    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(v.newShopAddress));
-    var geo = await geoRes.json();
-    if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = { name: v.newShopCode + ' ' + v.newShopName, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: { C1: 10, C2: 12, C3: 13, C4: 14, C5: 15 }, communityZones: {}, townPrices: {} };
-    var res = await fetch('/api/shops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) throw new Error('Could not create shop');
-    return res.json();
-  },
-  onSuccess: function(shop) {
-    shops.push(shop);
-    renderShops();
-  },
-  successText: function(shop) { return 'Shop added: ' + shop.name; }
-});
-
-async function toggleStar(shopId) {
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  if (!shop) return;
-  shop.featured = !shop.featured;
-  await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ featured: shop.featured }) });
-  renderShops();
-}
-
-async function editShop(shopId) {
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  if (!shop) return;
-  var name = window.prompt('Shop name:', shop.name); if (name === null) return;
-  var address = window.prompt('Shop address:', shop.address); if (address === null) return;
-  try {
-    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
-    var geo = await geoRes.json();
-    if (!geo.lat) throw new Error('Could not geocode');
-    await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng }) });
-    shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng;
-    renderShops(); alert('Updated: ' + geo.formatted);
-  } catch(e) { alert('Could not update: ' + e.message); }
-}
-
-async function loadShops() {
-  var res = await fetch('/api/shops');
-  shops = await res.json();
-  renderShops();
-}
-
-/* ===== RATES ===== */
-function renderRates() {
-  var el = document.getElementById('ratesTable');
-  var keys = Object.keys(rates).sort();
-  if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Zone</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
-    keys.map(function(zone) {
-      var r = rates[zone];
-      function inp(field) {
-        return '<input class="rate-input" type="number" step="0.25" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
-      }
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
-    }).join('') + '</tbody></table>';
-}
-
-async function updateRate(zone, field, value) {
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone][field] = parseFloat(value) || 0;
-  try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
-  catch(e) { alert('Could not save rate.'); }
-}
-
-wireAddRowControl({
-  buttonId: 'addZoneBtn',
-  msgId: 'addZoneMsg',
-  fields: [
-    { id: 'newZoneCode', required: true, uppercase: true, label: 'Zone code' }
-  ],
-  savingText: 'Adding...',
-  clearFieldsAfter: true,
-  onSave: async function(v) {
-    var code = v.newZoneCode;
-    if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
-    rates[code] = { drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0 };
-    try {
-      await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
-    } catch (e) {
-      delete rates[code];
-      throw e;
-    }
-    return code;
-  },
-  onSuccess: function() { renderRates(); },
-  successText: function(code) { return 'Zone ' + code + ' added — set its rates below.'; }
-});
-
-async function loadRates() {
-  var res = await fetch('/api/rates');
-  rates = await res.json();
-  renderRates();
-}
-
-/* ===== GDPI ===== */
-var ZONE_KM = {
-  C1: 5, C2: 12, C3: 17, C4: 23, C5: 30,
-  TSA: 28, TSU: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
-  AIR: 40, COC: 45, CHE: 25, OKO: 38, EVA: 25, BRG: 45,
-  MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140,
-  HAR: 30,
-  OUT1: 15, OUT2: 30, OUT3: 55, OUT4: 85
+var WHOLESALER_BILLING = {
+  AT: 'wholesaler', FS: 'wholesaler',
+  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'shop', QF: 'shop'
 };
 
-async function applySingleGdpi(zone, value) {
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone].gdpi = value;
-  await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
-  renderRates();
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
+function setBillingDefault(code) {
+  var billing = WHOLESALER_BILLING[code] || 'shop';
+  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.billing === billing);
+  });
 }
 
-document.getElementById('calcGdpiBtn').addEventListener('click', function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) { alert('Enter current gas price.'); return; }
-  var diff = current - base;
-  var perKm = diff * 0.11;
-  document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
-  document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
-  var tbody = document.getElementById('gdpiTableBody');
-  tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
-    var km = ZONE_KM[zone];
-    var newGdpi = Math.round(perKm * km * 100) / 100;
-    var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
-    return '<tr>' +
-      '<td><strong>' + zone + '</strong></td>' +
-      '<td>' + km + ' km</td>' +
-      '<td class="gdpi-highlight">$' + newGdpi.toFixed(2) + '</td>' +
-      '<td style="color:var(--warm);font-weight:600;">$' + (newGdpi * 1.33).toFixed(2) + '</td>' +
-      '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
-      '<td><button class="btn btn-sm" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
-      '</tr>';
-  }).join('');
-  document.getElementById('gdpiResults').hidden = false;
-});
+function getAllNonWholesaleZones() {
+  return Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); }).sort();
+}
 
-document.getElementById('applyAllGdpiBtn').addEventListener('click', function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) return;
-  var perKm = (current - base) * 0.11;
-  Object.keys(ZONE_KM).forEach(function(zone) {
-    if (!rates[zone]) rates[zone] = {};
-    rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+function getNeighbourZones(code) {
+  if (deliveryType === 'wholesale') {
+    return Object.keys(rates).filter(isWholesaleZone).sort();
+  }
+  var city = ['C1','C2','C3','C4','C5'];
+  var idx = city.indexOf(code);
+  var base;
+  if (idx >= 0) {
+    var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
+    base = n.concat(['TSU','TSA']);
+  } else {
+    base = [code];
+  }
+  // Always include every other zone currently in the rate table so a driver
+  // can manually pick any valid zone, not just a hardcoded subset. New zones
+  // added in admin (OUT1-4, HAR, etc.) show up here automatically, no code
+  // change needed. "base" (closest/most relevant) zones are listed first.
+  var all = getAllNonWholesaleZones();
+  var rest = all.filter(function(z) { return base.indexOf(z) < 0; });
+  return base.concat(rest);
+}
+
+function getWholesaleZoneForShop(shop) {
+  if (!shop || !shop.lat || !shop.lng) return 'WPU';
+  var lat = shop.lat, lng = shop.lng;
+  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return 'WPU';
+  var towns = [
+    {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
+    {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
+    {zone:'WCH', lat:51.0487, lng:-113.8225, r:7},
+    {zone:'WPO', lat:50.7258, lng:-113.9758, r:8},
+    {zone:'WST', lat:51.0378, lng:-113.4003, r:8},
+    {zone:'WHR', lat:50.5808, lng:-113.8747, r:8},
+    {zone:'WLY', lat:51.1000, lng:-113.5000, r:6},
+    {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
+  ];
+  function hav(a, b) {
+    var R=6371, rd=function(d){return d*Math.PI/180;};
+    var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
+    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+  }
+  for (var i=0; i<towns.length; i++) {
+    var t = towns[i];
+    if (hav({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return t.zone;
+  }
+  return 'WPU';
+}
+
+function buildZoneButtons(suggested) {
+  var list;
+  if (deliveryType === 'wholesale') {
+    list = ['WPU', 'WPH'];
+  } else {
+    list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
+  }
+  var container = document.getElementById('zoneButtons');
+  container.innerHTML = '';
+  list.forEach(function(z) {
+    var r = rates[z];
+    var btn = document.createElement('button');
+    btn.className = 'zone-btn';
+    btn.textContent = z + (r ? ' $'+r.drate : '');
+    if (z === suggested) {
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.background = 'var(--accent-soft)';
+      btn.style.fontWeight = '700';
+    }
+    btn.onclick = function() { setZone(z, 'Manual selection', true); };
+    container.appendChild(btn);
   });
-  fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) })
-    .then(function() { renderRates(); });
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-});
+}
 
-/* ===== APPLICATIONS ===== */
-function loadApplications() {
-  var el = document.getElementById('applicationsList');
-  if (!el) return;
-  fetch('/api/onboard').then(function(res) { return res.json(); }).then(function(apps) {
-    if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
-    el.innerHTML = '<table><thead><tr>' +
-      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
-      '</tr></thead><tbody>' +
-      apps.map(function(a, i) {
-        return '<tr>' +
-          '<td>' + esc(a.date || '') + '</td>' +
-          '<td><strong>' + esc(a.name || '') + '</strong></td>' +
-          '<td>' + esc(a.email || '') + '</td>' +
-          '<td>' + esc(a.phone || '') + '</td>' +
-          '<td>' + esc(a.days_available || '') + '</td>' +
-          '<td>' + esc(a.time_available || '') + '</td>' +
-          '<td>' + esc(a.vehicle || '') + '</td>' +
-          '<td>' + esc(a.referred_by || '') + '</td>' +
-          '<td>' + esc(a.comments || '') + '</td>' +
-          '<td><button class="btn-danger btn-green" data-idx="' + i + '">Hire</button></td>' +
-          '</tr>';
-      }).join('') + '</tbody></table>';
-    el.querySelectorAll('[data-idx]').forEach(function(btn) {
+function setZone(code, desc, manual) {
+  selectedZone = code;
+  refreshZoneDisplay(desc);
+  updatePay();
+}
+
+function refreshZoneDisplay(baseDesc) {
+  var eff = getEffectiveZone();
+  var desc = baseDesc || '';
+  if (eff.isEventOverride) {
+    var ev = EVENT_TYPES[eventType];
+    desc = (eff.code === ev.outTownCode)
+      ? (ev.label + ' — out of town (underlying zone: ' + eff.baseZone + ')')
+      : (ev.label + ' — flat rate');
+  }
+  document.getElementById('zoneCode').textContent = eff.code;
+  document.getElementById('zoneDesc').textContent = desc;
+  document.getElementById('zoneResult').hidden = false;
+  document.getElementById('zoneManual').hidden = true;
+}
+
+function overrideZone() {
+  document.getElementById('zoneManual').hidden = false;
+  buildZoneButtons(selectedZone);
+}
+
+function updatePay() {
+  var pay = computePay();
+  if (!pay) return;
+  document.getElementById('payAmount').textContent = '$' + pay.total.toFixed(2);
+  var breakdown = 'Base $' + pay.base.toFixed(2) +
+    (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
+    ' + fuel $' + pay.gdpi.toFixed(2) +
+    (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '');
+  document.getElementById('payBreakdown').textContent = breakdown;
+  document.getElementById('payPreview').hidden = false;
+}
+
+function lookupZone(address) {
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneLoading').hidden = false;
+  document.getElementById('zoneManual').hidden = true;
+  selectedZone = '';
+
+  if (deliveryType === 'wholesale') {
+    document.getElementById('zoneLoading').hidden = true;
+    document.getElementById('zoneManual').hidden = false;
+    buildZoneButtons(null);
+    return;
+  }
+
+  var shopId = document.getElementById('fShop').value;
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var params = 'address=' + encodeURIComponent(address);
+  if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
+
+  fetch('/api/suggest-zone?' + params)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('zoneLoading').hidden = true;
+      if (data.suggested) {
+        setZone(data.suggested, data.message, false);
+      } else {
+        document.getElementById('zoneManual').hidden = false;
+        buildZoneButtons(null);
+      }
+    })
+    .catch(function() {
+      document.getElementById('zoneLoading').hidden = true;
+      document.getElementById('zoneManual').hidden = false;
+      buildZoneButtons(null);
+    });
+}
+
+/* Shop search dropdown */
+function populateShopDropdown() {
+  if (deliveryType === 'wholesale') {
+    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop)';
+    document.getElementById('wholesalerField').hidden = false;
+    document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
+    document.getElementById('recipientNameField').hidden = true;
+    document.getElementById('statusCard').hidden = true;
+    document.getElementById('wholesaleStatusCard').hidden = false;
+  } else {
+    document.getElementById('wholesalerField').hidden = true;
+    document.getElementById('shopLabel').textContent = 'Shop';
+    document.getElementById('fAddress').placeholder = 'Start typing address...';
+    document.getElementById('recipientNameField').hidden = false;
+    document.getElementById('billingQueryField').hidden = true;
+    document.getElementById('statusCard').hidden = false;
+    document.getElementById('wholesaleStatusCard').hidden = true;
+  }
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShop').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
+}
+
+function renderShopDropdown(search) {
+  var dd = document.getElementById('fShopDropdown');
+  var s = (search || '').toLowerCase();
+  var featured = shops.filter(function(sh){ return sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var others = shops.filter(function(sh){ return !sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var html = '';
+  if (featured.length && !s) {
+    html += '<div class="shop-dd-header">Frequently Used</div>';
+    featured.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  var allShops = s ? featured.concat(others) : others;
+  if (allShops.length) {
+    if (!s) html += '<div class="shop-dd-header">All Shops</div>';
+    allShops.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  if (!featured.length && !allShops.length) {
+    html = '<div style="padding:10px 14px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
+  }
+  dd.innerHTML = html;
+  dd.querySelectorAll('.shop-dd-item').forEach(function(item) {
+    item.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var id = this.dataset.id;
+      var shop = shops.find(function(sh){ return sh.id === id; });
+      if (!shop) return;
+      document.getElementById('fShop').value = id;
+      document.getElementById('fShopSearch').value = shop.name;
+      document.getElementById('fShopDropdown').style.display = 'none';
+      if (deliveryType === 'wholesale') {
+        var addr = shop.address || '';
+        document.getElementById('fAddress').value = addr;
+        formattedAddress = addr;
+        var wZone = getWholesaleZoneForShop(shop);
+        setZone(wZone, wZone + ' - auto from ' + shop.name, false);
+      }
+    });
+  });
+}
+
+function resetForm() {
+  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = '';
+  document.getElementById('fEventType').value = '';
+  document.getElementById('eventTypeNote').hidden = true;
+  document.getElementById('fOrderId').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fAddress').value = '';
+  document.getElementById('fPieces').value = '1';
+  document.getElementById('fComments').value = '';
+  document.getElementById('fAcceptedBy').value = '';
+  document.getElementById('fWholesaleAcceptedBy').value = '';
+  document.getElementById('fNeighbouredTo').value = '';
+  document.getElementById('fPhoto').value = '';
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShop').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
+  document.getElementById('contactMethodField').hidden = true;
+  document.getElementById('billingQueryField').hidden = true;
+  document.getElementById('directSubField').hidden = true;
+  document.getElementById('redirectField').hidden = true;
+  document.getElementById('undeliverableSubField').hidden = true;
+  document.getElementById('fRedirectDetail').value = '';
+  document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#directSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#undeliverableSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneManual').hidden = true;
+  document.getElementById('payPreview').hidden = true;
+  document.getElementById('errorMsg').hidden = true;
+  document.querySelectorAll('.status-btn').forEach(function(b) { b.classList.remove('selected'); });
+  document.getElementById('neighbouredToField').hidden = true;
+  var now = new Date();
+  document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('successScreen').hidden = true;
+  document.getElementById('app').hidden = false;
+}
+
+async function submitDelivery() {
+  var btn = document.getElementById('submitBtn');
+  var errEl = document.getElementById('errorMsg');
+  errEl.hidden = true;
+  var address = formattedAddress || document.getElementById('fAddress').value.trim();
+  var shopId = document.getElementById('fShop').value;
+  if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; return; }
+  if (!shopId) { errEl.textContent = 'Select a shop.'; errEl.hidden = false; return; }
+  if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
+  if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var pay = computePay() || { effCode: selectedZone, isEventOverride: false, baseZone: selectedZone, total: 0 };
+  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
+  var driverPay = pay.total;
+  var billingParty = '';
+  if (deliveryType === 'wholesale') {
+    var active = document.querySelector('#billingToggle .toggle-btn.active');
+    var billing = active ? active.dataset.billing : 'shop';
+    var w = document.getElementById('fWholesaler').value;
+    billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
+  }
+  var payload = {
+    date: document.getElementById('fDate').value,
+    order_id: document.getElementById('fOrderId').value.trim() || '1',
+    name: document.getElementById('fName').value.trim(),
+    address: address,
+    shop: shop ? shop.name : shopId,
+    shop_code: shop ? shop.name.split(' ')[0] : '',
+    driver: driverCode,
+    driver_name: driverName,
+    total_pieces: pieces,
+    zone: pay.effCode,
+    event_type: eventType || '',
+    underlying_zone: pay.isEventOverride ? pay.baseZone : '',
+    delivery_type: deliveryType,
+    delivery_status: (function() {
+      var statuses = selectedStatuses.slice();
+      document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
+      document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
+      var rd = document.getElementById('fRedirectDetail').value.trim();
+      if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
+      return statuses;
+    })(),
+    delivery_time: document.getElementById('fTime').value,
+    accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
+    neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
+    comments: document.getElementById('fComments').value.trim(),
+    driver_pay: driverPay,
+    contact_method: (function(){
+      var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
+      return sel ? sel.dataset.contact : '';
+    })(),
+    billing_party: billingParty,
+    wholesaler: document.getElementById('fWholesaler').value,
+    source: 'driver_form'
+  };
+  try {
+    var res = await fetch('/api/orders', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    var resData = await res.json();
+    if (resData.queued) {
+      document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
+      document.getElementById('app').hidden = true;
+      document.getElementById('successScreen').hidden = false;
+      return;
+    }
+    if (!res.ok) throw new Error('Status ' + res.status);
+    document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
+    document.getElementById('app').hidden = true;
+    document.getElementById('successScreen').hidden = false;
+  } catch(e) {
+    errEl.textContent = 'Could not submit: ' + e.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit Delivery';
+  }
+}
+
+async function init() {
+  try {
+    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
+    if (!res.ok) { showNotFound(); return; }
+    var driver = await res.json();
+    driverCode = driver.code;
+    driverName = driver.name;
+    document.getElementById('driverBadge').textContent = driver.name;
+    document.title = 'Smart Choice - ' + driver.name;
+
+    var rRes = await fetch('/api/rates');
+    rates = await rRes.json();
+
+    var sRes = await fetch('/api/shops');
+    shops = await sRes.json();
+    populateShopDropdown();
+
+    var now = new Date();
+    document.getElementById('fDate').value = now.toISOString().slice(0,10);
+    document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+    var cfgRes = await fetch('/api/config');
+    var cfg = await cfgRes.json();
+    loadMaps(cfg.key);
+
+    // Shop search
+    document.getElementById('fShopSearch').addEventListener('input', function() {
+      var s = this.value.trim();
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(s);
+    });
+    document.getElementById('fShopSearch').addEventListener('focus', function() {
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(this.value.trim());
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
+        document.getElementById('fShopDropdown').style.display = 'none';
+      }
+    });
+
+    document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      deliveryType = btn.dataset.type;
+      document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+      populateShopDropdown();
+      selectedZone = '';
+      if (deliveryType === 'wholesale') {
+        eventType = '';
+        document.getElementById('fEventType').value = '';
+        document.getElementById('eventTypeNote').hidden = true;
+      }
+      document.getElementById('zoneResult').hidden = true;
+      document.getElementById('zoneManual').hidden = true;
+      document.getElementById('payPreview').hidden = true;
+    });
+
+    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var a = apps[parseInt(this.getAttribute('data-idx'))];
-        hireApplicant(a.name, a.email, a.phone, a.vehicle);
+        var status = this.dataset.status;
+        if (status === 'Undeliverable') {
+          selectedStatuses = ['Undeliverable'];
+          document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+          this.classList.add('selected');
+        } else {
+          var unIdx = selectedStatuses.indexOf('Undeliverable');
+          if (unIdx >= 0) {
+            selectedStatuses.splice(unIdx, 1);
+            document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){
+              if (b.dataset.status === 'Undeliverable') b.classList.remove('selected');
+            });
+          }
+          var idx = selectedStatuses.indexOf(status);
+          if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
+          else { selectedStatuses.push(status); this.classList.add('selected'); }
+        }
+        document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
+        document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+        document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
+        document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
       });
     });
-  }).catch(function() {
-    var el2 = document.getElementById('applicationsList');
-    if (el2) el2.innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>';
+
+    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
+       var doorstepSelected = document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+        document.getElementById('photoLabel').textContent = doorstepSelected ? 'Photo (required)' : 'Photo (optional)';
+        document.getElementById('photoRequired').hidden = !doorstepSelected;
+        if (doorstepSelected) {
+          document.getElementById('fPhoto').setAttribute('required', 'required');
+          document.getElementById('fPhoto').click();
+        } else {
+          document.getElementById('fPhoto').removeAttribute('required');
+        }
+      });
+    });
+
+    document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
+    });
+
+    document.getElementById('fEventType').addEventListener('change', function() {
+      eventType = this.value;
+      var note = document.getElementById('eventTypeNote');
+      if (eventType && EVENT_TYPES[eventType]) {
+        var ev = EVENT_TYPES[eventType];
+        note.hidden = false;
+        note.textContent = ev.outTownCode
+          ? (ev.label + ': in-town = flat rate, out-of-town = zone rate + $' + ev.outTownExtraRate + '/extra pc (tracked as ' + ev.outTownCode + ')')
+          : (ev.label + ': flat rate regardless of location.');
+      } else {
+        note.hidden = true;
+      }
+      if (selectedZone) { refreshZoneDisplay(); updatePay(); }
+    });
+
+    document.getElementById('fPieces').addEventListener('change', updatePay);
+
+    document.getElementById('fAcceptedBy').addEventListener('input', function() {
+      document.getElementById('contactMethodField').hidden = !this.value.trim();
+    });
+
+    document.getElementById('contactMethodGrid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.status-btn');
+  if (!btn) return;
+  btn.classList.toggle('selected');
+});
+  
+
+    document.getElementById('billingToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+    });
+
+    document.getElementById('fWholesaler').addEventListener('change', function() {
+      var code = this.value;
+      if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
+      else { document.getElementById('billingQueryField').hidden = true; }
+    });
+
+    document.getElementById('fAddress').addEventListener('blur', function() {
+      if (this.value.trim() && !selectedZone) {
+        formattedAddress = this.value.trim();
+        lookupZone(this.value.trim());
+      }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', submitDelivery);
+    document.getElementById('summaryBtn').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+    document.getElementById('nextBtn').addEventListener('click', resetForm);
+    document.getElementById('summaryBtn2').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+
+    document.getElementById('loadingScreen').hidden = true;
+    document.getElementById('app').hidden = false;
+
+  } catch(e) {
+    console.error('init error:', e.message);
+    showNotFound();
+  }
+}
+
+function loadMaps(key) {
+  window.__mapsReady = function() {
+    var input = document.getElementById('fAddress');
+    var ac = new google.maps.places.Autocomplete(input, {
+      componentRestrictions: { country: 'ca' },
+      fields: ['formatted_address', 'geometry']
+    });
+    ac.addListener('place_changed', function() {
+      var place = ac.getPlace();
+      if (place.geometry) {
+        formattedAddress = place.formatted_address;
+        lookupZone(place.formatted_address);
+      }
+    });
+  };
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&libraries=places&callback=__mapsReady';
+  document.head.appendChild(s);
+}
+
+init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(e) {
+      console.log('SW registration failed:', e);
+    });
   });
 }
-
-async function hireApplicant(name, email, phone, vehicle) {
-  var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
-  if (!hireDate) return;
-  var code = window.prompt('Driver code:', (name || '').split(' ')[0].toUpperCase());
-  if (!code) return;
-  code = code.toUpperCase();
-  try {
-    var res = await fetch('/api/drivers', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: code, name: name, email: email, phone: phone, vehicle: vehicle, hire_date: hireDate, active: true })
-    });
-    if (!res.ok) throw new Error('Could not create driver');
-    var driver = await res.json();
-    drivers.push(driver);
-    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
-    showTab('drivers');
-  } catch(e) { alert('Could not hire: ' + e.message); }
-}
-
-function loadTemplate() {
-  fetch('/api/onboard?type=template').then(function(res) { return res.json(); }).then(function(t) {
-    document.getElementById('tSeason').value = t.season || '';
-    document.getElementById('tDates').value = t.dates || '';
-    document.getElementById('tPositions').value = t.positions || '';
-    document.getElementById('tComment').value = t.comment || '';
-  }).catch(function() {});
-}
-
-document.getElementById('saveTemplateBtn').addEventListener('click', function() {
-  var btn = this;
-  btn.disabled = true; btn.textContent = 'Saving...';
-  fetch('/api/onboard?type=template', {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      season: document.getElementById('tSeason').value.trim(),
-      dates: document.getElementById('tDates').value.trim(),
-      positions: document.getElementById('tPositions').value.trim(),
-      comment: document.getElementById('tComment').value.trim()
-    })
-  }).then(function() {
-    document.getElementById('templateMsg').hidden = false;
-    setTimeout(function() { document.getElementById('templateMsg').hidden = true; }, 3000);
-  }).catch(function() { alert('Could not save template.'); })
-  .finally(function() { btn.disabled = false; btn.textContent = 'Save Template'; });
-});
-
-/* ===== INIT ===== */
-loadDrivers();
-loadShops();
-loadRates();
 </script>
 </body>
 </html>
