@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,7 +58,7 @@
   .quote-meta{color:var(--ink-soft);font-size:12px;line-height:1.7;margin-top:4px;}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent);margin-right:6px;}
   .quote-contact{background:#EAF4EA;border:1px solid #A8CFA8;color:#2C5F2C;padding:12px;border-radius:10px;font-size:13px;line-height:1.6;}
-  .quote-actions{display:flex;gap:6px;margin-top:8px;}
+  .quote-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   .map-wrap{flex:1;position:relative;}
   #map{position:absolute;inset:0;}
   .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
@@ -105,6 +104,7 @@
       <h2>Shops</h2>
       <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
       <div id="shopList"></div>
+      
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
@@ -411,7 +411,7 @@ async function generateQuote(){
       const retailPrice=shop.zonePrices[zoneCode]||0;
       const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
       let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
-      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:true});
+      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:true,communityName:community.name});
       placeQuoteMarkers(shop,dest);return;
     }
 
@@ -440,12 +440,12 @@ async function generateQuote(){
   finally{setQuoteLoading(false);}
 }
 
-function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown}){
+function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown,communityName}){
   const wsDetail=isWholesale?(isInTown
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote - ${shop.name}`,,
+    `Delivery quote - ${shop.name}`,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
     `Zone: ${zoneCode} (${label} - ${sublabel})`,
@@ -454,6 +454,11 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
     `Generated: ${new Date().toLocaleString()}`
   ].filter(Boolean).join('\n');
+
+  // Save-as-default is only meaningful when the quote matched an actual
+  // Calgary community polygon (communityName set) - that's the only case
+  // where shop.communityZones has a matching key to override.
+  const showSaveZone = !!communityName;
 
   document.getElementById('quoteResult').innerHTML=`
     <div class="quote-card">
@@ -468,7 +473,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-actions">
         <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
         <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
-        <button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>
+        ${showSaveZone?`<button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>`:''}
       </div>
     </div>`;
 
@@ -482,23 +487,30 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
   });
-  document.getElementById('saveZoneBtn').addEventListener('click', async function() {
-    var community = dest.address.split(',')[0].trim();
-    var shopId = shop.id;
-    try {
-      var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          communityZones: Object.assign({}, shop.communityZones || {}, { [community]: zoneCode })
-        })
-      });
-      if (res.ok) {
-        shop.communityZones = Object.assign({}, shop.communityZones || {}, { [community]: zoneCode });
-        alert('Default zone ' + zoneCode + ' saved for ' + community);
+  if(showSaveZone){
+    document.getElementById('saveZoneBtn').addEventListener('click', async function() {
+      var btn = this;
+      var shopId = shop.id;
+      var updatedZones = Object.assign({}, shop.communityZones || {}, { [communityName]: zoneCode });
+      btn.disabled = true; var origText = btn.textContent; btn.textContent = 'Saving...';
+      try {
+        var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ communityZones: updatedZones })
+        });
+        if (!res.ok) { const b = await res.json().catch(()=>({})); throw new Error(b.error || 'Could not save.'); }
+        shop.communityZones = updatedZones;
+        // Re-render the map/legend if this shop is the one currently selected.
+        if (getSelectedShop() && getSelectedShop().id === shopId) { styleCommunities(); renderLegend(); }
+        btn.textContent = 'Saved!';
+        setTimeout(()=>{btn.textContent = origText; btn.disabled = false;}, 1500);
+      } catch(e) {
+        alert('Could not save: ' + e.message);
+        btn.textContent = origText; btn.disabled = false;
       }
-    } catch(e) { alert('Could not save: ' + e.message); }
-  });
+    });
+  }
 }
 
 /* pricing sheet */
