@@ -1,3 +1,6 @@
+INDEX AUG 15 648
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,15 +10,15 @@
 <style>
   :root{
     --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
-    --border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;
-    --radius:12px;
+    --border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;
+        --radius:12px;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
   [hidden]{display:none !important;}
   body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;}
   h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
-  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;gap:10px;}
+  .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
   .topbar h1{font-size:19px;flex-shrink:0;}
   .topbar span{color:var(--ink-soft);font-size:13px;}
   .key-gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -61,8 +64,7 @@
   .quote-actions{display:flex;gap:6px;margin-top:8px;}
   .map-wrap{flex:1;position:relative;}
   #map{position:absolute;inset:0;}
-  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:40vh;overflow-y:auto;max-width:220px;}
-@media(max-width:768px){.legend{max-height:30vh;font-size:11px;padding:8px 10px;max-width:180px;}}
+  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
   .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
   .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
   .iw{font-size:13px;min-width:180px;}
@@ -100,15 +102,11 @@
 </div>
 <div class="layout" id="mainApp" hidden>
   <aside class="sidebar">
-    <section class="panel" id="lookupBanner" hidden></section>
-    <section class="panel" id="shopsPanel">
+   <section class="panel" id="shopsPanel">
       <h2>Shops</h2>
+      <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
       <div id="shopList"></div>
-      <form id="addShopForm">
-        <input id="newShopName" placeholder="Shop name" required>
-        <input id="newShopAddress" placeholder="Shop address" required>
-        <button class="btn btn-sm" type="submit">Add shop</button>
-      </form>
+      
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
@@ -135,16 +133,14 @@
   </aside>
   <main class="map-wrap">
     <div id="map"></div>
-    <div class="legend" id="legend">
-  <button id="legendToggle" onclick="toggleLegend()" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--ink-soft);">✕</button>
-</div>
-<button id="legendShow" hidden onclick="toggleLegend()" style="position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08);">Legend</button><div class="legend" id="legend"></div>
+    <div class="legend" id="legend"></div>
   </main>
 </div>
 <div class="modal-bg" id="priceSheetModal" hidden>
   <div class="modal" id="priceSheetContent"></div>
 </div>
 <script>
+function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
 const CALGARY_ZONES=['C1','C2','C3','C4'];
 const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
 const ZONE_LABELS={
@@ -152,10 +148,12 @@ const ZONE_LABELS={
   OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
 };
 const ZONE_COLORS={
-  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
+  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',C5:'#8B2500',
+  TSA:'#9B4D00',DEW:'#C9E4CA',HPT:'#88C08A',RVS:'#4A90A4',RVN:'#2C5F8A',
+  EVA:'#6B8E8E',COC:'#5B7FA6',AIR:'#3D6B8A',CHE:'#88A0B8',OKO:'#4A7A6A',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
-// Named towns — each gets a colored pin on the map
+// Named towns - each gets a colored pin on the map
 const NAMED_TOWNS=[
   {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
   {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
@@ -166,14 +164,11 @@ const NAMED_TOWNS=[
   {name:'Kananaskis',zone:'OUT2',lat:50.9311,lng:-115.0986,radiusKm:15,color:'#2196F3'},
   {name:'Canmore',zone:'OUT2',lat:51.0894,lng:-115.3582,radiusKm:8,color:'#2196F3'},
   {name:'Banff',zone:'OUT3',lat:51.1784,lng:-115.5708,radiusKm:10,color:'#1565C0'},
-  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'},
-  {name:'Millarville',zone:'OUT2',lat:50.7567,lng:-114.3259,radiusKm:12,color:'#88C08A'},
-{name:'Diamond Valley',zone:'OUT2',lat:50.6833,lng:-114.2600,radiusKm:10,color:'#88C08A'},
-{name:'Langdon',zone:'OUT1',lat:51.0000,lng:-113.6667,radiusKm:6,color:'#4CAF50'},
+  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'}
 ];
 
 // Wholesale config
-const WS_INTOWN_BASE=16;   // first piece, in-town wholesale
+const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
 const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
 
 function outerBandForDistance(km){
@@ -185,7 +180,7 @@ function outerBandForDistance(km){
 }
 
 const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
-const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
+var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
 function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
 const ROUTE=parseRoute();
 
@@ -217,7 +212,7 @@ async function geocodeAddress(address){const r=await fetch('/api/geocode?address
 async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
 /* shop model */
-function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
+function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
 function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
 function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
 function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
@@ -226,22 +221,6 @@ function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopI
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
-async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save changes.');return r.json();}
-
-function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-
-/* shop list */
-function renderShopList(){
-  const el=document.getElementById('shopList');
-  if(!state.shops.length){el.innerHTML='<p class="hint">No shops yet &mdash; add one below.</p>';return;}
-  el.innerHTML=state.shops.map(s=>`
-    <div class="shop-item-wrap">
-      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
-      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
-    </div>`).join('');
-  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
-  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
-}
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
@@ -278,13 +257,6 @@ function renderLegend(){
 }
 
 /* map */
-  function toggleLegend(){
-  var legend=document.getElementById('legend');
-  var show=document.getElementById('legendShow');
-  var hidden=legend.style.display==='none';
-  legend.style.display=hidden?'':'none';
-  show.hidden=!hidden;
-}
 function initMap(){
   state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
   state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
@@ -380,6 +352,7 @@ function selectShop(id){
   if(state.map) drawTownPins();
 }
 function enterLookupView(shop){
+  seedCommunityZones(shop);
   state.shops=[shop];state.selectedShopId=shop.id;
   document.getElementById('shopsPanel').hidden=true;
   document.getElementById('pricingPanel').hidden=true;
@@ -406,7 +379,21 @@ document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
 });
 
 function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
-function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
+async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
+  function renderShopList(){
+  const el=document.getElementById('shopList');
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
+  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||(s.address||'').toLowerCase().includes(search));
+  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
+  el.innerHTML=filtered.map(s=>`
+    <div class="shop-item-wrap">
+      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
+      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+    </div>`).join('');
+  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+}
+  function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
 async function generateQuote(){
   const shop=getSelectedShop();
@@ -460,10 +447,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote — ${shop.name}`,
+    `Delivery quote - ${shop.name}`,,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} — ${sublabel})`,
+    `Zone: ${zoneCode} (${label} - ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
     `Delivery price: $${Number(finalPrice).toFixed(2)}`,
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
@@ -475,7 +462,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
       <div class="quote-meta">
         ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
-        <span class="badge">${zoneCode}</span>${escapeHtml(label)} <span style="color:var(--ink-soft)">(${escapeHtml(sublabel)})</span><br>
+       <span class="badge" style="background:${ZONE_COLORS[zoneCode]||'var(--accent-soft)'};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
         ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
         ${escapeHtml(dest.address)}<br>
         ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
@@ -483,6 +470,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-actions">
         <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
         <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
+        <button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>
       </div>
     </div>`;
 
@@ -495,6 +483,23 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     const w=window.open('','_blank','width=520,height=460');
     w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
+  });
+  document.getElementById('saveZoneBtn').addEventListener('click', async function() {
+    var community = dest.address.split(',')[0].trim();
+    var shopId = shop.id;
+    try {
+      var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          communityZones: Object.assign({}, shop.communityZones || {}, { [community]: zoneCode })
+        })
+      });
+      if (res.ok) {
+        shop.communityZones = Object.assign({}, shop.communityZones || {}, { [community]: zoneCode });
+        alert('Default zone ' + zoneCode + ' saved for ' + community);
+      }
+    } catch(e) { alert('Could not save: ' + e.message); }
   });
 }
 
@@ -525,7 +530,7 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING — ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,'',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
@@ -573,28 +578,12 @@ async function boot(){
     }else{
       state.shops=await apiListShops();
       state.shops.forEach(seedCommunityZones);
-      renderShopList();
-      if(state.shops.length)selectShop(state.shops[0].id);
-    }
+       renderShopList();
+document.getElementById('shopSearch').addEventListener('input', renderShopList);
+if(state.shops.length)selectShop(state.shops[0].id);
+          }
   }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
 }
-
-document.getElementById('addShopForm').addEventListener('submit',async(ev)=>{
-  ev.preventDefault();
-  const name=document.getElementById('newShopName').value.trim();
-  const address=document.getElementById('newShopAddress').value.trim();
-  if(!name||!address)return;
-  const btn=ev.target.querySelector('button');
-  btn.disabled=true;btn.textContent='Locating...';
-  try{
-    const loc=await geocodeAddress(address);
-    const payload={name,address:loc.formatted,lat:loc.lat,lng:loc.lng,zonePrices:defaultPrices(),communityZones:{},townPrices:defaultTownPrices()};
-    seedCommunityZones(payload);
-    const shop=await apiCreateShop(payload);
-    state.shops.push(shop);renderShopList();selectShop(shop.id);ev.target.reset();
-  }catch(err){alert('Could not add that shop: '+err.message);}
-  finally{btn.disabled=false;btn.textContent='Add shop';}
-});
 
 document.getElementById('quoteBtn').addEventListener('click',generateQuote);
 document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
