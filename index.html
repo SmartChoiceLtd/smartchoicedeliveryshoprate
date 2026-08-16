@@ -141,6 +141,10 @@
 function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
 const CALGARY_ZONES=['C1','C2','C3','C4'];
 const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
+// Zones selectable when overriding an individual community's zone (border
+// communities whose delivery radius bleeds into the city need C5 / border
+// zone codes available, not just the standard C1-C4 bands).
+const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN'];
 const ZONE_LABELS={
   C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',
   OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
@@ -210,7 +214,7 @@ async function geocodeAddress(address){const r=await fetch('/api/geocode?address
 async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
 /* shop model */
-function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
+function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,C5:14.95,TSA:14.95,HPT:14.95,RVN:14.95,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
 function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
 function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
 function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
@@ -323,7 +327,7 @@ function onCommunityClick(e){
   }
   const content=document.createElement('div');
   content.className='iw';
-  content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone for ${escapeHtml(shop.name)}:<br><select id="iwZoneSelect" style="margin-top:4px;">${CALGARY_ZONES.map(z=>`<option value="${z}" ${z===current?'selected':''}>${z} &mdash; $${shop.zonePrices[z]||0}</option>`).join('')}</select></div><button class="btn btn-sm" id="iwApply" style="margin-top:4px;">Set zone</button>`;
+  content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone for ${escapeHtml(shop.name)}:<br><select id="iwZoneSelect" style="margin-top:4px;">${COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===current?'selected':''}>${z} &mdash; $${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}</option>`).join('')}</select></div><button class="btn btn-sm" id="iwApply" style="margin-top:4px;">Set zone</button>`;
   if(state.infoWindow)state.infoWindow.close();
   state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
   state.infoWindow.open(state.map);
