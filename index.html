@@ -61,7 +61,8 @@
   .quote-actions{display:flex;gap:6px;margin-top:8px;}
   .map-wrap{flex:1;position:relative;}
   #map{position:absolute;inset:0;}
-  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
+  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:40vh;overflow-y:auto;max-width:220px;}
+@media(max-width:768px){.legend{max-height:30vh;font-size:11px;padding:8px 10px;max-width:180px;}}
   .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
   .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
   .iw{font-size:13px;min-width:180px;}
@@ -99,9 +100,9 @@
 </div>
 <div class="layout" id="mainApp" hidden>
   <aside class="sidebar">
-   <section class="panel" id="shopsPanel">
+    <section class="panel" id="lookupBanner" hidden></section>
+    <section class="panel" id="shopsPanel">
       <h2>Shops</h2>
-      <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
       <div id="shopList"></div>
       <form id="addShopForm">
         <input id="newShopName" placeholder="Shop name" required>
@@ -134,7 +135,10 @@
   </aside>
   <main class="map-wrap">
     <div id="map"></div>
-    <div class="legend" id="legend"></div>
+    <div class="legend" id="legend">
+  <button id="legendToggle" onclick="toggleLegend()" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--ink-soft);">✕</button>
+</div>
+<button id="legendShow" hidden onclick="toggleLegend()" style="position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08);z-index:10;">Legend</button>
   </main>
 </div>
 <div class="modal-bg" id="priceSheetModal" hidden>
@@ -151,7 +155,7 @@ const ZONE_COLORS={
   C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
-// Named towns ΓÇö each gets a colored pin on the map
+// Named towns — each gets a colored pin on the map
 const NAMED_TOWNS=[
   {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
   {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
@@ -162,7 +166,10 @@ const NAMED_TOWNS=[
   {name:'Kananaskis',zone:'OUT2',lat:50.9311,lng:-115.0986,radiusKm:15,color:'#2196F3'},
   {name:'Canmore',zone:'OUT2',lat:51.0894,lng:-115.3582,radiusKm:8,color:'#2196F3'},
   {name:'Banff',zone:'OUT3',lat:51.1784,lng:-115.5708,radiusKm:10,color:'#1565C0'},
-  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'}
+  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'},
+  {name:'Millarville',zone:'OUT2',lat:50.7567,lng:-114.3259,radiusKm:12,color:'#88C08A'},
+{name:'Diamond Valley',zone:'OUT2',lat:50.6833,lng:-114.2600,radiusKm:10,color:'#88C08A'},
+{name:'Langdon',zone:'OUT1',lat:51.0000,lng:-113.6667,radiusKm:6,color:'#4CAF50'},
 ];
 
 // Wholesale config
@@ -224,15 +231,10 @@ async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComp
 function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
 /* shop list */
- function renderShopList(){
-   renderShopList();
-document.getElementById('shopSearch').addEventListener('input', renderShopList);
-if(state.shops.length)selectShop(state.shops[0].id);
+function renderShopList(){
   const el=document.getElementById('shopList');
-  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
-  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||s.address.toLowerCase().includes(search));
-  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
-  el.innerHTML=filtered.map(s=>`
+  if(!state.shops.length){el.innerHTML='<p class="hint">No shops yet &mdash; add one below.</p>';return;}
+  el.innerHTML=state.shops.map(s=>`
     <div class="shop-item-wrap">
       <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
       <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
@@ -240,7 +242,6 @@ if(state.shops.length)selectShop(state.shops[0].id);
   el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
 }
-
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
@@ -273,10 +274,16 @@ function renderLegend(){
   if(!shop){legend.innerHTML='';return;}
   const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
   const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
+  legend.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11px;font-weight:700;color:var(--ink-soft);">PRICING</span><button onclick="document.getElementById('legendBody').hidden=!document.getElementById('legendBody').hidden" style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;color:var(--ink-soft);">⊟</button></div><div id="legendBody"><div class="legend-section">Calgary</div>${cH}<div class="legend-section">Outer zones</div>${oH}</div>`;
 }
-
 /* map */
+  function toggleLegend(){
+  var legend=document.getElementById('legend');
+  var show=document.getElementById('legendShow');
+  var hidden=legend.style.display==='none';
+  legend.style.display=hidden?'':'none';
+  show.hidden=!hidden;
+}
 function initMap(){
   state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
   state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
@@ -363,7 +370,9 @@ function placeQuoteMarkers(shop,dest){
   if(state.markers.dest)state.markers.dest.setMap(null);
   state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
   state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
-  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
+  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);state.map.fitBounds(b,80);
+  if(window.innerWidth<768){var lb=document.getElementById('legendBody');if(lb)lb.hidden=true;}
+}
 }
 
 function selectShop(id){
@@ -452,10 +461,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote ΓÇö ${shop.name}`,
+    `Delivery quote — ${shop.name}`,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} ΓÇö ${sublabel})`,
+    `Zone: ${zoneCode} (${label} — ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
     `Delivery price: $${Number(finalPrice).toFixed(2)}`,
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
@@ -517,7 +526,7 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING ΓÇö ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING — ${shop.name}`,shop.address,`As of ${date}`,'',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
