@@ -372,20 +372,20 @@ function getNeighbourZones(code) {
   }
   var city = ['C1','C2','C3','C4','C5'];
   var idx = city.indexOf(code);
-  var base;
   if (idx >= 0) {
+    // Suggested zone is a Calgary zone: show its immediate neighbours plus
+    // the two adjacent reserve/border codes. Kept short and relevant -
+    // matches the original scope (3-4 quick options), not the full rate table.
     var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
-    base = n.concat(['TSU','TSA']);
-  } else {
-    base = [code];
+    return n.concat(['TSU','TSA']);
   }
-  // Always include every other zone currently in the rate table so a driver
-  // can manually pick any valid zone, not just a hardcoded subset. New zones
-  // added in admin (OUT1-4, HAR, etc.) show up here automatically, no code
-  // change needed. "base" (closest/most relevant) zones are listed first.
-  var all = getAllNonWholesaleZones();
-  var rest = all.filter(function(z) { return base.indexOf(z) < 0; });
-  return base.concat(rest);
+  // Suggested zone is a named out-of-town zone: offer it plus a small set
+  // of commonly-adjacent out-of-town codes. "Show all zones" (below the
+  // buttons) covers anything not in this short list.
+  var out = ['TSA','TSU','DEW','HPT','RVS','RVN','C5'];
+  var base = [code];
+  out.forEach(function(z) { if (base.indexOf(z) < 0) base.push(z); });
+  return base;
 }
 
 function getWholesaleZoneForShop(shop) {
@@ -415,10 +415,12 @@ function getWholesaleZoneForShop(shop) {
   return 'WPU';
 }
 
-function buildZoneButtons(suggested) {
+function buildZoneButtons(suggested, showAll) {
   var list;
   if (deliveryType === 'wholesale') {
     list = ['WPU', 'WPH'];
+  } else if (showAll) {
+    list = getAllNonWholesaleZones();
   } else {
     list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
   }
@@ -437,6 +439,18 @@ function buildZoneButtons(suggested) {
     btn.onclick = function() { setZone(z, 'Manual selection', true); };
     container.appendChild(btn);
   });
+  // Only offer "show all" when the current list is a narrowed-down subset -
+  // avoids a redundant link when everything is already being shown (e.g.
+  // no suggestion at all, so there's no anchor to narrow around).
+  if (deliveryType !== 'wholesale' && !showAll && list.length < getAllNonWholesaleZones().length) {
+    var moreBtn = document.createElement('button');
+    moreBtn.className = 'zone-btn';
+    moreBtn.style.fontStyle = 'italic';
+    moreBtn.style.color = 'var(--ink-soft)';
+    moreBtn.textContent = 'Show all zones…';
+    moreBtn.onclick = function() { buildZoneButtons(suggested, true); };
+    container.appendChild(moreBtn);
+  }
 }
 
 function setZone(code, desc, manual) {
