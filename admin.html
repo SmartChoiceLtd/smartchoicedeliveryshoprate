@@ -93,6 +93,15 @@ tr.inactive td{color:var(--ink-soft);}
 
   <div id="tab-rates" hidden>
     <div class="section">
+      <h2>Add Zone</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Add a new zone code (e.g. OUT1, HAR) so it appears in the table below for rate entry. Starts at $0 across the board — fill in rates after adding.</p>
+      <div class="field-row">
+        <div class="field" style="max-width:160px;"><label>Zone Code</label><input type="text" id="newZoneCode" placeholder="OUT1" maxlength="10" style="text-transform:uppercase;"></div>
+        <div class="field" style="display:flex;align-items:flex-end;max-width:160px;"><button class="btn btn-sm" id="addZoneBtn">Add Zone</button></div>
+      </div>
+      <div id="addZoneMsg" hidden></div>
+    </div>
+    <div class="section">
       <h2>Rate Table</h2>
       <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Changes save automatically. GDPI = fuel premium per delivery.</p>
       <div id="ratesTable" class="loading">Loading...</div>
@@ -155,6 +164,68 @@ function esc(s) {
 
 var drivers = [], shops = [], rates = {};
 
+/* ===== GENERIC ADD-ROW UTILITY =====
+   Reusable for any "Add X" control, now or in the future (Drivers, Shops,
+   Rates/Zones, or any new table added later). Handles field validation,
+   button disable/loading state, and success/error messaging so each new
+   table only needs to define its fields + a save function.
+
+   opts = {
+     buttonId:   id of the button that triggers the add
+     msgId:      id of the message <div> to show success/error in
+     fields: [
+       { id: 'newFooCode', required: true, uppercase: true, label: 'Code' },
+       ...
+     ],
+     onSave:     async function(values) -> returns the new record, or throws Error
+     onSuccess:  function(record, values) -> update local array/state + re-render
+     successText: string OR function(record, values) -> string
+     savingText: optional button label while saving (default 'Saving...')
+     idleText:    optional button label when idle (default: button's current text)
+     clearFieldsAfter: default true
+   }
+*/
+function wireAddRowControl(opts) {
+  var btn = document.getElementById(opts.buttonId);
+  var msgEl = document.getElementById(opts.msgId);
+  var idleText = opts.idleText || btn.textContent;
+  btn.addEventListener('click', async function() {
+    var values = {};
+    for (var i = 0; i < opts.fields.length; i++) {
+      var f = opts.fields[i];
+      var el = document.getElementById(f.id);
+      var v = el.value.trim();
+      if (f.uppercase) v = v.toUpperCase();
+      if (f.required && !v) {
+        msgEl.className = 'error-msg';
+        msgEl.textContent = (f.label || f.id) + ' is required.';
+        msgEl.hidden = false;
+        return;
+      }
+      values[f.id] = v;
+    }
+    btn.disabled = true;
+    btn.textContent = opts.savingText || 'Saving...';
+    try {
+      var record = await opts.onSave(values);
+      if (opts.onSuccess) opts.onSuccess(record, values);
+      if (opts.clearFieldsAfter !== false) {
+        opts.fields.forEach(function(f) { document.getElementById(f.id).value = ''; });
+      }
+      msgEl.className = 'success-msg';
+      msgEl.textContent = typeof opts.successText === 'function' ? opts.successText(record, values) : (opts.successText || 'Added.');
+      msgEl.hidden = false;
+    } catch (e) {
+      msgEl.className = 'error-msg';
+      msgEl.textContent = 'Error: ' + e.message;
+      msgEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = idleText;
+    }
+  });
+}
+
 function showTab(name) {
   ['drivers','shops','rates','gdpi','applications'].forEach(function(t) {
     document.getElementById('tab-' + t).hidden = t !== name;
@@ -191,26 +262,25 @@ function renderDrivers() {
     '</tbody></table>';
 }
 
-document.getElementById('addDriverBtn').addEventListener('click', async function() {
-  var code = document.getElementById('newDriverCode').value.trim().toUpperCase();
-  var name = document.getElementById('newDriverName').value.trim();
-  var vehicle = document.getElementById('newDriverVehicle').value.trim();
-  var msgEl = document.getElementById('addDriverMsg');
-  if (!code || !name) { msgEl.className = 'error-msg'; msgEl.textContent = 'Code and name required.'; msgEl.hidden = false; return; }
-  this.disabled = true; this.textContent = 'Adding...';
-  try {
-    var res = await fetch('/api/drivers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: code, name: name, vehicle: vehicle, active: true }) });
-    var driver = await res.json();
+wireAddRowControl({
+  buttonId: 'addDriverBtn',
+  msgId: 'addDriverMsg',
+  fields: [
+    { id: 'newDriverCode', required: true, uppercase: true, label: 'Driver code' },
+    { id: 'newDriverName', required: true, label: 'Name' },
+    { id: 'newDriverVehicle', required: false }
+  ],
+  savingText: 'Adding...',
+  onSave: async function(v) {
+    var res = await fetch('/api/drivers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v.newDriverCode, name: v.newDriverName, vehicle: v.newDriverVehicle, active: true }) });
+    if (!res.ok) throw new Error('Could not add driver');
+    return res.json();
+  },
+  onSuccess: function(driver) {
     drivers.push(driver);
     renderDrivers();
-    document.getElementById('newDriverCode').value = '';
-    document.getElementById('newDriverName').value = '';
-    document.getElementById('newDriverVehicle').value = '';
-    msgEl.className = 'success-msg';
-    msgEl.textContent = 'Driver added. Link: ' + location.origin + '/driver/' + code.toLowerCase();
-    msgEl.hidden = false;
-  } catch(e) { msgEl.className = 'error-msg'; msgEl.textContent = 'Error: ' + e.message; msgEl.hidden = false; }
-  finally { this.disabled = false; this.textContent = 'Add Driver'; }
+  },
+  successText: function(driver) { return 'Driver added. Link: ' + location.origin + '/driver/' + driver.code.toLowerCase(); }
 });
 
 function copyDriverLink(code) {
@@ -277,29 +347,29 @@ function renderShops() {
     }).join('') + '</tbody></table>';
 }
 
-document.getElementById('addShopBtn').addEventListener('click', async function() {
-  var code = document.getElementById('newShopCode').value.trim().toUpperCase();
-  var name = document.getElementById('newShopName').value.trim().toUpperCase();
-  var address = document.getElementById('newShopAddress').value.trim();
-  var msgEl = document.getElementById('addShopMsg');
-  if (!code || !name || !address) { msgEl.className = 'error-msg'; msgEl.textContent = 'All fields required.'; msgEl.hidden = false; return; }
-  this.disabled = true; this.textContent = 'Adding...';
-  try {
-    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
+wireAddRowControl({
+  buttonId: 'addShopBtn',
+  msgId: 'addShopMsg',
+  fields: [
+    { id: 'newShopCode', required: true, uppercase: true, label: 'Shop code' },
+    { id: 'newShopName', required: true, uppercase: true, label: 'Shop name' },
+    { id: 'newShopAddress', required: true, label: 'Address' }
+  ],
+  savingText: 'Adding...',
+  onSave: async function(v) {
+    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(v.newShopAddress));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = { name: code + ' ' + name, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: { C1: 10, C2: 12, C3: 13, C4: 14, C5: 15 }, communityZones: {}, townPrices: {} };
+    var payload = { name: v.newShopCode + ' ' + v.newShopName, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: { C1: 10, C2: 12, C3: 13, C4: 14, C5: 15 }, communityZones: {}, townPrices: {} };
     var res = await fetch('/api/shops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error('Could not create shop');
-    var shop = await res.json();
+    return res.json();
+  },
+  onSuccess: function(shop) {
     shops.push(shop);
     renderShops();
-    document.getElementById('newShopCode').value = '';
-    document.getElementById('newShopName').value = '';
-    document.getElementById('newShopAddress').value = '';
-    msgEl.className = 'success-msg'; msgEl.textContent = 'Shop added: ' + shop.name; msgEl.hidden = false;
-  } catch(e) { msgEl.className = 'error-msg'; msgEl.textContent = 'Error: ' + e.message; msgEl.hidden = false; }
-  finally { this.disabled = false; this.textContent = 'Add Shop'; }
+  },
+  successText: function(shop) { return 'Shop added: ' + shop.name; }
 });
 
 async function toggleStar(shopId) {
@@ -353,6 +423,30 @@ async function updateRate(zone, field, value) {
   catch(e) { alert('Could not save rate.'); }
 }
 
+wireAddRowControl({
+  buttonId: 'addZoneBtn',
+  msgId: 'addZoneMsg',
+  fields: [
+    { id: 'newZoneCode', required: true, uppercase: true, label: 'Zone code' }
+  ],
+  savingText: 'Adding...',
+  clearFieldsAfter: true,
+  onSave: async function(v) {
+    var code = v.newZoneCode;
+    if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
+    rates[code] = { drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0 };
+    try {
+      await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
+    } catch (e) {
+      delete rates[code];
+      throw e;
+    }
+    return code;
+  },
+  onSuccess: function() { renderRates(); },
+  successText: function(code) { return 'Zone ' + code + ' added — set its rates below.'; }
+});
+
 async function loadRates() {
   var res = await fetch('/api/rates');
   rates = await res.json();
@@ -364,7 +458,9 @@ var ZONE_KM = {
   C1: 5, C2: 12, C3: 17, C4: 23, C5: 30,
   TSA: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
   AIR: 40, COC: 45, CHE: 25, OKO: 38, EVA: 25, BRG: 45,
-  MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140
+  MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140,
+  HAR: 30,
+  OUT1: 15, OUT2: 30, OUT3: 55, OUT4: 85
 };
 
 async function applySingleGdpi(zone, value) {
