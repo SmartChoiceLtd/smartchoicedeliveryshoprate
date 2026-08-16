@@ -38,6 +38,15 @@
   #addShopForm input,#destinationInput{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;}
   .pricing-section h3{font-size:12px;color:var(--ink-soft);margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
   .pricing-section h3:first-child{border-top:none;margin-top:0;}
+  .pricing-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;}
+  .pricing-group summary{padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);list-style:none;display:flex;align-items:center;justify-content:space-between;}
+  .pricing-group summary::-webkit-details-marker{display:none;}
+  .pricing-group summary::after{content:'+';font-size:16px;color:var(--ink-soft);}
+  .pricing-group[open] summary::after{content:'\2212';}
+  .pricing-group[open] summary{border-bottom:1px solid var(--border);}
+  .pricing-group>table,.pricing-group>h3{margin:0 12px;}
+  .pricing-group>table{width:calc(100% - 24px);margin-top:8px;margin-bottom:10px;}
+  .pricing-group>div{margin:10px 12px;}
   table.pricing{width:100%;border-collapse:collapse;font-size:13px;}
   table.pricing th,table.pricing td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:left;}
   .swatch-box{width:13px;height:13px;border-radius:3px;display:inline-block;vertical-align:middle;}
@@ -239,11 +248,38 @@ function renderPricingTable(){
   panel.hidden=false;
   document.getElementById('pricingShopName').textContent=shop.name;
   const body=document.getElementById('pricingBody');
-  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
-  const oRows=OUTER_ZONES.map(z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]||0}"></td></tr>`).join('');
+
+  // Border zones = everything in ZONE_COLORS that isn't a core Calgary zone
+  // or a rural/outer band (C5, TSA, HPT, RVN, RVS, and the rest).
+  const BORDER_ZONES=Object.keys(ZONE_COLORS).filter(z=>!CALGARY_ZONES.includes(z)&&!OUTER_ZONES.includes(z));
+
+  const zoneRow=z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]||''}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}"></td></tr>`;
+  const cRows=CALGARY_ZONES.map(zoneRow).join('');
+  const bRows=BORDER_ZONES.map(zoneRow).join('');
+  const oRows=OUTER_ZONES.map(zoneRow).join('');
   const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${t.color}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
-  const wsNote=`<div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px;color:#2C5F2C;"><strong>Wholesale rates:</strong> In-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece.</div>`;
-  body.innerHTML=`<h3>Calgary zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${cRows}</tbody></table><h3>Outer / rural zones</h3><table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${oRows}</tbody></table><h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3><table class="pricing"><thead><tr><th></th><th>Town</th><th>Retail price</th></tr></thead><tbody>${tRows}</tbody></table>${wsNote}`;
+  const wsNote=`<div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:8px 10px;font-size:12px;color:#2C5F2C;"><strong>Wholesale rates:</strong> In-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece.</div>`;
+
+  body.innerHTML=`
+    <details class="pricing-group" open>
+      <summary>Calgary zones</summary>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${cRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Border communities</summary>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${bRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Out of town</summary>
+      <h3 style="margin-top:0;">Rural / outer zones</h3>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${oRows}</tbody></table>
+      <h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3>
+      <table class="pricing"><thead><tr><th></th><th>Town</th><th>Retail price</th></tr></thead><tbody>${tRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Wholesale</summary>
+      ${wsNote}
+    </details>`;
   body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
   body.querySelectorAll('input[data-town]').forEach(i=>{i.addEventListener('change',()=>{if(!shop.townPrices)shop.townPrices={};const t=i.dataset.town,v=parseFloat(i.value);shop.townPrices[t]=isNaN(v)?null:v;apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
 }
