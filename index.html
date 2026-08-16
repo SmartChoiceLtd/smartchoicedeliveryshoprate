@@ -1,3 +1,5 @@
+Index aug 1
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -146,9 +148,7 @@ const ZONE_LABELS={
   OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
 };
 const ZONE_COLORS={
-  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',C5:'#8B2500',
-  TSA:'#9B4D00',DEW:'#C9E4CA',HPT:'#88C08A',RVS:'#4A90A4',RVN:'#2C5F8A',
-  EVA:'#6B8E8E',COC:'#5B7FA6',AIR:'#3D6B8A',CHE:'#88A0B8',OKO:'#4A7A6A',
+  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
 // Named towns - each gets a colored pin on the map
@@ -166,7 +166,7 @@ const NAMED_TOWNS=[
 ];
 
 // Wholesale config
-const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
+const WS_INTOWN_BASE=16;   // first piece, in-town wholesale
 const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
 
 function outerBandForDistance(km){
@@ -210,7 +210,7 @@ async function geocodeAddress(address){const r=await fetch('/api/geocode?address
 async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
 /* shop model */
-function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
+function defaultPrices(){return{C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
 function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
 function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
 function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
@@ -350,7 +350,6 @@ function selectShop(id){
   if(state.map) drawTownPins();
 }
 function enterLookupView(shop){
-  seedCommunityZones(shop);
   state.shops=[shop];state.selectedShopId=shop.id;
   document.getElementById('shopsPanel').hidden=true;
   document.getElementById('pricingPanel').hidden=true;
@@ -460,7 +459,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
       <div class="quote-meta">
         ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
-       <span class="badge" style="background:${ZONE_COLORS[zoneCode]||'var(--accent-soft)'};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
+        <span class="badge">${zoneCode}</span>${escapeHtml(label)} <span style="color:var(--ink-soft)">(${escapeHtml(sublabel)})</span><br>
         ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
         ${escapeHtml(dest.address)}<br>
         ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
@@ -468,7 +467,6 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-actions">
         <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
         <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
-        <button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>
       </div>
     </div>`;
 
@@ -481,23 +479,6 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     const w=window.open('','_blank','width=520,height=460');
     w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
-  });
-  document.getElementById('saveZoneBtn').addEventListener('click', async function() {
-    var community = dest.address.split(',')[0].trim();
-    var shopId = shop.id;
-    try {
-      var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          communityZones: Object.assign({}, shop.communityZones || {}, { [community]: zoneCode })
-        })
-      });
-      if (res.ok) {
-        shop.communityZones = Object.assign({}, shop.communityZones || {}, { [community]: zoneCode });
-        alert('Default zone ' + zoneCode + ' saved for ' + community);
-      }
-    } catch(e) { alert('Could not save: ' + e.message); }
   });
 }
 
