@@ -406,13 +406,13 @@ function renderRates() {
   var el = document.getElementById('ratesTable');
   var keys = Object.keys(rates).sort();
   if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Zone</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Zone</th><th>km</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
     keys.map(function(zone) {
       var r = rates[zone];
-      function inp(field) {
-        return '<input class="rate-input" type="number" step="0.25" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
+      function inp(field, step) {
+        return '<input class="rate-input" type="number" step="' + (step || '0.25') + '" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
       }
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
+      return '<tr><td><strong>' + zone + '</strong></td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -434,7 +434,7 @@ wireAddRowControl({
   onSave: async function(v) {
     var code = v.newZoneCode;
     if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
-    rates[code] = { drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0 };
+    rates[code] = { km: 0, drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0 };
     try {
       await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
     } catch (e) {
@@ -454,14 +454,31 @@ async function loadRates() {
 }
 
 /* ===== GDPI ===== */
+// Legacy seed values, used only as a fallback suggestion for zones that
+// don't yet have their own "km" set on the rate table row. Once a zone's
+// km is set in the Rate Table, that value is the source of truth.
 var ZONE_KM = {
   C1: 5, C2: 12, C3: 17, C4: 23, C5: 30,
-  TSA: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
+  TSA: 28, TSU: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
   AIR: 40, COC: 45, CHE: 25, OKO: 38, EVA: 25, BRG: 45,
   MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140,
   HAR: 30,
   OUT1: 15, OUT2: 30, OUT3: 55, OUT4: 85
 };
+// Flat event-type codes aren't distance-based — GDPI doesn't apply to them
+// directly (WEDO/FUNO borrow GDPI from their underlying geographic zone at
+// calculation time, and don't have their own rate-table row at all).
+var NON_DISTANCE_ZONES = ['SPEC', 'WED', 'FUN'];
+
+function kmForZone(zone) {
+  var r = rates[zone];
+  if (r && r.km) return r.km;
+  return ZONE_KM[zone] || 0;
+}
+
+function gdpiEligibleZones() {
+  return Object.keys(rates).filter(function(z) { return NON_DISTANCE_ZONES.indexOf(z) < 0; }).sort();
+}
 
 async function applySingleGdpi(zone, value) {
   if (!rates[zone]) rates[zone] = {};
@@ -481,13 +498,14 @@ document.getElementById('calcGdpiBtn').addEventListener('click', function() {
   document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
   document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
   var tbody = document.getElementById('gdpiTableBody');
-  tbody.innerHTML = Object.keys(ZONE_KM).map(function(zone) {
-    var km = ZONE_KM[zone];
+  tbody.innerHTML = gdpiEligibleZones().map(function(zone) {
+    var km = kmForZone(zone);
     var newGdpi = Math.round(perKm * km * 100) / 100;
     var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
+    var kmNote = (!rates[zone] || !rates[zone].km) && ZONE_KM[zone] ? ' <span style="color:var(--ink-soft);font-size:11px;">(seed default — set in Rate Table to persist)</span>' : '';
     return '<tr>' +
       '<td><strong>' + zone + '</strong></td>' +
-      '<td>' + km + ' km</td>' +
+      '<td>' + km + ' km' + kmNote + '</td>' +
       '<td class="gdpi-highlight">$' + newGdpi.toFixed(2) + '</td>' +
       '<td style="color:var(--warm);font-weight:600;">$' + (newGdpi * 1.33).toFixed(2) + '</td>' +
       '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
@@ -502,9 +520,14 @@ document.getElementById('applyAllGdpiBtn').addEventListener('click', function() 
   var current = parseFloat(document.getElementById('gdpiCurrent').value);
   if (!current) return;
   var perKm = (current - base) * 0.11;
-  Object.keys(ZONE_KM).forEach(function(zone) {
+  gdpiEligibleZones().forEach(function(zone) {
+    var km = kmForZone(zone);
     if (!rates[zone]) rates[zone] = {};
-    rates[zone].gdpi = Math.round(perKm * ZONE_KM[zone] * 100) / 100;
+    rates[zone].gdpi = Math.round(perKm * km * 100) / 100;
+    // Persist the resolved km onto the rate record itself if it wasn't
+    // already set, so future calculations use the Rate Table as the
+    // source of truth instead of falling back to the seed table again.
+    if (!rates[zone].km && km) rates[zone].km = km;
   });
   fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) })
     .then(function() { renderRates(); });
