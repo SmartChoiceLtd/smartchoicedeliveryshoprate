@@ -1,6 +1,3 @@
-Index aug 1
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,15 +7,15 @@ Index aug 1
 <style>
   :root{
     --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
-    --border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;
-        --radius:12px;
+    --border:#E6DECF;--accent:#B8472B;--accent-soft:#F4DCC9;
+    --radius:12px;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
   [hidden]{display:none !important;}
   body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;}
   h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
-  .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;gap:10px;}
   .topbar h1{font-size:19px;flex-shrink:0;}
   .topbar span{color:var(--ink-soft);font-size:13px;}
   .key-gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -106,7 +103,11 @@ Index aug 1
       <h2>Shops</h2>
       <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
       <div id="shopList"></div>
-      
+      <form id="addShopForm">
+        <input id="newShopName" placeholder="Shop name" required>
+        <input id="newShopAddress" placeholder="Shop address" required>
+        <button class="btn btn-sm" type="submit">Add shop</button>
+      </form>
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
@@ -140,7 +141,6 @@ Index aug 1
   <div class="modal" id="priceSheetContent"></div>
 </div>
 <script>
-function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
 const CALGARY_ZONES=['C1','C2','C3','C4'];
 const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
 const ZONE_LABELS={
@@ -151,7 +151,7 @@ const ZONE_COLORS={
   C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
-// Named towns - each gets a colored pin on the map
+// Named towns ΓÇö each gets a colored pin on the map
 const NAMED_TOWNS=[
   {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
   {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
@@ -178,7 +178,7 @@ function outerBandForDistance(km){
 }
 
 const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
-var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
+const state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
 function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
 const ROUTE=parseRoute();
 
@@ -219,6 +219,28 @@ function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopI
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
+async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save changes.');return r.json();}
+
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+/* shop list */
+ function renderShopList(){
+   renderShopList();
+document.getElementById('shopSearch').addEventListener('input', renderShopList);
+if(state.shops.length)selectShop(state.shops[0].id);
+  const el=document.getElementById('shopList');
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
+  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||s.address.toLowerCase().includes(search));
+  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
+  el.innerHTML=filtered.map(s=>`
+    <div class="shop-item-wrap">
+      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
+      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+    </div>`).join('');
+  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+}
+
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
@@ -376,21 +398,7 @@ document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
 });
 
 function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
-async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
-  function renderShopList(){
-  const el=document.getElementById('shopList');
-  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
-  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||(s.address||'').toLowerCase().includes(search));
-  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
-  el.innerHTML=filtered.map(s=>`
-    <div class="shop-item-wrap">
-      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
-      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
-    </div>`).join('');
-  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
-  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
-}
-  function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
+function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
 async function generateQuote(){
   const shop=getSelectedShop();
@@ -444,10 +452,10 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
   const quoteText=[
-    `Delivery quote - ${shop.name}`,,
+    `Delivery quote ΓÇö ${shop.name}`,
     `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
     `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} - ${sublabel})`,
+    `Zone: ${zoneCode} (${label} ΓÇö ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
     `Delivery price: $${Number(finalPrice).toFixed(2)}`,
     driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
@@ -509,7 +517,7 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING ΓÇö ${shop.name}`,shop.address,`As of ${date}`,'',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
@@ -557,12 +565,28 @@ async function boot(){
     }else{
       state.shops=await apiListShops();
       state.shops.forEach(seedCommunityZones);
-       renderShopList();
-document.getElementById('shopSearch').addEventListener('input', renderShopList);
-if(state.shops.length)selectShop(state.shops[0].id);
-          }
+      renderShopList();
+      if(state.shops.length)selectShop(state.shops[0].id);
+    }
   }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
 }
+
+document.getElementById('addShopForm').addEventListener('submit',async(ev)=>{
+  ev.preventDefault();
+  const name=document.getElementById('newShopName').value.trim();
+  const address=document.getElementById('newShopAddress').value.trim();
+  if(!name||!address)return;
+  const btn=ev.target.querySelector('button');
+  btn.disabled=true;btn.textContent='Locating...';
+  try{
+    const loc=await geocodeAddress(address);
+    const payload={name,address:loc.formatted,lat:loc.lat,lng:loc.lng,zonePrices:defaultPrices(),communityZones:{},townPrices:defaultTownPrices()};
+    seedCommunityZones(payload);
+    const shop=await apiCreateShop(payload);
+    state.shops.push(shop);renderShopList();selectShop(shop.id);ev.target.reset();
+  }catch(err){alert('Could not add that shop: '+err.message);}
+  finally{btn.disabled=false;btn.textContent='Add shop';}
+});
 
 document.getElementById('quoteBtn').addEventListener('click',generateQuote);
 document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
