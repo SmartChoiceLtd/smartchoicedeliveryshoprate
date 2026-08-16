@@ -67,6 +67,18 @@ const RVS_COMMUNITIES = [
 // RVN communities — Rocky View County North
 const RVN_COMMUNITIES = ['Conrich'];
 
+// Distance-banded rural fallback zones. Used only as a last resort, after
+// every named out-of-town zone (OUT_OF_TOWN_ZONES) has already been checked
+// and none matched. These bands mirror the quote tool's outerBandForDistance()
+// so an address that doesn't fall inside any named zone's radius still gets a
+// sensible auto-suggestion instead of being dropped straight to fully manual.
+const OUT_BANDS = [
+  { code:'OUT1', maxKm:20  },
+  { code:'OUT2', maxKm:40  },
+  { code:'OUT3', maxKm:70  },
+  { code:'OUT4', maxKm:100 }
+];
+
 function isLikelyInCalgary(lat, lng) {
   return lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800;
 }
@@ -101,6 +113,13 @@ function cityZoneForKm(km) {
   if (km <= 18) return { code:'C3', confidence:'high' };
   if (km <= 24) return { code:'C4', confidence:'high' };
   return             { code:'C5', confidence:'high' };
+}
+
+function outBandForKm(km) {
+  for (const band of OUT_BANDS) {
+    if (km <= band.maxKm) return band.code;
+  }
+  return null; // beyond 100km — genuinely needs manual/custom quote
 }
 
 async function geocode(address, key) {
@@ -262,7 +281,23 @@ export default async (req) => {
       formatted_address: formatted });
   }
 
+  // Rural distance-band fallback (OUT1-4) — last resort before giving up to
+  // fully manual selection. Uses straight-line distance since driving
+  // distance for far-flung rural addresses isn't always reliable/available,
+  // and this is only meant as a rough auto-suggestion the driver can
+  // correct via the "Change" zone override if it's off.
   const straightKm = haversineKm({ lat: shopLat, lng: shopLng }, { lat, lng });
+  const outBand = outBandForKm(straightKm);
+  if (outBand) {
+    return json({
+      suggested: outBand,
+      confidence: 'low',
+      message: `No named zone match — approx ${Math.round(straightKm)} km straight-line from shop, ${outBand} suggested. Please confirm or override.`,
+      formatted_address: formatted,
+      straight_line_km: Math.round(straightKm)
+    });
+  }
+
   return json({
     suggested: null,
     confidence: 'manual',
