@@ -193,13 +193,14 @@ export default async (req) => {
           </div>
           <div class="detail">
             <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>DSHOP</th><th>DZONE</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
+              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>DSHOP</th><th>DZONE</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
               <tbody>
                 ${orderPay.map(({o,zone,pieces,drate,gdpi,total})=>`<tr>
                   <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
                   <td>${o.order_id||1}</td>
                   <td>${(o.name||'').slice(0,18)}</td>
                   <td>${(o.formatted_address||o.address||'').slice(0,28)}</td>
+                  <td>${(o.community||'').slice(0,18)}</td>
                   <td>${o.shop_code||''}</td>
                   <td>${zone}</td>
                   <td>${pieces}</td>
@@ -274,13 +275,14 @@ export default async (req) => {
           </div>
           <div class="detail">
             <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Driver</th><th>DZONE</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
+              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>Driver</th><th>DZONE</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
               <tbody>
                 ${orderAmts.map(({o,zone,pieces,amount})=>`<tr>
                   <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
                   <td>${o.order_id||1}</td>
                   <td>${(o.name||'').slice(0,20)}</td>
                   <td>${(o.formatted_address||o.address||'').slice(0,30)}</td>
+                  <td>${(o.community||'').slice(0,20)}</td>
                   <td>${o.driver||''}</td>
                   <td>${zone}</td>
                   <td>${pieces}</td>
@@ -300,4 +302,3 @@ export default async (req) => {
 };
 
 export const config = { path: '/api/reports' };
-
