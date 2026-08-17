@@ -27,6 +27,16 @@ function needsZoneCalculation(zoneCode) {
   return false;
 }
 
+// Event-type pricing codes from driver.html's Event Type overlay (Special
+// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
+// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
+// are tracked under their own code. None of them should ever be
+// re-suggested or overwritten by the address-based zone matcher below.
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
+function isEventZoneCode(zoneCode) {
+  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
+}
+
 async function suggestZone(address, shopLat, shopLng, key) {
   try {
     const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
@@ -111,7 +121,23 @@ export default async (req) => {
     let zoneSource = 'manual';
     let zoneSuggestion = null;
 
-    if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
+    if (isEventZoneCode(enteredZoneCode)) {
+      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
+      // never re-suggested/overwritten. Still look up the address for its
+      // community name (for tracking/reports), but ignore any suggested
+      // zone code that comes back with it.
+      zoneCode = enteredZoneCode.toUpperCase();
+      zoneSource = 'manual';
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+      }
+    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
       const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
       zoneSuggestion = await suggestZone(
         raw.address,
@@ -153,6 +179,7 @@ export default async (req) => {
    const isWholesale = (raw.delivery_type === 'wholesale') || 
       (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
     const zoneConflict = !isWholesale &&
+      !isEventZoneCode(enteredZoneCode) &&
       zoneSuggestion?.suggested &&
       enteredZoneCode &&
       zoneSuggestion.suggested !== enteredZoneCode &&
