@@ -35,6 +35,16 @@ label.textContent = formatWeekLabel(getWeekBounds(weekOffset));
 function parseOrderDate(o) {
 var raw = o.date || o.received_at;
 if (!raw) return new Date(0);
+// Bare YYYY-MM-DD (date-only, no time/timezone - e.g. from driver.html's
+// <input type="date">) must be parsed as a LOCAL calendar date. JS treats
+// a bare ISO date string as UTC midnight per spec, which in timezones
+// behind UTC shifts it backward several hours - sometimes enough to land
+// on the previous calendar day and push the order across a week boundary
+// in this page's date-filtered table view, even though it still matches
+// in the unfiltered search/card view. Full timestamps (received_at) are
+// NOT affected by this and still parse normally below.
+var isoDateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+if (isoDateOnly) return new Date(parseInt(isoDateOnly[1]), parseInt(isoDateOnly[2]) - 1, parseInt(isoDateOnly[3]));
 var d = new Date(raw);
 if (!isNaN(d.getTime())) return d;
 var months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
