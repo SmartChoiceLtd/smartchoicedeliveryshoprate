@@ -5,11 +5,11 @@ function json(data, status = 200) {
 }
 
 const DEFAULT_RATES = {
-  C1:{drate:8,dratex:1.5,gdpi:0.5,srate:11,sratex:3},
-  C2:{drate:8,dratex:1.5,gdpi:0.5,srate:12,sratex:3},
-  C3:{drate:8.25,dratex:1.5,gdpi:0.5,srate:13,sratex:3},
-  C4:   { drate:8.75,  dratex:1.5, gdpi:0.5,  srate:14, sratex:3 },
-  C5:   { drate:14.95, dratex:1.5, gdpi:0.75, srate:23, sratex:3 },
+  C1:{drate:8.25,dratex:1.5,gdpi:0.11,srate:13.5,sratex:3},
+  C2:{drate:8,dratex:1.5,gdpi:0.5,srate:15,sratex:3},
+  C3:{drate:8.25,dratex:1.5,gdpi:0.5,srate:16.5,sratex:3},
+  C4:   { drate:8.75,  dratex:1.5, gdpi:0.5,  srate:17, sratex:3 },
+  C5:   { drate:14.95, dratex:1.5, gdpi:0.75, srate:18, sratex:3 },
   TSA:  { drate:14.95, dratex:1.5, gdpi:0.75, srate:23, sratex:3 },
   AIR:{drate:16.25,dratex:1.5,gdpi:1,srate:25,sratex:3},
   BAL:{drate:14.3,dratex:1.5,gdpi:0.5,srate:22,sratex:3},
