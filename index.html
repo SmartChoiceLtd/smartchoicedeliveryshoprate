@@ -117,6 +117,14 @@
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
+      <div style="margin-bottom:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+        <label style="display:block;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Copy zone setup from another shop</label>
+        <div style="display:flex;gap:6px;">
+          <select id="copyFromShopSelect" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;"></select>
+          <button class="btn btn-sm" id="copyFromShopBtn" style="flex-shrink:0;">Copy</button>
+        </div>
+        <p class="hint" style="margin-top:6px;">Copies zone prices, community overrides, and town rates. Overwrites this shop's current setup.</p>
+      </div>
       <div class="pricing-section" id="pricingBody"></div>
       <div style="margin-top:10px;">
         <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="width:100%;">View / print pricing sheet</button>
@@ -252,6 +260,34 @@ function copyShopLink(shopId,btn){
   else window.prompt('Copy this link:',url);
 }
 
+/* copy zone setup between shops */
+function renderCopyFromShopSelect(currentShop){
+  const sel=document.getElementById('copyFromShopSelect');
+  const others=state.shops.filter(s=>s.id!==currentShop.id).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!others.length){sel.innerHTML='<option value="">No other shops yet</option>';sel.disabled=true;return;}
+  sel.disabled=false;
+  sel.innerHTML='<option value="">Select a shop&hellip;</option>'+others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+
+async function copyZoneSetupFromShop(){
+  const target=getSelectedShop();
+  const sourceId=document.getElementById('copyFromShopSelect').value;
+  if(!target||!sourceId)return;
+  const source=state.shops.find(s=>s.id===sourceId);
+  if(!source)return;
+  if(!window.confirm(`Copy zone prices, community overrides, and town rates from ${source.name} to ${target.name}? This overwrites ${target.name}'s current setup.`))return;
+  const btn=document.getElementById('copyFromShopBtn');
+  const orig=btn.textContent;btn.disabled=true;btn.textContent='Copying...';
+  target.zonePrices={...source.zonePrices};
+  target.communityZones={...source.communityZones};
+  target.townPrices={...source.townPrices};
+  try{
+    await apiSaveShop(target);
+    styleCommunities();renderPricingTable();renderLegend();if(state.map)drawTownPins();
+  }catch(e){alert('Could not copy setup: '+e.message);}
+  finally{btn.disabled=false;btn.textContent=orig;}
+}
+
 /* pricing table */
 function renderPricingTable(){
   const shop=getSelectedShop();
@@ -259,6 +295,7 @@ function renderPricingTable(){
   if(!shop){panel.hidden=true;return;}
   panel.hidden=false;
   document.getElementById('pricingShopName').textContent=shop.name;
+  renderCopyFromShopSelect(shop);
   const body=document.getElementById('pricingBody');
 
   // Border zones = everything in ZONE_COLORS that isn't a core Calgary zone
@@ -651,6 +688,7 @@ if(state.shops.length)selectShop(state.shops[0].id);
 
 document.getElementById('quoteBtn').addEventListener('click',generateQuote);
 document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
+document.getElementById('copyFromShopBtn').addEventListener('click',copyZoneSetupFromShop);
 
 boot();
 </script>
