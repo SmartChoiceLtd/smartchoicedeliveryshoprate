@@ -153,7 +153,7 @@ const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
 // Zones selectable when overriding an individual community's zone (border
 // communities whose delivery radius bleeds into the city need C5 / border
 // zone codes available, not just the standard C1-C4 bands).
-const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN','RVS'];
+const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN','RVS','BPW','SBK'];
 const ZONE_LABELS={
   C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',C5:'City limit edge',
   OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
@@ -162,8 +162,20 @@ const ZONE_COLORS={
   C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',C5:'#8B2500',
   TSA:'#9B4D00',DEW:'#C9E4CA',HPT:'#88C08A',RVS:'#4A90A4',RVN:'#2C5F8A',
   EVA:'#6B8E8E',COC:'#5B7FA6',AIR:'#3D6B8A',CHE:'#88A0B8',OKO:'#4A7A6A',
+  BPW:'#8A6D4B',SBK:'#6B8E5A',
   OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
+// Zone color resolution, in order: a color explicitly set in the Rate
+// Table (admin.html) for this zone, then the hardcoded map above (legacy
+// zones that predate the Rate Table color picker), then a safe grey
+// fallback. This means adding a new zone via admin's Add Zone + color
+// picker never needs a code change here, and an unrecognized zone can
+// never silently render as undefined/blank on the map again.
+function getZoneColor(code){
+  if(state.rates&&state.rates[code]&&state.rates[code].color)return state.rates[code].color;
+  if(ZONE_COLORS[code])return ZONE_COLORS[code];
+  return '#999999';
+}
 // Named towns - each gets a colored pin on the map
 const NAMED_TOWNS=[
   {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
@@ -191,7 +203,7 @@ function outerBandForDistance(km){
 }
 
 const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
-var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail'};
+var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail',rates:{}};
 function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
 const ROUTE=parseRoute();
 
@@ -253,7 +265,7 @@ function renderPricingTable(){
   // or a rural/outer band (C5, TSA, HPT, RVN, RVS, and the rest).
   const BORDER_ZONES=Object.keys(ZONE_COLORS).filter(z=>!CALGARY_ZONES.includes(z)&&!OUTER_ZONES.includes(z));
 
-  const zoneRow=z=>`<tr><td><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]||''}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}"></td></tr>`;
+  const zoneRow=z=>`<tr><td><span class="swatch-box" style="background:${getZoneColor(z)}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]||''}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}"></td></tr>`;
   const cRows=CALGARY_ZONES.map(zoneRow).join('');
   const bRows=BORDER_ZONES.map(zoneRow).join('');
   const oRows=OUTER_ZONES.map(zoneRow).join('');
@@ -289,8 +301,8 @@ function renderLegend(){
   const shop=getSelectedShop();
   const legend=document.getElementById('legend');
   if(!shop){legend.innerHTML='';return;}
-  const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${ZONE_COLORS[z]}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
   legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
 }
 
@@ -343,7 +355,7 @@ function styleCommunities(){
   state.map.data.setStyle(feature=>{
     const name=feature.getProperty('quoteToolName');
     let fill='#E4DDD0';
-    if(shop){const code=shop.communityZones[name]||'C4';fill=ZONE_COLORS[code];}
+    if(shop){const code=shop.communityZones[name]||'C4';fill=getZoneColor(code);}
     return{fillColor:fill,fillOpacity:0.55,strokeWeight:0.6,strokeColor:'#FFFFFF',zIndex:1};
   });
 }
@@ -505,7 +517,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
       <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
       <div class="quote-meta">
         ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
-       <span class="badge" style="background:${ZONE_COLORS[zoneCode]||'var(--accent-soft)'};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
+       <span class="badge" style="background:${getZoneColor(zoneCode)};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
         ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
         ${escapeHtml(dest.address)}<br>
         ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
@@ -559,8 +571,8 @@ function showPricingSheet(){
   const modal=document.getElementById('priceSheetModal');
   const content=document.getElementById('priceSheetContent');
   const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>$${WS_INTOWN_BASE} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
-  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${ZONE_COLORS[z]};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>Zone rate + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>$${WS_INTOWN_BASE} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>Zone rate + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
   const tRows=NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);const note=flat!==null?'flat':'zone';return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.color};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} (${note})</td><td>$${Number(price).toFixed(2)}</td><td>$${Number(price).toFixed(2)} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`;}).join('');
 
   content.innerHTML=`
@@ -615,6 +627,8 @@ async function boot(){
     const key=await fetchMapsKey();
     loadingMsg.textContent='Loading map...';
     await loadGoogleMaps(key);
+    loadingMsg.textContent='Loading zone colors...';
+    try{const rRes=await fetch('/api/rates');if(rRes.ok)state.rates=await rRes.json();}catch(e){/* fall back to hardcoded ZONE_COLORS if this fails */}
     loadingMsg.textContent='Loading Calgary communities...';
     state.communities=await loadCommunities();
     initMap();
