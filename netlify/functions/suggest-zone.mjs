@@ -1,5 +1,57 @@
 const GOOGLE_GEOCODE = 'https://maps.googleapis.com/maps/api/geocode/json';
 const GOOGLE_DISTANCE = 'https://maps.googleapis.com/maps/api/distancematrix/json';
+const COMMUNITY_GEOJSON_URL = 'https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
+
+// In-memory cache across warm function invocations - avoids re-fetching
+// the ~1MB community boundary file on every single request.
+let communityCache = null;
+let communityCacheTime = 0;
+const COMMUNITY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function getCommunityName(props) {
+  const keys = ['name', 'NAME', 'comm_name', 'COMM_NAME'];
+  for (const k of keys) if (props && props[k]) return String(props[k]);
+  if (props) { const ks = Object.keys(props); if (ks.length) return String(props[ks[0]]); }
+  return null;
+}
+
+function pointInRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > pt.lat) !== (yj > pt.lat)) && (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(pt, g) {
+  if (!g) return false;
+  if (g.type === 'Polygon') return pointInRing(pt, g.coordinates[0]);
+  if (g.type === 'MultiPolygon') return g.coordinates.some(p => pointInRing(pt, p[0]));
+  return false;
+}
+
+async function loadCommunities() {
+  const now = Date.now();
+  if (communityCache && (now - communityCacheTime) < COMMUNITY_CACHE_TTL_MS) return communityCache;
+  try {
+    const res = await fetch(COMMUNITY_GEOJSON_URL);
+    if (!res.ok) return communityCache || [];
+    const geo = await res.json();
+    communityCache = (geo.features || []).map(f => ({ name: getCommunityName(f.properties), geometry: f.geometry }));
+    communityCacheTime = now;
+    return communityCache;
+  } catch (e) {
+    return communityCache || [];
+  }
+}
+
+async function findCommunityName(lat, lng) {
+  const communities = await loadCommunities();
+  const pt = { lat, lng };
+  const match = communities.find(c => c.geometry && pointInGeometry(pt, c.geometry));
+  return match ? match.name : null;
+}
 
 function haversineKm(a, b) {
   const R = 6371, toRad = d => d * Math.PI / 180;
@@ -87,6 +139,15 @@ function isTSACommunity(formatted) {
   if (!formatted) return false;
   const upper = formatted.toUpperCase();
   return TSA_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+// Returns the exact community name that matched (for inclusion in the
+// response/tracking), or null if none of the list matched.
+function matchCommunityName(formatted, list) {
+  if (!formatted) return null;
+  const upper = formatted.toUpperCase();
+  const match = list.find(c => upper.includes(c.toUpperCase()));
+  return match || null;
 }
 
 function isC5NorthCommunity(formatted) {
@@ -183,44 +244,51 @@ export default async (req) => {
   if (isTSACommunity(formatted)) {
     return json({ suggested:'TSA', confidence:'high',
       message:"Tsuu T'ina Adjacent area — out-of-town rate applies",
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, TSA_COMMUNITIES) });
   }
 
   // RVN — Rocky View County North by name
   if (isRVNCommunity(formatted)) {
     return json({ suggested:'RVN', confidence:'high',
       message:'Rocky View County North',
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVN_COMMUNITIES) });
   }
 
   // RVS — Rocky View County South by name
   if (isRVSCommunity(formatted)) {
     return json({ suggested:'RVS', confidence:'high',
       message:'Rocky View County South',
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVS_COMMUNITIES) });
   }
 
   // C5 border communities — name check before radius matching
   if (isC5NorthCommunity(formatted) && isLikelyInCalgary(lat, lng)) {
     return json({ suggested:'C5', confidence:'high',
       message:'Calgary border community — C5 rate applies',
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, C5_NORTH_COMMUNITIES) });
   }
 
   // SE Calgary deep communities — intercept before rural radius matching
   const SE_C5 = ['Seton','Auburn','Mahogany','Chaparral','Cranston',
     'Wolf Willow','Ranchview','Ricardo Ranch','Legacy'];
   if (isLikelyInCalgary(lat, lng) && SE_C5.some(c => formatted.toUpperCase().includes(c.toUpperCase()))) {
+    const community = await findCommunityName(lat, lng);
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
     if (drivingKm !== null) {
       const zone = cityZoneForKm(drivingKm);
       return json({ suggested: zone.code, confidence: zone.confidence,
         message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
-        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10 });
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community: community || matchCommunityName(formatted, SE_C5) });
     }
     return json({ suggested:'C5', confidence:'medium',
       message:'Deep SE Calgary community — C5 rate applies',
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community: community || matchCommunityName(formatted, SE_C5) });
   }
 
   // RVS/RVN geographic corridor — east of Stoney, outside Calgary
@@ -256,16 +324,19 @@ export default async (req) => {
 
   // Calgary — driving distance bands
   if (isLikelyInCalgary(lat, lng)) {
+    const community = await findCommunityName(lat, lng);
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
     if (drivingKm !== null) {
       const zone = cityZoneForKm(drivingKm);
       return json({ suggested: zone.code, confidence: zone.confidence,
         message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
-        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10 });
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community });
     }
     return json({ suggested:'C3', confidence:'low',
       message:'Calgary address — driving distance unavailable, C3 suggested as default.',
-      formatted_address: formatted });
+      formatted_address: formatted,
+      community });
   }
 
   // Secondary boundary checks
