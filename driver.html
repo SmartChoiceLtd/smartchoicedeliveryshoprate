@@ -114,9 +114,9 @@
         </div>
       </div>
       <div class="field">
-        <label>Delivery Type</label>
+        <label>Event Type</label>
         <select id="fEventType">
-          <option value="">ShopTo Door</option>
+          <option value="">None</option>
           <option value="SPEC">Special Event</option>
           <option value="WED">Wedding</option>
           <option value="FUN">Funeral</option>
@@ -283,6 +283,7 @@ var selectedZone = '';
 var eventType = '';
 var selectedStatuses = [];
 var formattedAddress = '';
+var matchedCommunity = '';
 var deliveryType = 'store';
 
 // Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
@@ -466,8 +467,9 @@ function buildZoneButtons(suggested, showAll) {
   }
 }
 
-function setZone(code, desc, manual) {
+function setZone(code, desc, manual, community) {
   selectedZone = code;
+  matchedCommunity = manual ? '' : (community || '');
   refreshZoneDisplay(desc);
   updatePay();
 }
@@ -527,7 +529,7 @@ function lookupZone(address) {
     .then(function(data) {
       document.getElementById('zoneLoading').hidden = true;
       if (data.suggested) {
-        setZone(data.suggested, data.message, false);
+        setZone(data.suggested, data.message, false, data.community);
       } else {
         document.getElementById('zoneManual').hidden = false;
         buildZoneButtons(null);
@@ -607,7 +609,7 @@ function renderShopDropdown(search) {
 }
 
 function resetForm() {
-  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = '';
+  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = '';
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
   document.getElementById('fOrderId').value = '';
@@ -676,6 +678,7 @@ async function submitDelivery() {
     driver_name: driverName,
     total_pieces: pieces,
     zone: pay.effCode,
+    community: matchedCommunity || '',
     event_type: eventType || '',
     underlying_zone: pay.isEventOverride ? pay.baseZone : '',
     delivery_type: deliveryType,
