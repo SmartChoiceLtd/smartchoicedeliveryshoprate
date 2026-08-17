@@ -347,6 +347,20 @@ function renderShops() {
     }).join('') + '</tbody></table>';
 }
 
+// Builds a new shop's starting zonePrices from the Rate Table's "srate"
+// field (shop-facing rate), for every Calgary/border zone currently in
+// rates. Falls back to $0 for a zone with no srate set yet - same "needs
+// input" signal used elsewhere (km, new zone rates) rather than a
+// hardcoded number that silently drifts out of sync with the rate table.
+function buildDefaultZonePricesFromRates() {
+  var CORE_ZONES = ['C1','C2','C3','C4','C5'];
+  var out = {};
+  CORE_ZONES.forEach(function(z) {
+    out[z] = (rates[z] && rates[z].srate) || 0;
+  });
+  return out;
+}
+
 wireAddRowControl({
   buttonId: 'addShopBtn',
   msgId: 'addShopMsg',
@@ -360,7 +374,7 @@ wireAddRowControl({
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(v.newShopAddress));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = { name: v.newShopCode + ' ' + v.newShopName, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: { C1: 10, C2: 12, C3: 13, C4: 14, C5: 15 }, communityZones: {}, townPrices: {} };
+    var payload = { name: v.newShopCode + ' ' + v.newShopName, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: buildDefaultZonePricesFromRates(), communityZones: {}, townPrices: {} };
     var res = await fetch('/api/shops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error('Could not create shop');
     return res.json();
@@ -402,17 +416,29 @@ async function loadShops() {
 }
 
 /* ===== RATES ===== */
+// Deterministic fallback color for a zone that hasn't had one set yet -
+// gives every new zone a distinct, reasonable starting color instead of
+// grey, while still being fully overridable via the picker below.
+function hashColorForZone(zone) {
+  var hash = 0;
+  for (var i = 0; i < zone.length; i++) { hash = zone.charCodeAt(i) + ((hash << 5) - hash); }
+  var hue = Math.abs(hash) % 360;
+  return 'hsl(' + hue + ', 45%, 45%)';
+}
+
 function renderRates() {
   var el = document.getElementById('ratesTable');
   var keys = Object.keys(rates).sort();
   if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Zone</th><th>km</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Zone</th><th>Color</th><th>km</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
     keys.map(function(zone) {
       var r = rates[zone];
       function inp(field, step) {
         return '<input class="rate-input" type="number" step="' + (step || '0.25') + '" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
       }
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
+      var colorVal = r.color || '#999999';
+      var colorInp = '<input type="color" value="' + colorVal + '" style="width:44px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;cursor:pointer;" onchange="updateRateColor(\'' + zone + '\',this.value)">';
+      return '<tr><td><strong>' + zone + '</strong></td><td>' + colorInp + '</td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -421,6 +447,13 @@ async function updateRate(zone, field, value) {
   rates[zone][field] = parseFloat(value) || 0;
   try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
   catch(e) { alert('Could not save rate.'); }
+}
+
+async function updateRateColor(zone, value) {
+  if (!rates[zone]) rates[zone] = {};
+  rates[zone].color = value;
+  try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
+  catch(e) { alert('Could not save color.'); }
 }
 
 wireAddRowControl({
@@ -434,7 +467,7 @@ wireAddRowControl({
   onSave: async function(v) {
     var code = v.newZoneCode;
     if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
-    rates[code] = { km: 0, drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0 };
+    rates[code] = { km: 0, drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0, color: hashColorForZone(code) };
     try {
       await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
     } catch (e) {
