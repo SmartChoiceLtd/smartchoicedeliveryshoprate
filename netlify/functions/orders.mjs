@@ -167,6 +167,7 @@ export default async (req) => {
       name: raw.name,
       address: raw.address,
       formatted_address: zoneSuggestion?.formatted_address || raw.address,
+      community: zoneSuggestion?.community || null,
       shop_code: shopCode,
       shop_full: raw.shop_full || raw.shop || null,
       driver: raw.driver,
