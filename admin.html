@@ -437,7 +437,10 @@ function renderRates() {
         return '<input class="rate-input" type="number" step="' + (step || '0.25') + '" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
       }
       var colorVal = r.color || '#999999';
-      var colorInp = '<input type="color" value="' + colorVal + '" style="width:44px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;cursor:pointer;" onchange="updateRateColor(\'' + zone + '\',this.value)">';
+      var colorInp = '<div style="display:flex;gap:4px;align-items:center;">' +
+        '<input type="color" value="' + colorVal + '" style="width:32px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;cursor:pointer;flex-shrink:0;" onchange="updateRateColor(\'' + zone + '\',this.value,true)">' +
+        '<input type="text" value="' + colorVal + '" maxlength="7" placeholder="#RRGGBB" style="width:72px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;" onchange="updateRateColor(\'' + zone + '\',this.value,false)">' +
+        '</div>';
       return '<tr><td><strong>' + zone + '</strong></td><td>' + colorInp + '</td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
@@ -449,11 +452,18 @@ async function updateRate(zone, field, value) {
   catch(e) { alert('Could not save rate.'); }
 }
 
-async function updateRateColor(zone, value) {
+async function updateRateColor(zone, value, fromPicker) {
+  var v = (value || '').trim();
+  if (!fromPicker) {
+    if (!v.startsWith('#')) v = '#' + v;
+    if (!/^#[0-9A-Fa-f]{6}$/.test(v)) { alert('Enter a valid hex color, e.g. #8A6D4B'); renderRates(); return; }
+  }
   if (!rates[zone]) rates[zone] = {};
-  rates[zone].color = value;
-  try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
-  catch(e) { alert('Could not save color.'); }
+  rates[zone].color = v;
+  try {
+    await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
+    renderRates();
+  } catch(e) { alert('Could not save color.'); }
 }
 
 wireAddRowControl({
