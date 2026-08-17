@@ -147,7 +147,7 @@ cardsEl.hidden = false;
     + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
     + '</div>'
     + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
-    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + '</div>'
+    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + (o.community ? ' &mdash; <span style="color:var(--accent);font-weight:600;">' + escapeHtml(o.community) + '</span>' : '') + '</div>'
     + '<div style="font-size:12px;margin-bottom:4px;">'
     + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
     + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
