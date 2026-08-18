@@ -103,6 +103,7 @@ export default async (req) => {
       driver:           body['Driver']                   || body['driver']            || null,
       driver_pay: body.driver_pay || body['driver_pay'] || 0,
      total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
+      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
       zone:             body['Zone']                     || body['zone']              || null,
       zone_full:        body['Zone (with Group Name)']   || null,
       delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
@@ -195,6 +196,7 @@ export default async (req) => {
       address: raw.address,
       formatted_address: zoneSuggestion?.formatted_address || raw.address,
       community: zoneSuggestion?.community || null,
+      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
       shop_code: shopCode,
       shop_full: raw.shop_full || raw.shop || null,
       driver: raw.driver,
@@ -203,7 +205,11 @@ export default async (req) => {
         const r = ratesData ? ratesData[zoneCode] : null;
         if (!r) return 0;
         const pieces = parseInt(raw.total_pieces || 1);
-        return (r.drate || 0) + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        const base = (zoneCode === 'RURALKM' && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
       })(),
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
