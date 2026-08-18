@@ -284,6 +284,7 @@ var eventType = '';
 var selectedStatuses = [];
 var formattedAddress = '';
 var matchedCommunity = '';
+var matchedDistanceKm = null;
 var deliveryType = 'store';
 
 // Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
@@ -320,6 +321,17 @@ function getEffectiveZone() {
 }
 
 // Computes {base, extra, gdpi, total} pay for the current selection,
+// Base pay for a zone, handling RURALKM's distance formula (base + perkm x
+// distance) as a special case. All other zones just use their flat drate.
+function getZoneBasePay(zoneCode) {
+  var r = rates[zoneCode] || {};
+  if (zoneCode === 'RURALKM' && matchedDistanceKm != null) {
+    return (r.drate || 0) + (r.perkm || 0) * matchedDistanceKm;
+  }
+  return r.drate || 0;
+}
+
+// Computes {base, extra, gdpi, total} pay for the current selection,
 // applying the event-type overlay if applicable.
 function computePay() {
   if (!selectedZone) return null;
@@ -328,18 +340,19 @@ function computePay() {
   var base, extra, gdpi;
   if (eff.isEventOverride && eff.code === (EVENT_TYPES[eventType] || {}).outTownCode) {
     // Out-of-town event: base pay comes from the underlying geographic
-    // zone's own rate, but the extra-piece rate is overridden to the
-    // event's rate.
+    // zone's own rate (RURALKM-aware), but the extra-piece rate is
+    // overridden to the event's rate.
     var zr = rates[selectedZone] || {};
     var ev = EVENT_TYPES[eventType];
-    base = zr.drate || 0;
+    base = getZoneBasePay(selectedZone);
     gdpi = zr.gdpi || 0;
     extra = (pieces - 1) * (ev.outTownExtraRate || 0);
   } else {
-    // Flat rate (in-town event code, or no event type at all) - straight
-    // lookup from the rate table.
+    // Flat rate (in-town event code, or no event type at all), or
+    // RURALKM's distance formula via getZoneBasePay - straight lookup
+    // otherwise.
     var r = rates[eff.code] || {};
-    base = r.drate || 0;
+    base = getZoneBasePay(eff.code);
     extra = (pieces - 1) * (r.dratex || 0);
     gdpi = r.gdpi || 0;
   }
@@ -467,9 +480,10 @@ function buildZoneButtons(suggested, showAll) {
   }
 }
 
-function setZone(code, desc, manual, community) {
+function setZone(code, desc, manual, community, distanceKm) {
   selectedZone = code;
   matchedCommunity = manual ? '' : (community || '');
+  matchedDistanceKm = manual ? null : (typeof distanceKm === 'number' ? distanceKm : null);
   refreshZoneDisplay(desc);
   updatePay();
 }
@@ -529,7 +543,7 @@ function lookupZone(address) {
     .then(function(data) {
       document.getElementById('zoneLoading').hidden = true;
       if (data.suggested) {
-        setZone(data.suggested, data.message, false, data.community);
+        setZone(data.suggested, data.message, false, data.community, data.distance_km);
       } else {
         document.getElementById('zoneManual').hidden = false;
         buildZoneButtons(null);
@@ -609,7 +623,7 @@ function renderShopDropdown(search) {
 }
 
 function resetForm() {
-  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = '';
+  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
   document.getElementById('fOrderId').value = '';
@@ -679,6 +693,7 @@ async function submitDelivery() {
     total_pieces: pieces,
     zone: pay.effCode,
     community: matchedCommunity || '',
+    distance_km: matchedDistanceKm,
     event_type: eventType || '',
     underlying_zone: pay.isEventOverride ? pay.baseZone : '',
     delivery_type: deliveryType,
