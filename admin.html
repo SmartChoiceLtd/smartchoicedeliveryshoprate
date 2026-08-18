@@ -1,668 +1,417 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Panel — Smart Choice Delivery</title>
-<style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
-*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-[hidden]{display:none!important;}
-.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:16px;}
-.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
-.topbar a{color:var(--accent);font-size:13px;text-decoration:none;}
-.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);background:var(--card);padding:0 20px;flex-wrap:wrap;}
-.tab{padding:12px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:var(--ink-soft);border-bottom:3px solid transparent;margin-bottom:-2px;}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-.content{max-width:1200px;margin:0 auto;padding:24px 20px;}
-.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
-.section h2{font-family:Georgia,serif;font-size:16px;margin:0 0 16px;}
-.field{margin-bottom:12px;}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;text-transform:uppercase;}
-.field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--ink);}
-.field-row{display:flex;gap:10px;flex-wrap:wrap;}
-.field-row .field{flex:1;min-width:120px;}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600;}
-.btn:disabled{opacity:0.5;}
-.btn-sm{padding:6px 12px;font-size:12px;}
-.btn-warm{background:var(--warm);}
-.btn-green{background:var(--green);}
-.btn-grey{background:#666;}
-.btn-danger{color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:var(--warm);}
-.success-msg{color:var(--green);background:var(--green-soft);border:1px solid #A8CFA8;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
-.error-msg{color:var(--warm);background:var(--warm-soft);border:1px solid #E3B3AE;border-radius:8px;padding:8px 12px;font-size:13px;margin-top:8px;}
-.loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px;}
-th{background:var(--accent);color:#fff;padding:8px 10px;text-align:left;font-size:12px;}
-td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
-tr.inactive td{color:var(--ink-soft);}
-.star-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:0 4px;}
-.copy-link{background:var(--accent-soft);color:var(--accent);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:600;}
-.rate-input{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;}
-.gdpi-highlight{color:var(--accent);font-weight:600;}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <h1>Admin Panel</h1>
-  <a href="/">Quote tool</a>
-  <a href="/orders">Orders</a>
-</div>
-<div class="tabs">
-  <button class="tab active" onclick="showTab('drivers')">Drivers</button>
-  <button class="tab" onclick="showTab('shops')">Shops</button>
-  <button class="tab" onclick="showTab('rates')">Rate Table</button>
-  <button class="tab" onclick="showTab('gdpi')">GDPI</button>
-  <button class="tab" onclick="showTab('applications')">Applications</button>
-</div>
-<div class="content">
+const GOOGLE_GEOCODE = 'https://maps.googleapis.com/maps/api/geocode/json';
+const GOOGLE_DISTANCE = 'https://maps.googleapis.com/maps/api/distancematrix/json';
+const COMMUNITY_GEOJSON_URL = 'https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
 
-  <div id="tab-drivers">
-    <div class="section">
-      <h2>Add Driver</h2>
-      <div class="field-row">
-        <div class="field"><label>Driver Code</label><input type="text" id="newDriverCode" placeholder="KE" maxlength="10" style="text-transform:uppercase;"></div>
-        <div class="field"><label>Full Name</label><input type="text" id="newDriverName" placeholder="Kevin Michaud"></div>
-        <div class="field"><label>Vehicle</label><input type="text" id="newDriverVehicle" placeholder="SUV"></div>
-      </div>
-      <button class="btn" id="addDriverBtn">Add Driver</button>
-      <div id="addDriverMsg" hidden></div>
-    </div>
-    <div class="section">
-      <h2>Drivers</h2>
-      <div id="driversList" class="loading">Loading...</div>
-    </div>
-  </div>
+// In-memory cache across warm function invocations - avoids re-fetching
+// the ~1MB community boundary file on every single request.
+let communityCache = null;
+let communityCacheTime = 0;
+const COMMUNITY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-  <div id="tab-shops" hidden>
-    <div class="section">
-      <h2>Add Shop</h2>
-      <div class="field-row">
-        <div class="field"><label>Shop Code</label><input type="text" id="newShopCode" placeholder="KF" maxlength="6" style="text-transform:uppercase;"></div>
-        <div class="field"><label>Shop Name</label><input type="text" id="newShopName" placeholder="KENSINGTON FLOWERS"></div>
-      </div>
-      <div class="field"><label>Address</label><input type="text" id="newShopAddress" placeholder="1145 Kensington Cres NW Calgary AB"></div>
-      <button class="btn" id="addShopBtn">Add Shop</button>
-      <div id="addShopMsg" hidden></div>
-    </div>
-    <div class="section">
-      <h2>Shops <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">(star to feature in driver form)</span></h2>
-      <div id="shopsList" class="loading">Loading...</div>
-    </div>
-  </div>
-
-  <div id="tab-rates" hidden>
-    <div class="section">
-      <h2>Add Zone</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Add a new zone code (e.g. OUT1, HAR) so it appears in the table below for rate entry. Starts at $0 across the board — fill in rates after adding.</p>
-      <div class="field-row">
-        <div class="field" style="max-width:160px;"><label>Zone Code</label><input type="text" id="newZoneCode" placeholder="OUT1" maxlength="10" style="text-transform:uppercase;"></div>
-        <div class="field" style="display:flex;align-items:flex-end;max-width:160px;"><button class="btn btn-sm" id="addZoneBtn">Add Zone</button></div>
-      </div>
-      <div id="addZoneMsg" hidden></div>
-    </div>
-    <div class="section">
-      <h2>Rate Table</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Changes save automatically. GDPI = fuel premium per delivery.</p>
-      <div id="ratesTable" class="loading">Loading...</div>
-    </div>
-  </div>
-
-  <div id="tab-gdpi" hidden>
-    <div class="section">
-      <h2>GDPI — Fuel Premium Calculator</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 16px;">Formula: (Current price − Base price) &times; 0.11 &times; Zone km = GDPI per delivery &nbsp;|&nbsp; <a href="https://fuelinsights.gasbuddy.com/Home/CAN/AB/Calgary" target="_blank" style="color:var(--accent);">Check Calgary Gas Price →</a></p>
-      <div class="field-row">
-        <div class="field"><label>Base Price ($/L)</label><input type="number" id="gdpiBase" value="1.50" step="0.01" style="max-width:130px;"></div>
-        <div class="field"><label>Current Weekly Average ($/L)</label><input type="number" id="gdpiCurrent" placeholder="1.85" step="0.01" style="max-width:130px;"></div>
-        <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-sm" id="calcGdpiBtn">Calculate</button></div>
-      </div>
-      <div id="gdpiResults" hidden style="margin-top:16px;">
-        <div style="background:var(--accent-soft);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;">
-          <strong>Price difference: <span id="gdpiDiff"></span>/L &nbsp;|&nbsp; Per km premium: <span id="gdpiPerKm"></span></strong>
-        </div>
-        <table>
-         <thead><tr><th>Zone</th><th>Distance (km)</th><th>Driver GDPI</th><th>Shop GDPI (×1.33)</th><th>Current GDPI</th><th>Apply</th></tr></thead>
-          <tbody id="gdpiTableBody"></tbody>
-        </table>
-        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-sm" id="applyAllGdpiBtn">Apply All to Rate Table</button>
-          <span style="font-size:12px;color:var(--ink-soft);">Updates GDPI for all zones shown</span>
-        </div>
-        <div id="gdpiApplyMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">GDPI rates updated.</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="tab-applications" hidden>
-    <div class="section">
-      <h2>Email Template — Seasonal Header</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Updates the seasonal section in the application acknowledgement email.</p>
-      <div class="field-row">
-        <div class="field"><label>Season</label><input type="text" id="tSeason" placeholder="Mother's Day 2026"></div>
-        <div class="field"><label>Dates</label><input type="text" id="tDates" placeholder="May 8-10, 2026"></div>
-        <div class="field"><label>Positions Available</label><input type="text" id="tPositions" placeholder="5"></div>
-      </div>
-      <div class="field"><label>Opening Comment</label><input type="text" id="tComment" placeholder="We have positions available..."></div>
-      <button class="btn btn-sm" id="saveTemplateBtn">Save Template</button>
-      <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
-    </div>
-    <div class="section">
-      <h2>Applications</h2>
-      <div id="applicationsList" class="loading">Loading...</div>
-    </div>
-  </div>
-
-</div>
-<script>
-function esc(s) {
-  if (!s) return '';
-  var d = document.createElement('div');
-  d.textContent = String(s);
-  return d.innerHTML;
+function getCommunityName(props) {
+  const keys = ['name', 'NAME', 'comm_name', 'COMM_NAME'];
+  for (const k of keys) if (props && props[k]) return String(props[k]);
+  if (props) { const ks = Object.keys(props); if (ks.length) return String(props[ks[0]]); }
+  return null;
 }
 
-var drivers = [], shops = [], rates = {};
-
-/* ===== GENERIC ADD-ROW UTILITY =====
-   Reusable for any "Add X" control, now or in the future (Drivers, Shops,
-   Rates/Zones, or any new table added later). Handles field validation,
-   button disable/loading state, and success/error messaging so each new
-   table only needs to define its fields + a save function.
-
-   opts = {
-     buttonId:   id of the button that triggers the add
-     msgId:      id of the message <div> to show success/error in
-     fields: [
-       { id: 'newFooCode', required: true, uppercase: true, label: 'Code' },
-       ...
-     ],
-     onSave:     async function(values) -> returns the new record, or throws Error
-     onSuccess:  function(record, values) -> update local array/state + re-render
-     successText: string OR function(record, values) -> string
-     savingText: optional button label while saving (default 'Saving...')
-     idleText:    optional button label when idle (default: button's current text)
-     clearFieldsAfter: default true
-   }
-*/
-function wireAddRowControl(opts) {
-  var btn = document.getElementById(opts.buttonId);
-  var msgEl = document.getElementById(opts.msgId);
-  var idleText = opts.idleText || btn.textContent;
-  btn.addEventListener('click', async function() {
-    var values = {};
-    for (var i = 0; i < opts.fields.length; i++) {
-      var f = opts.fields[i];
-      var el = document.getElementById(f.id);
-      var v = el.value.trim();
-      if (f.uppercase) v = v.toUpperCase();
-      if (f.required && !v) {
-        msgEl.className = 'error-msg';
-        msgEl.textContent = (f.label || f.id) + ' is required.';
-        msgEl.hidden = false;
-        return;
-      }
-      values[f.id] = v;
-    }
-    btn.disabled = true;
-    btn.textContent = opts.savingText || 'Saving...';
-    try {
-      var record = await opts.onSave(values);
-      if (opts.onSuccess) opts.onSuccess(record, values);
-      if (opts.clearFieldsAfter !== false) {
-        opts.fields.forEach(function(f) { document.getElementById(f.id).value = ''; });
-      }
-      msgEl.className = 'success-msg';
-      msgEl.textContent = typeof opts.successText === 'function' ? opts.successText(record, values) : (opts.successText || 'Added.');
-      msgEl.hidden = false;
-    } catch (e) {
-      msgEl.className = 'error-msg';
-      msgEl.textContent = 'Error: ' + e.message;
-      msgEl.hidden = false;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = idleText;
-    }
-  });
-}
-
-function showTab(name) {
-  ['drivers','shops','rates','gdpi','applications'].forEach(function(t) {
-    document.getElementById('tab-' + t).hidden = t !== name;
-  })
-  document.querySelectorAll('.tab').forEach(function(b, i) {
-    b.classList.toggle('active', ['drivers','shops','rates','gdpi','applications'][i] === name);
-  });
-  if (name === 'applications') { loadApplications(); loadTemplate(); }
-}
-
-/* ===== DRIVERS ===== */
-function renderDrivers() {
-  var el = document.getElementById('driversList');
-  if (!drivers.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No drivers yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr>' +
-    '<th>Code</th><th>Name</th><th>Vehicle</th><th>Email</th><th>Phone</th><th>Hire Date</th><th>Status</th><th>Link</th><th>Actions</th>' +
-    '</tr></thead><tbody>' +
-    drivers.map(function(d) {
-      return '<tr class="' + (d.active ? '' : 'inactive') + '">' +
-        '<td><strong>' + esc(d.code) + '</strong></td>' +
-        '<td>' + esc(d.name) + '</td>' +
-        '<td>' + esc(d.vehicle || '') + '</td>' +
-        '<td>' + esc(d.email || '') + '</td>' +
-        '<td>' + esc(d.phone || '') + '</td>' +
-        '<td>' + esc(d.hire_date || '') + '</td>' +
-        '<td>' + (d.active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--ink-soft)">Inactive</span>') + '</td>' +
-        '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
-        '<td style="display:flex;gap:4px;">' +
-        '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
-        '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
-        '<button class="btn-danger btn-grey" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
-        '</td></tr>';
-    }).join('') +
-    '</tbody></table>';
-}
-
-wireAddRowControl({
-  buttonId: 'addDriverBtn',
-  msgId: 'addDriverMsg',
-  fields: [
-    { id: 'newDriverCode', required: true, uppercase: true, label: 'Driver code' },
-    { id: 'newDriverName', required: true, label: 'Name' },
-    { id: 'newDriverVehicle', required: false }
-  ],
-  savingText: 'Adding...',
-  onSave: async function(v) {
-    var res = await fetch('/api/drivers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: v.newDriverCode, name: v.newDriverName, vehicle: v.newDriverVehicle, active: true }) });
-    if (!res.ok) throw new Error('Could not add driver');
-    return res.json();
-  },
-  onSuccess: function(driver) {
-    drivers.push(driver);
-    renderDrivers();
-  },
-  successText: function(driver) { return 'Driver added. Link: ' + location.origin + '/driver/' + driver.code.toLowerCase(); }
-});
-
-function copyDriverLink(code) {
-  var url = location.origin + '/driver/' + code.toLowerCase();
-  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function() { alert('Copied: ' + url); });
-  else window.prompt('Copy link:', url);
-}
-
-async function toggleDriver(code, active) {
-  try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ active: active }) });
-    var d = drivers.find(function(x) { return x.code === code; });
-    if (d) d.active = active;
-    renderDrivers();
-  } catch(e) { alert('Could not update driver.'); }
-}
-
-function editDriver(code) {
-  var d = drivers.find(function(x) { return x.code === code; });
-  if (!d) return;
-  var name = window.prompt('Edit name:', d.name); if (name === null) return;
-  var vehicle = window.prompt('Edit vehicle:', d.vehicle || ''); if (vehicle === null) return;
-  var email = window.prompt('Edit email:', d.email || ''); if (email === null) return;
-  var phone = window.prompt('Edit phone:', d.phone || ''); if (phone === null) return;
-  fetch('/api/drivers?code=' + encodeURIComponent(code), {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: name.trim(), vehicle: vehicle.trim(), email: email.trim(), phone: phone.trim() })
-  }).then(function(r) { return r.json(); }).then(function(updated) {
-    var idx = drivers.findIndex(function(x) { return x.code === code; });
-    if (idx >= 0) drivers[idx] = updated;
-    renderDrivers();
-  }).catch(function() { alert('Could not update driver.'); });
-}
-
-async function deleteDriver(code) {
-  if (!confirm('Permanently delete driver ' + code + '? This cannot be undone.')) return;
-  try {
-    await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'DELETE' });
-    drivers = drivers.filter(function(d) { return d.code !== code; });
-    renderDrivers();
-  } catch(e) { alert('Could not delete driver.'); }
-}
-
-async function loadDrivers() {
-  var res = await fetch('/api/drivers');
-  drivers = await res.json();
-  renderDrivers();
-}
-
-/* ===== SHOPS ===== */
-function renderShops() {
-  var el = document.getElementById('shopsList');
-  if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Edit</th></tr></thead><tbody>' +
-    shops.map(function(s) {
-      var code = s.name ? s.name.split(' ')[0] : '';
-      return '<tr>' +
-        '<td><button class="star-btn" onclick="toggleStar(\'' + esc(s.id) + '\')">' + (s.featured ? '★' : '☆') + '</button></td>' +
-        '<td><strong>' + esc(code) + '</strong></td>' +
-        '<td>' + esc(s.name) + '</td>' +
-        '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
-        '<td><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button></td>' +
-        '</tr>';
-    }).join('') + '</tbody></table>';
-}
-
-// Builds a new shop's starting zonePrices from the Rate Table's "srate"
-// field (shop-facing rate), for every Calgary/border zone currently in
-// rates. Falls back to $0 for a zone with no srate set yet - same "needs
-// input" signal used elsewhere (km, new zone rates) rather than a
-// hardcoded number that silently drifts out of sync with the rate table.
-function buildDefaultZonePricesFromRates() {
-  var CORE_ZONES = ['C1','C2','C3','C4','C5'];
-  var out = {};
-  CORE_ZONES.forEach(function(z) {
-    out[z] = (rates[z] && rates[z].srate) || 0;
-  });
-  return out;
-}
-
-wireAddRowControl({
-  buttonId: 'addShopBtn',
-  msgId: 'addShopMsg',
-  fields: [
-    { id: 'newShopCode', required: true, uppercase: true, label: 'Shop code' },
-    { id: 'newShopName', required: true, uppercase: true, label: 'Shop name' },
-    { id: 'newShopAddress', required: true, label: 'Address' }
-  ],
-  savingText: 'Adding...',
-  onSave: async function(v) {
-    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(v.newShopAddress));
-    var geo = await geoRes.json();
-    if (!geo.lat) throw new Error('Could not geocode address');
-    var payload = { name: v.newShopCode + ' ' + v.newShopName, address: geo.formatted, lat: geo.lat, lng: geo.lng, zonePrices: buildDefaultZonePricesFromRates(), communityZones: {}, townPrices: {} };
-    var res = await fetch('/api/shops', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) throw new Error('Could not create shop');
-    return res.json();
-  },
-  onSuccess: function(shop) {
-    shops.push(shop);
-    renderShops();
-  },
-  successText: function(shop) { return 'Shop added: ' + shop.name; }
-});
-
-async function toggleStar(shopId) {
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  if (!shop) return;
-  shop.featured = !shop.featured;
-  await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ featured: shop.featured }) });
-  renderShops();
-}
-
-async function editShop(shopId) {
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  if (!shop) return;
-  var name = window.prompt('Shop name:', shop.name); if (name === null) return;
-  var address = window.prompt('Shop address:', shop.address); if (address === null) return;
-  try {
-    var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
-    var geo = await geoRes.json();
-    if (!geo.lat) throw new Error('Could not geocode');
-    await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng }) });
-    shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng;
-    renderShops(); alert('Updated: ' + geo.formatted);
-  } catch(e) { alert('Could not update: ' + e.message); }
-}
-
-async function loadShops() {
-  var res = await fetch('/api/shops');
-  shops = await res.json();
-  renderShops();
-}
-
-/* ===== RATES ===== */
-// Deterministic fallback color for a zone that hasn't had one set yet -
-// gives every new zone a distinct, reasonable starting color instead of
-// grey, while still being fully overridable via the picker below.
-function hashColorForZone(zone) {
-  var hash = 0;
-  for (var i = 0; i < zone.length; i++) { hash = zone.charCodeAt(i) + ((hash << 5) - hash); }
-  var hue = Math.abs(hash) % 360;
-  return 'hsl(' + hue + ', 45%, 45%)';
-}
-
-function renderRates() {
-  var el = document.getElementById('ratesTable');
-  var keys = Object.keys(rates).sort();
-  if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Zone</th><th>Color</th><th>km</th><th>drate</th><th>dratex</th><th>perkm</th><th>GDPI</th><th>srate</th><th>sratex</th><th>sperkm</th></tr></thead><tbody>' +
-    keys.map(function(zone) {
-      var r = rates[zone];
-      function inp(field, step) {
-        return '<input class="rate-input" type="number" step="' + (step || '0.25') + '" value="' + (r[field] || 0) + '" onchange="updateRate(\'' + zone + '\',\'' + field + '\',this.value)">';
-      }
-      var colorVal = r.color || '#999999';
-      var colorInp = '<div style="display:flex;gap:4px;align-items:center;">' +
-        '<input type="color" value="' + colorVal + '" style="width:32px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;cursor:pointer;flex-shrink:0;" onchange="updateRateColor(\'' + zone + '\',this.value,true)">' +
-        '<input type="text" value="' + colorVal + '" maxlength="7" placeholder="#RRGGBB" style="width:72px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;" onchange="updateRateColor(\'' + zone + '\',this.value,false)">' +
-        '</div>';
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + colorInp + '</td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('perkm') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td><td>' + inp('sperkm') + '</td></tr>';
-    }).join('') + '</tbody></table>';
-}
-
-async function updateRate(zone, field, value) {
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone][field] = parseFloat(value) || 0;
-  try { await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) }); }
-  catch(e) { alert('Could not save rate.'); }
-}
-
-async function updateRateColor(zone, value, fromPicker) {
-  var v = (value || '').trim();
-  if (!fromPicker) {
-    if (!v.startsWith('#')) v = '#' + v;
-    if (!/^#[0-9A-Fa-f]{6}$/.test(v)) { alert('Enter a valid hex color, e.g. #8A6D4B'); renderRates(); return; }
+function pointInRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > pt.lat) !== (yj > pt.lat)) && (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi)) inside = !inside;
   }
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone].color = v;
-  try {
-    await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
-    renderRates();
-  } catch(e) { alert('Could not save color.'); }
+  return inside;
 }
 
-wireAddRowControl({
-  buttonId: 'addZoneBtn',
-  msgId: 'addZoneMsg',
-  fields: [
-    { id: 'newZoneCode', required: true, uppercase: true, label: 'Zone code' }
-  ],
-  savingText: 'Adding...',
-  clearFieldsAfter: true,
-  onSave: async function(v) {
-    var code = v.newZoneCode;
-    if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
-    rates[code] = { km: 0, drate: 0, dratex: 0, perkm: 0, gdpi: 0, srate: 0, sratex: 0, sperkm: 0, color: hashColorForZone(code) };
-    try {
-      await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
-    } catch (e) {
-      delete rates[code];
-      throw e;
+function pointInGeometry(pt, g) {
+  if (!g) return false;
+  if (g.type === 'Polygon') return pointInRing(pt, g.coordinates[0]);
+  if (g.type === 'MultiPolygon') return g.coordinates.some(p => pointInRing(pt, p[0]));
+  return false;
+}
+
+async function loadCommunities() {
+  const now = Date.now();
+  if (communityCache && (now - communityCacheTime) < COMMUNITY_CACHE_TTL_MS) return communityCache;
+  try {
+    const res = await fetch(COMMUNITY_GEOJSON_URL);
+    if (!res.ok) return communityCache || [];
+    const geo = await res.json();
+    communityCache = (geo.features || []).map(f => ({ name: getCommunityName(f.properties), geometry: f.geometry }));
+    communityCacheTime = now;
+    return communityCache;
+  } catch (e) {
+    return communityCache || [];
+  }
+}
+
+async function findCommunityName(lat, lng) {
+  const communities = await loadCommunities();
+  const pt = { lat, lng };
+  const match = communities.find(c => c.geometry && pointInGeometry(pt, c.geometry));
+  return match ? match.name : null;
+}
+
+function haversineKm(a, b) {
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+const OUT_OF_TOWN_ZONES = [
+  { code:'TSA', name:'Tsuu Tina Adjacent',                   lat:50.9175, lng:-114.1615, radiusKm:4  },
+  { code:'TSU', name:'Tsuu Tina Nation',                     lat:50.9800, lng:-114.2600, radiusKm:4  },
+  { code:'BAL', name:'Balzac',                               lat:51.2100, lng:-114.0200, radiusKm:3  },
+  { code:'HPT', name:'Heritage Pointe',                      lat:50.8500, lng:-113.9500, radiusKm:3  },
+  { code:'DEW', name:'DeWinton',                             lat:50.8200, lng:-113.9800, radiusKm:6  },
+  { code:'EVA', name:'Elbow Valley / Elbow River Estates',   lat:51.0190, lng:-114.2820, radiusKm:8  },
+  { code:'BPW', name:'Bearspaw',                             lat:51.1500, lng:-114.3000, radiusKm:5  },
+  { code:'SBK', name:'Springbank',                           lat:51.0800, lng:-114.3500, radiusKm:8  },
+  { code:'PRI', name:'Priddis',                              lat:50.8800, lng:-114.3500, radiusKm:6  },
+  { code:'BRG', name:'Bragg Creek',                          lat:50.9500, lng:-114.5700, radiusKm:7  },
+  { code:'MDF', name:'MD Foothills',                         lat:50.7500, lng:-114.0000, radiusKm:10 },
+  { code:'MIL', name:'Millarville',                          lat:50.7567, lng:-114.3194, radiusKm:12 },
+  { code:'DVA', name:'Diamond Valley',                       lat:50.6833, lng:-114.2833, radiusKm:10 },
+  { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:10 },
+  { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:10 },
+  { code:'AIR', name:'Airdrie',                              lat:51.2920, lng:-114.0144, radiusKm:8  },
+  { code:'CHE', name:'Chestermere',                          lat:51.0487, lng:-113.8225, radiusKm:7  },
+  { code:'OKO', name:'Okotoks',                              lat:50.7258, lng:-113.9758, radiusKm:8  },
+  { code:'STR', name:'Strathmore',                           lat:51.0378, lng:-113.4003, radiusKm:8  },
+  { code:'COC', name:'Cochrane',                             lat:51.1897, lng:-114.4672, radiusKm:9  },
+  { code:'LAN', name:'Langdon',                              lat:51.0000, lng:-113.6667, radiusKm:6  },
+  { code:'LYA', name:'Lyalta',                               lat:51.1000, lng:-113.5000, radiusKm:6  },
+  { code:'CAR', name:'Carsland',                             lat:51.1333, lng:-113.4333, radiusKm:6  },
+  { code:'CRO', name:'Crossfield',                           lat:51.4333, lng:-114.0333, radiusKm:7  },
+  { code:'HRV', name:'High River',                           lat:50.5808, lng:-113.8747, radiusKm:8  },
+  { code:'NAN', name:'Nanton',                               lat:50.3500, lng:-113.7667, radiusKm:8  },
+  { code:'BEI', name:'Beiseker',                             lat:51.3833, lng:-113.5333, radiusKm:7  },
+  { code:'KAN', name:'Kananaskis',                           lat:50.9311, lng:-115.0986, radiusKm:15 },
+  { code:'CAN', name:'Canmore',                              lat:51.0894, lng:-115.3582, radiusKm:9  },
+  { code:'BNF', name:'Banff',                                lat:51.1784, lng:-115.5708, radiusKm:10 },
+  { code:'LKL', name:'Lake Louise',                          lat:51.4254, lng:-116.1773, radiusKm:12 },
+];
+
+const SHOP_FALLBACK_LAT = 51.0447;
+const SHOP_FALLBACK_LNG = -114.0719;
+
+// TSA communities
+const TSA_COMMUNITIES = ['Alpine Park', 'Vermilion Hill', 'Versant', 'Timberline', 'Bluerock'];
+
+// Named acreage/estate developments that fall within the Bearspaw (BPW)
+// zone but aren't part of Calgary's official community set - matched by
+// name before falling back to generic radius matching, so they get both
+// the correct zone AND their own tracked community name (rather than
+// being lumped in as generic "Bearspaw").
+const BPW_COMMUNITIES = ['Watermark'];
+
+// C5 border communities — north and deep SE
+const C5_NORTH_COMMUNITIES = [
+  'Glacier Ridge', 'Ambleton', 'Symons Valley Ranch', 'Moraine',
+  'Livingston', 'Carrington', 'Keystone Hills', 'Homestead',
+  'Stoney', 'Stoney 4', 'Stoney Nakoda',
+  'Mahogany', 'Auburn Bay', 'Seton', 'Cranston', 'Chaparral',
+  'Legacy', 'Walden', 'Wolf Willow', 'Belmont', 'Rangeview',
+  'Cranford', 'Cranleigh', 'Cranbrook', 'Auburn'
+];
+
+// RVS communities — Rocky View County South
+const RVS_COMMUNITIES = [
+  'Sora', 'Hotchkiss', 'Pine Creek', 'Ralph Klein', 'Shepard',
+  'Great Plains', 'Starfield', 'Twin Hills', 'Huxley', 'Belvedere'
+];
+
+// RVN communities — Rocky View County North
+const RVN_COMMUNITIES = ['Conrich'];
+
+// Distance-banded rural fallback zones. Used only as a last resort, after
+// every named out-of-town zone (OUT_OF_TOWN_ZONES) has already been checked
+// and none matched. These bands mirror the quote tool's outerBandForDistance()
+// so an address that doesn't fall inside any named zone's radius still gets a
+// sensible auto-suggestion instead of being dropped straight to fully manual.
+const OUT_BANDS = [
+  { code:'OUT1', maxKm:20  },
+  { code:'OUT2', maxKm:40  },
+  { code:'OUT3', maxKm:70  },
+  { code:'OUT4', maxKm:100 }
+];
+
+// Actual Calgary city boundary, derived from the union of all 298 official
+// community polygons in the same dataset the quote tool uses (dissolved
+// into one outline via a one-time offline computation - not fetched at
+// request time). Replaces the old lat/lng bounding-box approximation,
+// which incorrectly included/excluded real addresses near the corners of
+// that rectangle since the actual city limit is an irregular shape, not
+// a box. [lng, lat] pairs, matching GeoJSON coordinate order.
+const CALGARY_BOUNDARY = [[-114.209793,50.90681],[-114.209769,50.921456],[-114.186562,50.921447],[-114.163339,50.921449],[-114.141266,50.921426],[-114.141268,50.927455],[-114.141268,50.927455],[-114.141271,50.934133],[-114.141281,50.950467],[-114.141281,50.963842],[-114.141286,50.978079],[-114.141287,50.979659],[-114.153289,50.984388],[-114.1642,50.984777],[-114.164219,50.996773],[-114.158814,50.998276],[-114.151521,50.997242],[-114.142987,50.994102],[-114.141295,50.994102],[-114.141277,51.008607],[-114.164856,51.008639],[-114.187718,51.008664],[-114.234373,51.008713],[-114.234321,51.01973],[-114.234397,51.037709],[-114.234309,51.045192],[-114.234414,51.052425],[-114.234348,51.074307],[-114.234355,51.081505],[-114.245796,51.081544],[-114.25828,51.081546],[-114.258278,51.078801],[-114.26166,51.079329],[-114.264961,51.080894],[-114.267051,51.080894],[-114.267192,51.079027],[-114.269089,51.079788],[-114.269084,51.081521],[-114.277376,51.081502],[-114.292311,51.081503],[-114.292287,51.096124],[-114.280823,51.096115],[-114.280821,51.100597],[-114.282492,51.101338],[-114.282493,51.102826],[-114.287664,51.105503],[-114.289486,51.10726],[-114.290307,51.110556],[-114.288652,51.115993],[-114.28982,51.119063],[-114.2915,51.120532],[-114.295742,51.122884],[-114.298488,51.12359],[-114.299871,51.124587],[-114.304096,51.125864],[-114.308083,51.128903],[-114.309002,51.132312],[-114.310742,51.135273],[-114.31266,51.137316],[-114.315796,51.139678],[-114.29541,51.139626],[-114.296842,51.138246],[-114.291785,51.135791],[-114.289547,51.1324],[-114.288483,51.131423],[-114.289552,51.129709],[-114.288899,51.129017],[-114.286592,51.128931],[-114.285243,51.12632],[-114.283377,51.125343],[-114.280385,51.125006],[-114.280533,51.114528],[-114.274006,51.114531],[-114.274005,51.110554],[-114.26906,51.110557],[-114.269056,51.116608],[-114.267339,51.115173],[-114.265716,51.114869],[-114.261776,51.115571],[-114.259366,51.115131],[-114.258847,51.11632],[-114.261541,51.116844],[-114.2647,51.116239],[-114.264704,51.119937],[-114.269063,51.119939],[-114.269064,51.122705],[-114.257672,51.122703],[-114.257598,51.125183],[-114.25761,51.143714],[-114.257623,51.154216],[-114.234365,51.154246],[-114.234446,51.161462],[-114.234383,51.183292],[-114.211115,51.183359],[-114.211224,51.190527],[-114.211161,51.197759],[-114.167944,51.197716],[-114.167944,51.196922],[-114.164601,51.196886],[-114.164672,51.197711],[-114.152521,51.197732],[-114.152517,51.196828],[-114.141309,51.196847],[-114.141307,51.19775],[-114.129532,51.19779],[-114.129534,51.212264],[-114.09458,51.212336],[-114.071184,51.212392],[-114.013291,51.212425],[-114.013277,51.20524],[-114.002662,51.205245],[-114.002662,51.183532],[-113.9707,51.183546],[-113.946746,51.183546],[-113.911707,51.183524],[-113.911718,51.154342],[-113.911728,51.139763],[-113.911734,51.110636],[-113.911735,51.096061],[-113.911746,51.066841],[-113.911746,51.059656],[-113.900275,51.05966],[-113.889744,51.059774],[-113.8893,51.059936],[-113.877029,51.059939],[-113.877029,51.059665],[-113.865538,51.059667],[-113.865553,51.037767],[-113.865562,51.016094],[-113.91176,51.01608],[-113.911762,51.008783],[-113.911778,50.979672],[-113.911635,50.979202],[-113.90272,50.979206],[-113.901771,50.97948],[-113.865525,50.979482],[-113.865573,50.950534],[-113.865589,50.94324],[-113.872932,50.94324],[-113.877123,50.944527],[-113.877128,50.927879],[-113.888963,50.927885],[-113.888866,50.921606],[-113.860112,50.921567],[-113.860005,50.908479],[-113.86013,50.907179],[-113.859998,50.905536],[-113.859905,50.857744],[-113.861385,50.857155],[-113.868673,50.858833],[-113.872575,50.859184],[-113.877373,50.85883],[-113.881493,50.859834],[-113.884699,50.860179],[-113.89287,50.860398],[-113.89635,50.860197],[-113.900137,50.859526],[-113.902605,50.857252],[-113.90577,50.855464],[-113.908226,50.854262],[-113.914367,50.853087],[-113.91985,50.853183],[-113.92164,50.85254],[-113.926819,50.852213],[-113.933688,50.85264],[-113.935983,50.852492],[-113.939785,50.851579],[-113.944919,50.848914],[-113.946279,50.846796],[-113.950015,50.843386],[-113.951737,50.842918],[-113.954988,50.8435],[-113.956533,50.846131],[-113.957169,50.849658],[-113.959846,50.85079],[-113.964436,50.854913],[-113.96766,50.855657],[-113.97055,50.85454],[-113.9721,50.853877],[-113.972246,50.852346],[-113.973698,50.848503],[-113.998215,50.84842],[-114.001811,50.848486],[-114.023421,50.84854],[-114.024884,50.84877],[-114.047656,50.84876],[-114.047657,50.848532],[-114.070786,50.848514],[-114.070769,50.85334],[-114.071052,50.854055],[-114.073993,50.854212],[-114.076256,50.852217],[-114.078647,50.853749],[-114.080374,50.857663],[-114.081738,50.859155],[-114.081644,50.861152],[-114.082827,50.863009],[-114.094134,50.863013],[-114.094112,50.870075],[-114.093824,50.874111],[-114.094117,50.877639],[-114.0941,50.888491],[-114.094452,50.891188],[-114.095281,50.891389],[-114.105388,50.891384],[-114.112574,50.891379],[-114.116127,50.889336],[-114.114192,50.88487],[-114.11489,50.884871],[-114.123042,50.884867],[-114.123039,50.888416],[-114.14052,50.888394],[-114.140519,50.891497],[-114.141352,50.891977],[-114.163471,50.892053],[-114.186672,50.892004],[-114.209819,50.891967],[-114.209793,50.90681]];
+
+function isLikelyInCalgary(lat, lng) {
+  return pointInRing({ lat, lng }, CALGARY_BOUNDARY);
+}
+
+function isTSACommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return TSA_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isBPWCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return BPW_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+// Returns the exact community name that matched (for inclusion in the
+// response/tracking), or null if none of the list matched.
+function matchCommunityName(formatted, list) {
+  if (!formatted) return null;
+  const upper = formatted.toUpperCase();
+  const match = list.find(c => upper.includes(c.toUpperCase()));
+  return match || null;
+}
+
+function isC5NorthCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return C5_NORTH_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVSCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVS_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVNCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVN_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function cityZoneForKm(km) {
+  if (km <= 8)  return { code:'C1', confidence:'high' };
+  if (km <= 13) return { code:'C2', confidence:'high' };
+  if (km <= 18) return { code:'C3', confidence:'high' };
+  if (km <= 24) return { code:'C4', confidence:'high' };
+  return             { code:'C5', confidence:'high' };
+}
+
+function outBandForKm(km) {
+  for (const band of OUT_BANDS) {
+    if (km <= band.maxKm) return band.code;
+  }
+  return null; // beyond 100km — genuinely needs manual/custom quote
+}
+
+async function geocode(address, key) {
+  const url = `${GOOGLE_GEOCODE}?address=${encodeURIComponent(address + ', Alberta, Canada')}&key=${key}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.status !== 'OK' || !data.results[0]) return null;
+  const r = data.results[0];
+  return {
+    lat: r.geometry.location.lat,
+    lng: r.geometry.location.lng,
+    formatted: r.formatted_address,
+    types: r.types || []
+  };
+}
+
+async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
+  const url = `${GOOGLE_DISTANCE}?origins=${originLat},${originLng}&destinations=${destLat},${destLng}&mode=driving&units=metric&key=${key}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const el = data.rows?.[0]?.elements?.[0];
+  if (!el || el.status !== 'OK') return null;
+  return el.distance.value / 1000;
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
+  });
+}
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
+  }
+
+  const key = process.env.GOOGLE_MAPS_KEY;
+  if (!key) return json({ error: 'GOOGLE_MAPS_KEY not configured.' }, 500);
+
+  const url = new URL(req.url);
+  const address = url.searchParams.get('address');
+  const shopLat = parseFloat(url.searchParams.get('shop_lat') || SHOP_FALLBACK_LAT);
+  const shopLng = parseFloat(url.searchParams.get('shop_lng') || SHOP_FALLBACK_LNG);
+
+  if (!address) return json({ error: 'address parameter required' }, 400);
+
+  const geo = await geocode(address, key);
+  if (!geo) {
+    return json({
+      suggested: null,
+      confidence: 'unresolvable',
+      message: 'Address could not be geocoded. Please select zone manually.',
+      address_searched: address
+    });
+  }
+
+  const { lat, lng, formatted } = geo;
+
+  // TSA — named community check
+  if (isTSACommunity(formatted)) {
+    return json({ suggested:'TSA', confidence:'high',
+      message:"Tsuu T'ina Adjacent area — out-of-town rate applies",
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, TSA_COMMUNITIES) });
+  }
+
+  // BPW — named acreage development within Bearspaw
+  if (isBPWCommunity(formatted)) {
+    return json({ suggested:'BPW', confidence:'high',
+      message:'Bearspaw area — out-of-town rate applies',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, BPW_COMMUNITIES) });
+  }
+
+  // RVN — Rocky View County North by name
+  if (isRVNCommunity(formatted)) {
+    return json({ suggested:'RVN', confidence:'high',
+      message:'Rocky View County North',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVN_COMMUNITIES) });
+  }
+
+  // RVS — Rocky View County South by name
+  if (isRVSCommunity(formatted)) {
+    return json({ suggested:'RVS', confidence:'high',
+      message:'Rocky View County South',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVS_COMMUNITIES) });
+  }
+
+  // C5 border communities — name check before radius matching
+  if (isC5NorthCommunity(formatted) && isLikelyInCalgary(lat, lng)) {
+    return json({ suggested:'C5', confidence:'high',
+      message:'Calgary border community — C5 rate applies',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, C5_NORTH_COMMUNITIES) });
+  }
+
+  // SE Calgary deep communities — intercept before rural radius matching
+  const SE_C5 = ['Seton','Auburn','Mahogany','Chaparral','Cranston',
+    'Wolf Willow','Ranchview','Ricardo Ranch','Legacy'];
+  if (isLikelyInCalgary(lat, lng) && SE_C5.some(c => formatted.toUpperCase().includes(c.toUpperCase()))) {
+    const community = await findCommunityName(lat, lng);
+    const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+    if (drivingKm !== null) {
+      const zone = cityZoneForKm(drivingKm);
+      return json({ suggested: zone.code, confidence: zone.confidence,
+        message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community: community || matchCommunityName(formatted, SE_C5) });
     }
-    return code;
-  },
-  onSuccess: function() { renderRates(); },
-  successText: function(code) { return 'Zone ' + code + ' added — set its rates below.'; }
-});
+    return json({ suggested:'C5', confidence:'medium',
+      message:'Deep SE Calgary community — C5 rate applies',
+      formatted_address: formatted,
+      community: community || matchCommunityName(formatted, SE_C5) });
+  }
 
-async function loadRates() {
-  var res = await fetch('/api/rates');
-  rates = await res.json();
-  renderRates();
-}
+  // RVS/RVN geographic corridor — east of Stoney, outside Calgary
+  // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south)
+  if (!isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
+    if (lat >= 51.055) {
+      return json({ suggested:'RVN', confidence:'medium',
+        message:'Rocky View County North (north of Trans-Canada)',
+        formatted_address: formatted });
+    }
+    if (lat >= 50.840 && lat < 51.055) {
+      return json({ suggested:'RVS', confidence:'medium',
+        message:'Rocky View County South (south of Trans-Canada)',
+        formatted_address: formatted });
+    }
+  }
 
-/* ===== GDPI ===== */
-// Legacy seed values, used only as a fallback suggestion for zones that
-// don't yet have their own "km" set on the rate table row. Once a zone's
-// km is set in the Rate Table, that value is the source of truth.
-var ZONE_KM = {
-  C1: 5, C2: 12, C3: 17, C4: 23, C5: 30,
-  TSA: 28, TSU: 28, DEW: 30, HPT: 25, RVS: 28, RVN: 40,
-  AIR: 40, COC: 45, CHE: 25, OKO: 38, EVA: 25, BRG: 45,
-  MDF: 35, STR: 50, HRV: 55, CAN: 120, BNF: 140,
-  HAR: 30,
-  OUT1: 15, OUT2: 30, OUT3: 55, OUT4: 85
+  // Named out-of-town zones — radius matching
+  let bestTown = null, bestDist = Infinity;
+  for (const zone of OUT_OF_TOWN_ZONES) {
+    const d = haversineKm({ lat, lng }, { lat: zone.lat, lng: zone.lng });
+    if (d <= zone.radiusKm && d < bestDist) { bestTown = zone; bestDist = d; }
+  }
+  if (bestTown) {
+    return json({
+      suggested: bestTown.code,
+      confidence: bestDist < bestTown.radiusKm * 0.6 ? 'high' : 'medium',
+      message: `Matched to ${bestTown.name} (${bestTown.code})`,
+      formatted_address: formatted,
+      distance_to_zone_km: Math.round(bestDist * 10) / 10,
+      community: bestTown.name
+    });
+  }
+
+  // Calgary — driving distance bands
+  if (isLikelyInCalgary(lat, lng)) {
+    const community = await findCommunityName(lat, lng);
+    const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+    if (drivingKm !== null) {
+      const zone = cityZoneForKm(drivingKm);
+      return json({ suggested: zone.code, confidence: zone.confidence,
+        message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community });
+    }
+    return json({ suggested:'C3', confidence:'low',
+      message:'Calgary address — driving distance unavailable, C3 suggested as default.',
+      formatted_address: formatted,
+      community });
+  }
+
+  // Secondary boundary checks
+  if (lat > 50.92 && lat < 51.03 && lng < -114.215 && lng > -114.35) {
+    return json({ suggested:'TSU', confidence:'medium',
+      message:"Address appears to be in Tsuu T'ina territory",
+      formatted_address: formatted });
+  }
+
+  if (lat > 50.83 && lat < 50.95 && lng < -114.05 && lng > -114.25) {
+    return json({ suggested:'DEW', confidence:'medium',
+      message:'Address appears to be in DeWinton/Sirocco corridor',
+      formatted_address: formatted });
+  }
+
+  // Rural km-based fallback — last resort before giving up to fully manual
+  // selection. Replaces the old OUT1-4 banding for the true catch-all case
+  // (address matched nothing else): instead of bucketing into a wide band
+  // where a 21km and a 39km delivery paid identically, this carries the
+  // actual distance through so driver.html/orders.mjs/reports.mjs can pay
+  // proportionally (base + perkm x distance). Driving distance preferred
+  // since it reflects the real route; falls back to straight-line if the
+  // Distance Matrix call fails.
+  const drivingKmFallback = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+  const straightKm = haversineKm({ lat: shopLat, lng: shopLng }, { lat, lng });
+  const rangeKm = drivingKmFallback !== null ? drivingKmFallback : straightKm;
+  if (rangeKm <= 100) {
+    return json({
+      suggested: 'RURALKM',
+      confidence: drivingKmFallback !== null ? 'medium' : 'low',
+      message: `No named zone match — ${rangeKm.toFixed(1)} km ${drivingKmFallback !== null ? 'driving' : 'straight-line'} from shop, calculated by distance. Please confirm or override.`,
+      formatted_address: formatted,
+      distance_km: Math.round(rangeKm * 10) / 10,
+      distance_type: drivingKmFallback !== null ? 'driving' : 'straight_line'
+    });
+  }
+
+  return json({
+    suggested: null,
+    confidence: 'manual',
+    message: `Address is outside Calgary and did not match a known zone (approx ${Math.round(straightKm)} km from shop). Please select zone manually.`,
+    formatted_address: formatted,
+    straight_line_km: Math.round(straightKm)
+  });
 };
-// Flat event-type codes aren't distance-based — GDPI doesn't apply to them
-// directly (WEDO/FUNO borrow GDPI from their underlying geographic zone at
-// calculation time, and don't have their own rate-table row at all).
-var NON_DISTANCE_ZONES = ['SPEC', 'WED', 'FUN'];
 
-function kmForZone(zone) {
-  var r = rates[zone];
-  if (r && r.km) return r.km;
-  return ZONE_KM[zone] || 0;
-}
-
-function gdpiEligibleZones() {
-  return Object.keys(rates).filter(function(z) { return NON_DISTANCE_ZONES.indexOf(z) < 0; }).sort();
-}
-
-async function applySingleGdpi(zone, value) {
-  if (!rates[zone]) rates[zone] = {};
-  rates[zone].gdpi = value;
-  await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
-  renderRates();
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-}
-
-document.getElementById('calcGdpiBtn').addEventListener('click', function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) { alert('Enter current gas price.'); return; }
-  var diff = current - base;
-  var perKm = diff * 0.11;
-  document.getElementById('gdpiDiff').textContent = '$' + diff.toFixed(3);
-  document.getElementById('gdpiPerKm').textContent = '$' + perKm.toFixed(4);
-  var tbody = document.getElementById('gdpiTableBody');
-  tbody.innerHTML = gdpiEligibleZones().map(function(zone) {
-    var km = kmForZone(zone);
-    var newGdpi = Math.round(perKm * km * 100) / 100;
-    var currentGdpi = rates[zone] ? (rates[zone].gdpi || 0) : 'n/a';
-    var kmNote = (!rates[zone] || !rates[zone].km) && ZONE_KM[zone] ? ' <span style="color:var(--ink-soft);font-size:11px;">(seed default — set in Rate Table to persist)</span>' : '';
-    return '<tr>' +
-      '<td><strong>' + zone + '</strong></td>' +
-      '<td>' + km + ' km' + kmNote + '</td>' +
-      '<td class="gdpi-highlight">$' + newGdpi.toFixed(2) + '</td>' +
-      '<td style="color:var(--warm);font-weight:600;">$' + (newGdpi * 1.33).toFixed(2) + '</td>' +
-      '<td style="color:var(--ink-soft);">$' + (typeof currentGdpi === 'number' ? currentGdpi.toFixed(2) : currentGdpi) + '</td>' +
-      '<td><button class="btn btn-sm" onclick="applySingleGdpi(\'' + zone + '\',' + newGdpi + ')">Apply</button></td>' +
-      '</tr>';
-  }).join('');
-  document.getElementById('gdpiResults').hidden = false;
-});
-
-document.getElementById('applyAllGdpiBtn').addEventListener('click', function() {
-  var base = parseFloat(document.getElementById('gdpiBase').value) || 1.50;
-  var current = parseFloat(document.getElementById('gdpiCurrent').value);
-  if (!current) return;
-  var perKm = (current - base) * 0.11;
-  gdpiEligibleZones().forEach(function(zone) {
-    var km = kmForZone(zone);
-    if (!rates[zone]) rates[zone] = {};
-    rates[zone].gdpi = Math.round(perKm * km * 100) / 100;
-    // Persist the resolved km onto the rate record itself if it wasn't
-    // already set, so future calculations use the Rate Table as the
-    // source of truth instead of falling back to the seed table again.
-    if (!rates[zone].km && km) rates[zone].km = km;
-  });
-  fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) })
-    .then(function() { renderRates(); });
-  document.getElementById('gdpiApplyMsg').hidden = false;
-  setTimeout(function() { document.getElementById('gdpiApplyMsg').hidden = true; }, 2000);
-});
-
-/* ===== APPLICATIONS ===== */
-function loadApplications() {
-  var el = document.getElementById('applicationsList');
-  if (!el) return;
-  fetch('/api/onboard').then(function(res) { return res.json(); }).then(function(apps) {
-    if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
-    el.innerHTML = '<table><thead><tr>' +
-      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
-      '</tr></thead><tbody>' +
-      apps.map(function(a, i) {
-        return '<tr>' +
-          '<td>' + esc(a.date || '') + '</td>' +
-          '<td><strong>' + esc(a.name || '') + '</strong></td>' +
-          '<td>' + esc(a.email || '') + '</td>' +
-          '<td>' + esc(a.phone || '') + '</td>' +
-          '<td>' + esc(a.days_available || '') + '</td>' +
-          '<td>' + esc(a.time_available || '') + '</td>' +
-          '<td>' + esc(a.vehicle || '') + '</td>' +
-          '<td>' + esc(a.referred_by || '') + '</td>' +
-          '<td>' + esc(a.comments || '') + '</td>' +
-          '<td><button class="btn-danger btn-green" data-idx="' + i + '">Hire</button></td>' +
-          '</tr>';
-      }).join('') + '</tbody></table>';
-    el.querySelectorAll('[data-idx]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var a = apps[parseInt(this.getAttribute('data-idx'))];
-        hireApplicant(a.name, a.email, a.phone, a.vehicle);
-      });
-    });
-  }).catch(function() {
-    var el2 = document.getElementById('applicationsList');
-    if (el2) el2.innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>';
-  });
-}
-
-async function hireApplicant(name, email, phone, vehicle) {
-  var hireDate = window.prompt('Hire date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
-  if (!hireDate) return;
-  var code = window.prompt('Driver code:', (name || '').split(' ')[0].toUpperCase());
-  if (!code) return;
-  code = code.toUpperCase();
-  try {
-    var res = await fetch('/api/drivers', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: code, name: name, email: email, phone: phone, vehicle: vehicle, hire_date: hireDate, active: true })
-    });
-    if (!res.ok) throw new Error('Could not create driver');
-    var driver = await res.json();
-    drivers.push(driver);
-    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
-    showTab('drivers');
-  } catch(e) { alert('Could not hire: ' + e.message); }
-}
-
-function loadTemplate() {
-  fetch('/api/onboard?type=template').then(function(res) { return res.json(); }).then(function(t) {
-    document.getElementById('tSeason').value = t.season || '';
-    document.getElementById('tDates').value = t.dates || '';
-    document.getElementById('tPositions').value = t.positions || '';
-    document.getElementById('tComment').value = t.comment || '';
-  }).catch(function() {});
-}
-
-document.getElementById('saveTemplateBtn').addEventListener('click', function() {
-  var btn = this;
-  btn.disabled = true; btn.textContent = 'Saving...';
-  fetch('/api/onboard?type=template', {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      season: document.getElementById('tSeason').value.trim(),
-      dates: document.getElementById('tDates').value.trim(),
-      positions: document.getElementById('tPositions').value.trim(),
-      comment: document.getElementById('tComment').value.trim()
-    })
-  }).then(function() {
-    document.getElementById('templateMsg').hidden = false;
-    setTimeout(function() { document.getElementById('templateMsg').hidden = true; }, 3000);
-  }).catch(function() { alert('Could not save template.'); })
-  .finally(function() { btn.disabled = false; btn.textContent = 'Save Template'; });
-});
-
-/* ===== INIT ===== */
-loadDrivers();
-loadShops();
-loadRates();
-</script>
-</body>
-</html>
+export const config = { path: '/api/suggest-zone' };
