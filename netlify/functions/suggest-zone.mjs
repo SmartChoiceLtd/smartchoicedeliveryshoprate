@@ -383,20 +383,25 @@ export default async (req) => {
       formatted_address: formatted });
   }
 
-  // Rural distance-band fallback (OUT1-4) — last resort before giving up to
-  // fully manual selection. Uses straight-line distance since driving
-  // distance for far-flung rural addresses isn't always reliable/available,
-  // and this is only meant as a rough auto-suggestion the driver can
-  // correct via the "Change" zone override if it's off.
+  // Rural km-based fallback — last resort before giving up to fully manual
+  // selection. Replaces the old OUT1-4 banding for the true catch-all case
+  // (address matched nothing else): instead of bucketing into a wide band
+  // where a 21km and a 39km delivery paid identically, this carries the
+  // actual distance through so driver.html/orders.mjs/reports.mjs can pay
+  // proportionally (base + perkm x distance). Driving distance preferred
+  // since it reflects the real route; falls back to straight-line if the
+  // Distance Matrix call fails.
+  const drivingKmFallback = await getDrivingKm(shopLat, shopLng, lat, lng, key);
   const straightKm = haversineKm({ lat: shopLat, lng: shopLng }, { lat, lng });
-  const outBand = outBandForKm(straightKm);
-  if (outBand) {
+  const rangeKm = drivingKmFallback !== null ? drivingKmFallback : straightKm;
+  if (rangeKm <= 100) {
     return json({
-      suggested: outBand,
-      confidence: 'low',
-      message: `No named zone match — approx ${Math.round(straightKm)} km straight-line from shop, ${outBand} suggested. Please confirm or override.`,
+      suggested: 'RURALKM',
+      confidence: drivingKmFallback !== null ? 'medium' : 'low',
+      message: `No named zone match — ${rangeKm.toFixed(1)} km ${drivingKmFallback !== null ? 'driving' : 'straight-line'} from shop, calculated by distance. Please confirm or override.`,
       formatted_address: formatted,
-      straight_line_km: Math.round(straightKm)
+      distance_km: Math.round(rangeKm * 10) / 10,
+      distance_type: drivingKmFallback !== null ? 'driving' : 'straight_line'
     });
   }
 
