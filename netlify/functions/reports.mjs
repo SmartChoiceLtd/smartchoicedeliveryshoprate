@@ -142,7 +142,10 @@ export default async (req) => {
           total = parseFloat(o.driver_pay);
           drate = total - gdpi;
         } else {
-          drate = (r.drate||0) + (pieces-1)*(r.dratex||0);
+          const base = (zone === 'RURALKM' && o.distance_km != null)
+            ? (r.drate||0) + (r.perkm||0) * o.distance_km
+            : (r.drate||0);
+          drate = base + (pieces-1)*(r.dratex||0);
           total = drate + gdpi;
         }
         return {o, zone, pieces, drate, gdpi, total};
@@ -193,7 +196,7 @@ export default async (req) => {
           </div>
           <div class="detail">
             <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>DSHOP</th><th>DZONE</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
+              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>DSHOP</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
               <tbody>
                 ${orderPay.map(({o,zone,pieces,drate,gdpi,total})=>`<tr>
                   <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
@@ -203,6 +206,7 @@ export default async (req) => {
                   <td>${(o.community||'').slice(0,18)}</td>
                   <td>${o.shop_code||''}</td>
                   <td>${zone}</td>
+                  <td>${zone==='RURALKM'&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
                   <td>${pieces}</td>
                   <td>$${drate.toFixed(2)}</td>
                   <td>$${gdpi.toFixed(2)}</td>
@@ -242,7 +246,10 @@ export default async (req) => {
         const zone = (o.zone_code||'').toUpperCase();
         const pieces = parseInt(o.total_pieces||1);
         const r = rates[zone] || {};
-        const amount = (r.srate||0) + (pieces-1)*(r.sratex||0);
+        const base = (zone === 'RURALKM' && o.distance_km != null)
+          ? (r.srate||0) + (r.sperkm||0) * o.distance_km
+          : (r.srate||0);
+        const amount = base + (pieces-1)*(r.sratex||0);
         return {o, zone, pieces, amount};
       });
 
@@ -275,7 +282,7 @@ export default async (req) => {
           </div>
           <div class="detail">
             <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>Driver</th><th>DZONE</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
+              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>Driver</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
               <tbody>
                 ${orderAmts.map(({o,zone,pieces,amount})=>`<tr>
                   <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
@@ -285,6 +292,7 @@ export default async (req) => {
                   <td>${(o.community||'').slice(0,20)}</td>
                   <td>${o.driver||''}</td>
                   <td>${zone}</td>
+                  <td>${zone==='RURALKM'&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
                   <td>${pieces}</td>
                   <td>$${amount.toFixed(2)}</td>
                   <td class="chk">&#9744;</td>
