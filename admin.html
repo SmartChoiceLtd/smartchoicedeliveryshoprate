@@ -430,7 +430,7 @@ function renderRates() {
   var el = document.getElementById('ratesTable');
   var keys = Object.keys(rates).sort();
   if (!keys.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No rates loaded.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Zone</th><th>Color</th><th>km</th><th>drate</th><th>dratex</th><th>GDPI</th><th>srate</th><th>sratex</th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Zone</th><th>Color</th><th>km</th><th>drate</th><th>dratex</th><th>perkm</th><th>GDPI</th><th>srate</th><th>sratex</th><th>sperkm</th></tr></thead><tbody>' +
     keys.map(function(zone) {
       var r = rates[zone];
       function inp(field, step) {
@@ -441,7 +441,7 @@ function renderRates() {
         '<input type="color" value="' + colorVal + '" style="width:32px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;cursor:pointer;flex-shrink:0;" onchange="updateRateColor(\'' + zone + '\',this.value,true)">' +
         '<input type="text" value="' + colorVal + '" maxlength="7" placeholder="#RRGGBB" style="width:72px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;" onchange="updateRateColor(\'' + zone + '\',this.value,false)">' +
         '</div>';
-      return '<tr><td><strong>' + zone + '</strong></td><td>' + colorInp + '</td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td></tr>';
+      return '<tr><td><strong>' + zone + '</strong></td><td>' + colorInp + '</td><td>' + inp('km', '1') + '</td><td>' + inp('drate') + '</td><td>' + inp('dratex') + '</td><td>' + inp('perkm') + '</td><td>' + inp('gdpi') + '</td><td>' + inp('srate') + '</td><td>' + inp('sratex') + '</td><td>' + inp('sperkm') + '</td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -477,7 +477,7 @@ wireAddRowControl({
   onSave: async function(v) {
     var code = v.newZoneCode;
     if (rates[code]) throw new Error('Zone ' + code + ' already exists.');
-    rates[code] = { km: 0, drate: 0, dratex: 0, gdpi: 0, srate: 0, sratex: 0, color: hashColorForZone(code) };
+    rates[code] = { km: 0, drate: 0, dratex: 0, perkm: 0, gdpi: 0, srate: 0, sratex: 0, sperkm: 0, color: hashColorForZone(code) };
     try {
       await fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) });
     } catch (e) {
