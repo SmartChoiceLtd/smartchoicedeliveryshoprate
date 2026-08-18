@@ -100,6 +100,13 @@ const SHOP_FALLBACK_LNG = -114.0719;
 // TSA communities
 const TSA_COMMUNITIES = ['Alpine Park', 'Vermilion Hill', 'Versant', 'Timberline', 'Bluerock'];
 
+// Named acreage/estate developments that fall within the Bearspaw (BPW)
+// zone but aren't part of Calgary's official community set - matched by
+// name before falling back to generic radius matching, so they get both
+// the correct zone AND their own tracked community name (rather than
+// being lumped in as generic "Bearspaw").
+const BPW_COMMUNITIES = ['Watermark'];
+
 // C5 border communities — north and deep SE
 const C5_NORTH_COMMUNITIES = [
   'Glacier Ridge', 'Ambleton', 'Symons Valley Ranch', 'Moraine',
@@ -139,6 +146,12 @@ function isTSACommunity(formatted) {
   if (!formatted) return false;
   const upper = formatted.toUpperCase();
   return TSA_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isBPWCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return BPW_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
 }
 
 // Returns the exact community name that matched (for inclusion in the
@@ -248,6 +261,14 @@ export default async (req) => {
       community: matchCommunityName(formatted, TSA_COMMUNITIES) });
   }
 
+  // BPW — named acreage development within Bearspaw
+  if (isBPWCommunity(formatted)) {
+    return json({ suggested:'BPW', confidence:'high',
+      message:'Bearspaw area — out-of-town rate applies',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, BPW_COMMUNITIES) });
+  }
+
   // RVN — Rocky View County North by name
   if (isRVNCommunity(formatted)) {
     return json({ suggested:'RVN', confidence:'high',
@@ -318,7 +339,8 @@ export default async (req) => {
       confidence: bestDist < bestTown.radiusKm * 0.6 ? 'high' : 'medium',
       message: `Matched to ${bestTown.name} (${bestTown.code})`,
       formatted_address: formatted,
-      distance_to_zone_km: Math.round(bestDist * 10) / 10
+      distance_to_zone_km: Math.round(bestDist * 10) / 10,
+      community: bestTown.name
     });
   }
 
