@@ -1,0 +1,417 @@
+const GOOGLE_GEOCODE = 'https://maps.googleapis.com/maps/api/geocode/json';
+const GOOGLE_DISTANCE = 'https://maps.googleapis.com/maps/api/distancematrix/json';
+const COMMUNITY_GEOJSON_URL = 'https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
+
+// In-memory cache across warm function invocations - avoids re-fetching
+// the ~1MB community boundary file on every single request.
+let communityCache = null;
+let communityCacheTime = 0;
+const COMMUNITY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function getCommunityName(props) {
+  const keys = ['name', 'NAME', 'comm_name', 'COMM_NAME'];
+  for (const k of keys) if (props && props[k]) return String(props[k]);
+  if (props) { const ks = Object.keys(props); if (ks.length) return String(props[ks[0]]); }
+  return null;
+}
+
+function pointInRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > pt.lat) !== (yj > pt.lat)) && (pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(pt, g) {
+  if (!g) return false;
+  if (g.type === 'Polygon') return pointInRing(pt, g.coordinates[0]);
+  if (g.type === 'MultiPolygon') return g.coordinates.some(p => pointInRing(pt, p[0]));
+  return false;
+}
+
+async function loadCommunities() {
+  const now = Date.now();
+  if (communityCache && (now - communityCacheTime) < COMMUNITY_CACHE_TTL_MS) return communityCache;
+  try {
+    const res = await fetch(COMMUNITY_GEOJSON_URL);
+    if (!res.ok) return communityCache || [];
+    const geo = await res.json();
+    communityCache = (geo.features || []).map(f => ({ name: getCommunityName(f.properties), geometry: f.geometry }));
+    communityCacheTime = now;
+    return communityCache;
+  } catch (e) {
+    return communityCache || [];
+  }
+}
+
+async function findCommunityName(lat, lng) {
+  const communities = await loadCommunities();
+  const pt = { lat, lng };
+  const match = communities.find(c => c.geometry && pointInGeometry(pt, c.geometry));
+  return match ? match.name : null;
+}
+
+function haversineKm(a, b) {
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+const OUT_OF_TOWN_ZONES = [
+  { code:'TSA', name:'Tsuu Tina Adjacent',                   lat:50.9175, lng:-114.1615, radiusKm:4  },
+  { code:'TSU', name:'Tsuu Tina Nation',                     lat:50.9800, lng:-114.2600, radiusKm:4  },
+  { code:'BAL', name:'Balzac',                               lat:51.2100, lng:-114.0200, radiusKm:3  },
+  { code:'HPT', name:'Heritage Pointe',                      lat:50.8500, lng:-113.9500, radiusKm:3  },
+  { code:'DEW', name:'DeWinton',                             lat:50.8200, lng:-113.9800, radiusKm:6  },
+  { code:'EVA', name:'Elbow Valley / Elbow River Estates',   lat:51.0190, lng:-114.2820, radiusKm:8  },
+  { code:'BPW', name:'Bearspaw',                             lat:51.1500, lng:-114.3000, radiusKm:4  },
+  { code:'SBK', name:'Springbank',                           lat:51.0800, lng:-114.3500, radiusKm:8  },
+  { code:'PRI', name:'Priddis',                              lat:50.8800, lng:-114.3500, radiusKm:6  },
+  { code:'BRG', name:'Bragg Creek',                          lat:50.9500, lng:-114.5700, radiusKm:7  },
+  { code:'MDF', name:'MD Foothills',                         lat:50.7500, lng:-114.0000, radiusKm:10 },
+  { code:'MIL', name:'Millarville',                          lat:50.7567, lng:-114.3194, radiusKm:12 },
+  { code:'DVA', name:'Diamond Valley',                       lat:50.6833, lng:-114.2833, radiusKm:10 },
+  { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:10 },
+  { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:10 },
+  { code:'AIR', name:'Airdrie',                              lat:51.2920, lng:-114.0144, radiusKm:8  },
+  { code:'CHE', name:'Chestermere',                          lat:51.0487, lng:-113.8225, radiusKm:7  },
+  { code:'OKO', name:'Okotoks',                              lat:50.7258, lng:-113.9758, radiusKm:8  },
+  { code:'STR', name:'Strathmore',                           lat:51.0378, lng:-113.4003, radiusKm:8  },
+  { code:'COC', name:'Cochrane',                             lat:51.1897, lng:-114.4672, radiusKm:9  },
+  { code:'LAN', name:'Langdon',                              lat:51.0000, lng:-113.6667, radiusKm:6  },
+  { code:'LYA', name:'Lyalta',                               lat:51.1000, lng:-113.5000, radiusKm:6  },
+  { code:'CAR', name:'Carsland',                             lat:51.1333, lng:-113.4333, radiusKm:6  },
+  { code:'CRO', name:'Crossfield',                           lat:51.4333, lng:-114.0333, radiusKm:7  },
+  { code:'HRV', name:'High River',                           lat:50.5808, lng:-113.8747, radiusKm:8  },
+  { code:'NAN', name:'Nanton',                               lat:50.3500, lng:-113.7667, radiusKm:8  },
+  { code:'BEI', name:'Beiseker',                             lat:51.3833, lng:-113.5333, radiusKm:7  },
+  { code:'KAN', name:'Kananaskis',                           lat:50.9311, lng:-115.0986, radiusKm:15 },
+  { code:'CAN', name:'Canmore',                              lat:51.0894, lng:-115.3582, radiusKm:9  },
+  { code:'BNF', name:'Banff',                                lat:51.1784, lng:-115.5708, radiusKm:10 },
+  { code:'LKL', name:'Lake Louise',                          lat:51.4254, lng:-116.1773, radiusKm:12 },
+];
+
+const SHOP_FALLBACK_LAT = 51.0447;
+const SHOP_FALLBACK_LNG = -114.0719;
+
+// TSA communities
+const TSA_COMMUNITIES = ['Alpine Park', 'Vermilion Hill', 'Versant', 'Timberline', 'Bluerock'];
+
+// Named acreage/estate developments that fall within the Bearspaw (BPW)
+// zone but aren't part of Calgary's official community set - matched by
+// name before falling back to generic radius matching, so they get both
+// the correct zone AND their own tracked community name (rather than
+// being lumped in as generic "Bearspaw").
+const BPW_COMMUNITIES = ['Watermark'];
+
+// C5 border communities — north and deep SE
+const C5_NORTH_COMMUNITIES = [
+  'Glacier Ridge', 'Ambleton', 'Symons Valley Ranch', 'Moraine',
+  'Livingston', 'Carrington', 'Keystone Hills', 'Homestead',
+  'Stoney', 'Stoney 4', 'Stoney Nakoda',
+  'Mahogany', 'Auburn Bay', 'Seton', 'Cranston', 'Chaparral',
+  'Legacy', 'Walden', 'Wolf Willow', 'Belmont', 'Rangeview',
+  'Cranford', 'Cranleigh', 'Cranbrook', 'Auburn'
+];
+
+// RVS communities — Rocky View County South
+const RVS_COMMUNITIES = [
+  'Sora', 'Hotchkiss', 'Pine Creek', 'Ralph Klein', 'Shepard',
+  'Great Plains', 'Starfield', 'Twin Hills', 'Huxley', 'Belvedere'
+];
+
+// RVN communities — Rocky View County North
+const RVN_COMMUNITIES = ['Conrich'];
+
+// Distance-banded rural fallback zones. Used only as a last resort, after
+// every named out-of-town zone (OUT_OF_TOWN_ZONES) has already been checked
+// and none matched. These bands mirror the quote tool's outerBandForDistance()
+// so an address that doesn't fall inside any named zone's radius still gets a
+// sensible auto-suggestion instead of being dropped straight to fully manual.
+const OUT_BANDS = [
+  { code:'OUT1', maxKm:20  },
+  { code:'OUT2', maxKm:40  },
+  { code:'OUT3', maxKm:70  },
+  { code:'OUT4', maxKm:100 }
+];
+
+// Actual Calgary city boundary, derived from the union of all 298 official
+// community polygons in the same dataset the quote tool uses (dissolved
+// into one outline via a one-time offline computation - not fetched at
+// request time). Replaces the old lat/lng bounding-box approximation,
+// which incorrectly included/excluded real addresses near the corners of
+// that rectangle since the actual city limit is an irregular shape, not
+// a box. [lng, lat] pairs, matching GeoJSON coordinate order.
+const CALGARY_BOUNDARY = [[-114.209793,50.90681],[-114.209769,50.921456],[-114.186562,50.921447],[-114.163339,50.921449],[-114.141266,50.921426],[-114.141268,50.927455],[-114.141268,50.927455],[-114.141271,50.934133],[-114.141281,50.950467],[-114.141281,50.963842],[-114.141286,50.978079],[-114.141287,50.979659],[-114.153289,50.984388],[-114.1642,50.984777],[-114.164219,50.996773],[-114.158814,50.998276],[-114.151521,50.997242],[-114.142987,50.994102],[-114.141295,50.994102],[-114.141277,51.008607],[-114.164856,51.008639],[-114.187718,51.008664],[-114.234373,51.008713],[-114.234321,51.01973],[-114.234397,51.037709],[-114.234309,51.045192],[-114.234414,51.052425],[-114.234348,51.074307],[-114.234355,51.081505],[-114.245796,51.081544],[-114.25828,51.081546],[-114.258278,51.078801],[-114.26166,51.079329],[-114.264961,51.080894],[-114.267051,51.080894],[-114.267192,51.079027],[-114.269089,51.079788],[-114.269084,51.081521],[-114.277376,51.081502],[-114.292311,51.081503],[-114.292287,51.096124],[-114.280823,51.096115],[-114.280821,51.100597],[-114.282492,51.101338],[-114.282493,51.102826],[-114.287664,51.105503],[-114.289486,51.10726],[-114.290307,51.110556],[-114.288652,51.115993],[-114.28982,51.119063],[-114.2915,51.120532],[-114.295742,51.122884],[-114.298488,51.12359],[-114.299871,51.124587],[-114.304096,51.125864],[-114.308083,51.128903],[-114.309002,51.132312],[-114.310742,51.135273],[-114.31266,51.137316],[-114.315796,51.139678],[-114.29541,51.139626],[-114.296842,51.138246],[-114.291785,51.135791],[-114.289547,51.1324],[-114.288483,51.131423],[-114.289552,51.129709],[-114.288899,51.129017],[-114.286592,51.128931],[-114.285243,51.12632],[-114.283377,51.125343],[-114.280385,51.125006],[-114.280533,51.114528],[-114.274006,51.114531],[-114.274005,51.110554],[-114.26906,51.110557],[-114.269056,51.116608],[-114.267339,51.115173],[-114.265716,51.114869],[-114.261776,51.115571],[-114.259366,51.115131],[-114.258847,51.11632],[-114.261541,51.116844],[-114.2647,51.116239],[-114.264704,51.119937],[-114.269063,51.119939],[-114.269064,51.122705],[-114.257672,51.122703],[-114.257598,51.125183],[-114.25761,51.143714],[-114.257623,51.154216],[-114.234365,51.154246],[-114.234446,51.161462],[-114.234383,51.183292],[-114.211115,51.183359],[-114.211224,51.190527],[-114.211161,51.197759],[-114.167944,51.197716],[-114.167944,51.196922],[-114.164601,51.196886],[-114.164672,51.197711],[-114.152521,51.197732],[-114.152517,51.196828],[-114.141309,51.196847],[-114.141307,51.19775],[-114.129532,51.19779],[-114.129534,51.212264],[-114.09458,51.212336],[-114.071184,51.212392],[-114.013291,51.212425],[-114.013277,51.20524],[-114.002662,51.205245],[-114.002662,51.183532],[-113.9707,51.183546],[-113.946746,51.183546],[-113.911707,51.183524],[-113.911718,51.154342],[-113.911728,51.139763],[-113.911734,51.110636],[-113.911735,51.096061],[-113.911746,51.066841],[-113.911746,51.059656],[-113.900275,51.05966],[-113.889744,51.059774],[-113.8893,51.059936],[-113.877029,51.059939],[-113.877029,51.059665],[-113.865538,51.059667],[-113.865553,51.037767],[-113.865562,51.016094],[-113.91176,51.01608],[-113.911762,51.008783],[-113.911778,50.979672],[-113.911635,50.979202],[-113.90272,50.979206],[-113.901771,50.97948],[-113.865525,50.979482],[-113.865573,50.950534],[-113.865589,50.94324],[-113.872932,50.94324],[-113.877123,50.944527],[-113.877128,50.927879],[-113.888963,50.927885],[-113.888866,50.921606],[-113.860112,50.921567],[-113.860005,50.908479],[-113.86013,50.907179],[-113.859998,50.905536],[-113.859905,50.857744],[-113.861385,50.857155],[-113.868673,50.858833],[-113.872575,50.859184],[-113.877373,50.85883],[-113.881493,50.859834],[-113.884699,50.860179],[-113.89287,50.860398],[-113.89635,50.860197],[-113.900137,50.859526],[-113.902605,50.857252],[-113.90577,50.855464],[-113.908226,50.854262],[-113.914367,50.853087],[-113.91985,50.853183],[-113.92164,50.85254],[-113.926819,50.852213],[-113.933688,50.85264],[-113.935983,50.852492],[-113.939785,50.851579],[-113.944919,50.848914],[-113.946279,50.846796],[-113.950015,50.843386],[-113.951737,50.842918],[-113.954988,50.8435],[-113.956533,50.846131],[-113.957169,50.849658],[-113.959846,50.85079],[-113.964436,50.854913],[-113.96766,50.855657],[-113.97055,50.85454],[-113.9721,50.853877],[-113.972246,50.852346],[-113.973698,50.848503],[-113.998215,50.84842],[-114.001811,50.848486],[-114.023421,50.84854],[-114.024884,50.84877],[-114.047656,50.84876],[-114.047657,50.848532],[-114.070786,50.848514],[-114.070769,50.85334],[-114.071052,50.854055],[-114.073993,50.854212],[-114.076256,50.852217],[-114.078647,50.853749],[-114.080374,50.857663],[-114.081738,50.859155],[-114.081644,50.861152],[-114.082827,50.863009],[-114.094134,50.863013],[-114.094112,50.870075],[-114.093824,50.874111],[-114.094117,50.877639],[-114.0941,50.888491],[-114.094452,50.891188],[-114.095281,50.891389],[-114.105388,50.891384],[-114.112574,50.891379],[-114.116127,50.889336],[-114.114192,50.88487],[-114.11489,50.884871],[-114.123042,50.884867],[-114.123039,50.888416],[-114.14052,50.888394],[-114.140519,50.891497],[-114.141352,50.891977],[-114.163471,50.892053],[-114.186672,50.892004],[-114.209819,50.891967],[-114.209793,50.90681]];
+
+function isLikelyInCalgary(lat, lng) {
+  return pointInRing({ lat, lng }, CALGARY_BOUNDARY);
+}
+
+function isTSACommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return TSA_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isBPWCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return BPW_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+// Returns the exact community name that matched (for inclusion in the
+// response/tracking), or null if none of the list matched.
+function matchCommunityName(formatted, list) {
+  if (!formatted) return null;
+  const upper = formatted.toUpperCase();
+  const match = list.find(c => upper.includes(c.toUpperCase()));
+  return match || null;
+}
+
+function isC5NorthCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return C5_NORTH_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVSCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVS_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function isRVNCommunity(formatted) {
+  if (!formatted) return false;
+  const upper = formatted.toUpperCase();
+  return RVN_COMMUNITIES.some(c => upper.includes(c.toUpperCase()));
+}
+
+function cityZoneForKm(km) {
+  if (km <= 8)  return { code:'C1', confidence:'high' };
+  if (km <= 13) return { code:'C2', confidence:'high' };
+  if (km <= 18) return { code:'C3', confidence:'high' };
+  if (km <= 24) return { code:'C4', confidence:'high' };
+  return             { code:'C5', confidence:'high' };
+}
+
+function outBandForKm(km) {
+  for (const band of OUT_BANDS) {
+    if (km <= band.maxKm) return band.code;
+  }
+  return null; // beyond 100km — genuinely needs manual/custom quote
+}
+
+async function geocode(address, key) {
+  const url = `${GOOGLE_GEOCODE}?address=${encodeURIComponent(address + ', Alberta, Canada')}&key=${key}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.status !== 'OK' || !data.results[0]) return null;
+  const r = data.results[0];
+  return {
+    lat: r.geometry.location.lat,
+    lng: r.geometry.location.lng,
+    formatted: r.formatted_address,
+    types: r.types || []
+  };
+}
+
+async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
+  const url = `${GOOGLE_DISTANCE}?origins=${originLat},${originLng}&destinations=${destLat},${destLng}&mode=driving&units=metric&key=${key}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const el = data.rows?.[0]?.elements?.[0];
+  if (!el || el.status !== 'OK') return null;
+  return el.distance.value / 1000;
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify({ ...data, _build: 'bpw-radius-4km-2026-08-18' }), {
+    status,
+    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
+  });
+}
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
+  }
+
+  const key = process.env.GOOGLE_MAPS_KEY;
+  if (!key) return json({ error: 'GOOGLE_MAPS_KEY not configured.' }, 500);
+
+  const url = new URL(req.url);
+  const address = url.searchParams.get('address');
+  const shopLat = parseFloat(url.searchParams.get('shop_lat') || SHOP_FALLBACK_LAT);
+  const shopLng = parseFloat(url.searchParams.get('shop_lng') || SHOP_FALLBACK_LNG);
+
+  if (!address) return json({ error: 'address parameter required' }, 400);
+
+  const geo = await geocode(address, key);
+  if (!geo) {
+    return json({
+      suggested: null,
+      confidence: 'unresolvable',
+      message: 'Address could not be geocoded. Please select zone manually.',
+      address_searched: address
+    });
+  }
+
+  const { lat, lng, formatted } = geo;
+
+  // TSA — named community check
+  if (isTSACommunity(formatted)) {
+    return json({ suggested:'TSA', confidence:'high',
+      message:"Tsuu T'ina Adjacent area — out-of-town rate applies",
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, TSA_COMMUNITIES) });
+  }
+
+  // BPW — named acreage development within Bearspaw
+  if (isBPWCommunity(formatted)) {
+    return json({ suggested:'BPW', confidence:'high',
+      message:'Bearspaw area — out-of-town rate applies',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, BPW_COMMUNITIES) });
+  }
+
+  // RVN — Rocky View County North by name
+  if (isRVNCommunity(formatted)) {
+    return json({ suggested:'RVN', confidence:'high',
+      message:'Rocky View County North',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVN_COMMUNITIES) });
+  }
+
+  // RVS — Rocky View County South by name
+  if (isRVSCommunity(formatted)) {
+    return json({ suggested:'RVS', confidence:'high',
+      message:'Rocky View County South',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, RVS_COMMUNITIES) });
+  }
+
+  // C5 border communities — name check before radius matching
+  if (isC5NorthCommunity(formatted) && isLikelyInCalgary(lat, lng)) {
+    return json({ suggested:'C5', confidence:'high',
+      message:'Calgary border community — C5 rate applies',
+      formatted_address: formatted,
+      community: matchCommunityName(formatted, C5_NORTH_COMMUNITIES) });
+  }
+
+  // SE Calgary deep communities — intercept before rural radius matching
+  const SE_C5 = ['Seton','Auburn','Mahogany','Chaparral','Cranston',
+    'Wolf Willow','Ranchview','Ricardo Ranch','Legacy'];
+  if (isLikelyInCalgary(lat, lng) && SE_C5.some(c => formatted.toUpperCase().includes(c.toUpperCase()))) {
+    const community = await findCommunityName(lat, lng);
+    const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+    if (drivingKm !== null) {
+      const zone = cityZoneForKm(drivingKm);
+      return json({ suggested: zone.code, confidence: zone.confidence,
+        message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community: community || matchCommunityName(formatted, SE_C5) });
+    }
+    return json({ suggested:'C5', confidence:'medium',
+      message:'Deep SE Calgary community — C5 rate applies',
+      formatted_address: formatted,
+      community: community || matchCommunityName(formatted, SE_C5) });
+  }
+
+  // RVS/RVN geographic corridor — east of Stoney, outside Calgary
+  // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south)
+  if (!isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
+    if (lat >= 51.055) {
+      return json({ suggested:'RVN', confidence:'medium',
+        message:'Rocky View County North (north of Trans-Canada)',
+        formatted_address: formatted });
+    }
+    if (lat >= 50.840 && lat < 51.055) {
+      return json({ suggested:'RVS', confidence:'medium',
+        message:'Rocky View County South (south of Trans-Canada)',
+        formatted_address: formatted });
+    }
+  }
+
+  // Named out-of-town zones — radius matching
+  let bestTown = null, bestDist = Infinity;
+  for (const zone of OUT_OF_TOWN_ZONES) {
+    const d = haversineKm({ lat, lng }, { lat: zone.lat, lng: zone.lng });
+    if (d <= zone.radiusKm && d < bestDist) { bestTown = zone; bestDist = d; }
+  }
+  if (bestTown) {
+    return json({
+      suggested: bestTown.code,
+      confidence: bestDist < bestTown.radiusKm * 0.6 ? 'high' : 'medium',
+      message: `Matched to ${bestTown.name} (${bestTown.code})`,
+      formatted_address: formatted,
+      distance_to_zone_km: Math.round(bestDist * 10) / 10,
+      community: bestTown.name
+    });
+  }
+
+  // Calgary — driving distance bands
+  if (isLikelyInCalgary(lat, lng)) {
+    const community = await findCommunityName(lat, lng);
+    const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+    if (drivingKm !== null) {
+      const zone = cityZoneForKm(drivingKm);
+      return json({ suggested: zone.code, confidence: zone.confidence,
+        message: `Calgary delivery — ${drivingKm.toFixed(1)} km driving from shop`,
+        formatted_address: formatted, driving_km: Math.round(drivingKm * 10) / 10,
+        community });
+    }
+    return json({ suggested:'C3', confidence:'low',
+      message:'Calgary address — driving distance unavailable, C3 suggested as default.',
+      formatted_address: formatted,
+      community });
+  }
+
+  // Secondary boundary checks
+  if (lat > 50.92 && lat < 51.03 && lng < -114.215 && lng > -114.35) {
+    return json({ suggested:'TSU', confidence:'medium',
+      message:"Address appears to be in Tsuu T'ina territory",
+      formatted_address: formatted });
+  }
+
+  if (lat > 50.83 && lat < 50.95 && lng < -114.05 && lng > -114.25) {
+    return json({ suggested:'DEW', confidence:'medium',
+      message:'Address appears to be in DeWinton/Sirocco corridor',
+      formatted_address: formatted });
+  }
+
+  // Rural km-based fallback — last resort before giving up to fully manual
+  // selection. Replaces the old OUT1-4 banding for the true catch-all case
+  // (address matched nothing else): instead of bucketing into a wide band
+  // where a 21km and a 39km delivery paid identically, this carries the
+  // actual distance through so driver.html/orders.mjs/reports.mjs can pay
+  // proportionally (base + perkm x distance). Driving distance preferred
+  // since it reflects the real route; falls back to straight-line if the
+  // Distance Matrix call fails.
+  const drivingKmFallback = await getDrivingKm(shopLat, shopLng, lat, lng, key);
+  const straightKm = haversineKm({ lat: shopLat, lng: shopLng }, { lat, lng });
+  const rangeKm = drivingKmFallback !== null ? drivingKmFallback : straightKm;
+  if (rangeKm <= 100) {
+    return json({
+      suggested: 'RURALKM',
+      confidence: drivingKmFallback !== null ? 'medium' : 'low',
+      message: `No named zone match — ${rangeKm.toFixed(1)} km ${drivingKmFallback !== null ? 'driving' : 'straight-line'} from shop, calculated by distance. Please confirm or override.`,
+      formatted_address: formatted,
+      distance_km: Math.round(rangeKm * 10) / 10,
+      distance_type: drivingKmFallback !== null ? 'driving' : 'straight_line'
+    });
+  }
+
+  return json({
+    suggested: null,
+    confidence: 'manual',
+    message: `Address is outside Calgary and did not match a known zone (approx ${Math.round(straightKm)} km from shop). Please select zone manually.`,
+    formatted_address: formatted,
+    straight_line_km: Math.round(straightKm)
+  });
+};
+
+export const config = { path: '/api/suggest-zone' };
