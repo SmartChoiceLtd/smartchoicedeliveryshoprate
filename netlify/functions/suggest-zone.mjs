@@ -67,7 +67,7 @@ const OUT_OF_TOWN_ZONES = [
   { code:'HPT', name:'Heritage Pointe',                      lat:50.8500, lng:-113.9500, radiusKm:3  },
   { code:'DEW', name:'DeWinton',                             lat:50.8200, lng:-113.9800, radiusKm:6  },
   { code:'EVA', name:'Elbow Valley / Elbow River Estates',   lat:51.0190, lng:-114.2820, radiusKm:8  },
-  { code:'BPW', name:'Bearspaw',                             lat:51.1500, lng:-114.3000, radiusKm:8  },
+  { code:'BPW', name:'Bearspaw',                             lat:51.1500, lng:-114.3000, radiusKm:4  },
   { code:'SBK', name:'Springbank',                           lat:51.0800, lng:-114.3500, radiusKm:8  },
   { code:'PRI', name:'Priddis',                              lat:50.8800, lng:-114.3500, radiusKm:6  },
   { code:'BRG', name:'Bragg Creek',                          lat:50.9500, lng:-114.5700, radiusKm:7  },
@@ -205,8 +205,20 @@ function outBandForKm(km) {
   return null; // beyond 100km — genuinely needs manual/custom quote
 }
 
-async function geocode(address, key) {
-  const url = `${GOOGLE_GEOCODE}?address=${encodeURIComponent(address + ', Alberta, Canada')}&key=${key}`;
+async function geocode(address, key, biasLat, biasLng) {
+  let url = `${GOOGLE_GEOCODE}?address=${encodeURIComponent(address + ', Alberta, Canada')}&key=${key}`;
+  // Soft-bias toward the shop's location (does not exclude results
+  // elsewhere, just prefers a nearby match when the address is ambiguous -
+  // e.g. no city given, and Alberta has multiple towns with the same
+  // street name). A roughly 60km box around the shop is generous enough to
+  // cover any legitimate Calgary-area delivery while still meaningfully
+  // steering away from same-named streets in distant, unrelated towns.
+  if (typeof biasLat === 'number' && typeof biasLng === 'number') {
+    const box = 0.55; // ~60km in degrees at this latitude
+    const sw = `${(biasLat - box).toFixed(4)},${(biasLng - box).toFixed(4)}`;
+    const ne = `${(biasLat + box).toFixed(4)},${(biasLng + box).toFixed(4)}`;
+    url += `&bounds=${sw}|${ne}`;
+  }
   const res = await fetch(url);
   const data = await res.json();
   if (data.status !== 'OK' || !data.results[0]) return null;
@@ -229,7 +241,7 @@ async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
 }
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
+  return new Response(JSON.stringify({ ...data, _build: 'bpw-radius-4km-2026-08-18' }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
@@ -250,7 +262,7 @@ export default async (req) => {
 
   if (!address) return json({ error: 'address parameter required' }, 400);
 
-  const geo = await geocode(address, key);
+  const geo = await geocode(address, key, shopLat, shopLng);
   if (!geo) {
     return json({
       suggested: null,
@@ -336,24 +348,12 @@ export default async (req) => {
     }
   }
 
-  // Named out-of-town zones — radius matching
-  let bestTown = null, bestDist = Infinity;
-  for (const zone of OUT_OF_TOWN_ZONES) {
-    const d = haversineKm({ lat, lng }, { lat: zone.lat, lng: zone.lng });
-    if (d <= zone.radiusKm && d < bestDist) { bestTown = zone; bestDist = d; }
-  }
-  if (bestTown) {
-    return json({
-      suggested: bestTown.code,
-      confidence: bestDist < bestTown.radiusKm * 0.6 ? 'high' : 'medium',
-      message: `Matched to ${bestTown.name} (${bestTown.code})`,
-      formatted_address: formatted,
-      distance_to_zone_km: Math.round(bestDist * 10) / 10,
-      community: bestTown.name
-    });
-  }
-
-  // Calgary — driving distance bands
+  // Calgary — driving distance bands. Checked BEFORE the generic
+  // out-of-town radius matching below: the city boundary is now an exact
+  // polygon (not an approximation), so any address genuinely inside it
+  // should be claimed here first. Previously the radius loop ran first,
+  // which let a nearby rural zone's circle (e.g. EVA) incorrectly steal
+  // addresses that are actually inside Calgary (e.g. Springbank Hill).
   if (isLikelyInCalgary(lat, lng)) {
     const community = await findCommunityName(lat, lng);
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
@@ -368,6 +368,24 @@ export default async (req) => {
       message:'Calgary address — driving distance unavailable, C3 suggested as default.',
       formatted_address: formatted,
       community });
+  }
+
+  // Named out-of-town zones — radius matching. Only reached now for
+  // addresses confirmed outside the real Calgary boundary above.
+  let bestTown = null, bestDist = Infinity;
+  for (const zone of OUT_OF_TOWN_ZONES) {
+    const d = haversineKm({ lat, lng }, { lat: zone.lat, lng: zone.lng });
+    if (d <= zone.radiusKm && d < bestDist) { bestTown = zone; bestDist = d; }
+  }
+  if (bestTown) {
+    return json({
+      suggested: bestTown.code,
+      confidence: bestDist < bestTown.radiusKm * 0.6 ? 'high' : 'medium',
+      message: `Matched to ${bestTown.name} (${bestTown.code})`,
+      formatted_address: formatted,
+      distance_to_zone_km: Math.round(bestDist * 10) / 10,
+      community: bestTown.name
+    });
   }
 
   // Secondary boundary checks
