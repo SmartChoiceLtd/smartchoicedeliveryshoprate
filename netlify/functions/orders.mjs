@@ -223,11 +223,29 @@ export default async (req) => {
       neighboured_to: raw.neighboured_to,
       accepted_by: raw.accepted_by,
       comments: raw.comments,
+      has_photo: !!body.photo_base64,
     };
 
     try {
       const store = getStore('flower-orders');
       await store.setJSON(orderId, order);
+      // Photo is stored in a separate blob store, not embedded in the order
+      // record itself - GET /api/orders loads every order's full JSON on
+      // every page view, so embedding potentially-large photo data there
+      // would slow that down for every order, viewed or not. The photo is
+      // only fetched on-demand when someone actually wants to view it.
+      if (body.photo_base64) {
+        try {
+          const photoStore = getStore('flower-order-photos');
+          await photoStore.set(orderId, body.photo_base64);
+        } catch (e) {
+          // Order itself already saved successfully - don't fail the whole
+          // submission just because the photo couldn't be stored, but the
+          // has_photo flag above would then be misleading. Downgrade it.
+          order.has_photo = false;
+          await store.setJSON(orderId, order);
+        }
+      }
       return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
