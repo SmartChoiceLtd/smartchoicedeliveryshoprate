@@ -563,6 +563,7 @@ function populateShopDropdown() {
     document.getElementById('wholesalerField').hidden = false;
     document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
     document.getElementById('recipientNameField').hidden = true;
+    document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
   } else {
@@ -659,6 +660,35 @@ function resetForm() {
   document.getElementById('app').hidden = false;
 }
 
+// Resizes and re-compresses a photo file via canvas before upload - a raw
+// phone camera photo can be several MB, which is slow/costly on a driver's
+// mobile connection and unnecessary for proof-of-delivery purposes. Caps
+// the longest side at 1200px and re-encodes as JPEG at moderate quality.
+function compressPhotoToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      img.onload = function() {
+        var maxSide = 1200;
+        var w = img.width, h = img.height;
+        if (w > maxSide || h > maxSide) {
+          if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+          else { w = Math.round(w * (maxSide / h)); h = maxSide; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = function() { reject(new Error('Could not read photo.')); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error('Could not read photo file.')); };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
@@ -669,6 +699,13 @@ async function submitDelivery() {
   if (!shopId) { errEl.textContent = 'Select a shop.'; errEl.hidden = false; return; }
   if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
   if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
+  var photoFile = document.getElementById('fPhoto').files[0];
+  var doorstepSelected = !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+  if (doorstepSelected && !photoFile) {
+    errEl.textContent = 'Photo required for Doorstep delivery. Please take a photo.';
+    errEl.hidden = false;
+    return;
+  }
   btn.disabled = true; btn.textContent = 'Submitting...';
   var shop = shops.find(function(s) { return s.id === shopId; });
   var pay = computePay() || { effCode: selectedZone, isEventOverride: false, baseZone: selectedZone, total: 0 };
@@ -680,6 +717,19 @@ async function submitDelivery() {
     var billing = active ? active.dataset.billing : 'shop';
     var w = document.getElementById('fWholesaler').value;
     billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
+  }
+  var photoBase64 = null;
+  if (photoFile) {
+    try {
+      btn.textContent = 'Processing photo...';
+      photoBase64 = await compressPhotoToBase64(photoFile);
+      btn.textContent = 'Submitting...';
+    } catch (e) {
+      errEl.textContent = 'Could not process photo: ' + e.message;
+      errEl.hidden = false;
+      btn.disabled = false; btn.textContent = 'Submit Delivery';
+      return;
+    }
   }
   var payload = {
     date: document.getElementById('fDate').value,
@@ -716,7 +766,8 @@ async function submitDelivery() {
     })(),
     billing_party: billingParty,
     wholesaler: document.getElementById('fWholesaler').value,
-    source: 'driver_form'
+    source: 'driver_form',
+    photo_base64: photoBase64
   };
   try {
     var res = await fetch('/api/orders', {
