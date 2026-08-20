@@ -3,7 +3,7 @@
 #ordersCards > div{width:100%;max-width:100%;}
 #ordersCards{padding:12px 24px;}
 @media(max-height:500px){.topbar{display:none;}.toolbar{padding:3px 8px;gap:4px;}.filter-input{padding:4px 6px;font-size:12px;}.btn-sm{padding:3px 6px;font-size:11px;}.week-nav button{padding:3px 6px;}.week-label{min-width:100px;font-size:11px;}#ordersCards{max-height:calc(100vh - 50px);overflow-y:auto;}}</style> </head> <body> <div class="topbar"> <h1>Smart Choice Delivery — Orders</h1> <a href="/">&larr; Quote tool</a> <div class="stats"> <div class="stat"><strong id="statTotal">—</strong>Showing</div> <div class="stat"><strong id="statReview">—</strong>Needs review</div> <div class="stat"><strong id="statConflict">—</strong>Conflicts</div> </div> </div> <div class="toolbar"> <div class="week-nav"> <button id="prevWeek">&larr;</button> <span class="week-label" id="weekLabel">Loading...</span> <button id="nextWeek">&rarr;</button> <button class="btn btn-ghost btn-sm" id="allWeeks">All</button> </div> <input class="filter-input" id="filterInput" placeholder="Name, address, shop, driver..." style="width:200px;"> <select id="filterSource" class="filter-input" style="width:150px;"> <option value="">All sources</option> <option value="auto">Auto</option> <option value="manual">Manual</option> <option value="override">Override</option> <option value="needs_review">Needs review</option> <option value="conflict">Zone conflict</option> </select> <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button> <a class="btn btn-ghost btn-sm" href="/api/export?format=detail" download>Export detail</a> </a><button class="btn btn-ghost btn-sm" onclick="qbExport()">QB Export</button><button class="btn btn-ghost btn-sm" onclick="openReport('driver')">Driver Reports</button><button class="btn btn-ghost btn-sm" onclick="sendDriverPay()">Send Pay Emails</button>
-<button class="btn btn-ghost btn-sm" onclick="openReport('shop')">Shop Reports</button></div> <div id="errorMsg" class="error-msg" hidden></div> <div class="main"> <div class="loading" id="loadingMsg">Loading orders&hellip;</div> <div class="empty" id="emptyMsg" hidden>No orders for this period.</div> <table id="ordersTable" hidden> <thead><tr> <th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th> <th>Shop</th><th>Driver</th><th>Pcs</th><th>Zone</th> <th>Source</th><th>Suggested</th><th>Status</th><th>Actions</th> </tr></thead> <tbody id="ordersBody"></tbody> </table> </div> <div class="modal-bg" id="overrideModal" hidden> <div class="modal"> <h2>Override zone</h2> <label>Order ID</label><input id="ovOrderId" readonly style="background:var(--bg);"> <label>Address</label><input id="ovAddress" readonly style="background:var(--bg);"> <label>Current zone</label><input id="ovCurrent" readonly style="background:var(--bg);"> <div class="suggest-hint" id="ovHint"></div> <label>New zone code</label><input id="ovNew" placeholder="e.g. C4, COC, BNF" style="text-transform:uppercase;"> <label>Note (optional)</label><input id="ovNote" placeholder="Reason for override"> <div class="modal-actions"> <button class="btn" id="ovSaveBtn">Save</button> <button class="btn btn-ghost" id="ovCancelBtn">Cancel</button> </div> </div> </div> <script>
+<button class="btn btn-ghost btn-sm" onclick="openReport('shop')">Shop Reports</button></div> <div id="errorMsg" class="error-msg" hidden></div> <div class="main"> <div class="loading" id="loadingMsg">Loading orders&hellip;</div> <div class="empty" id="emptyMsg" hidden>No orders for this period.</div> <table id="ordersTable" hidden> <thead><tr> <th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th> <th>Shop</th><th>Driver</th><th>Pcs</th><th>Zone</th> <th>Source</th><th>Suggested</th><th>Status</th><th>Actions</th> </tr></thead> <tbody id="ordersBody"></tbody> </table> </div> <div class="modal-bg" id="overrideModal" hidden> <div class="modal"> <h2>Override zone</h2> <label>Order ID</label><input id="ovOrderId" readonly style="background:var(--bg);"> <label>Address</label><input id="ovAddress" readonly style="background:var(--bg);"> <label>Current zone</label><input id="ovCurrent" readonly style="background:var(--bg);"> <div class="suggest-hint" id="ovHint"></div> <label>New zone code</label><input id="ovNew" placeholder="e.g. C4, COC, BNF" style="text-transform:uppercase;"> <label>Note (optional)</label><input id="ovNote" placeholder="Reason for override"> <div class="modal-actions"> <button class="btn" id="ovSaveBtn">Save</button> <button class="btn btn-ghost" id="ovCancelBtn">Cancel</button> </div> </div> </div> <div class="modal-bg" id="photoModal" hidden onclick="if(event.target===this)this.hidden=true;"> <div class="modal" style="max-width:600px;text-align:center;"> <img id="photoModalImg" style="max-width:100%;max-height:70vh;border-radius:8px;" src=""> <div class="modal-actions" style="justify-content:center;"> <button class="btn btn-ghost" onclick="document.getElementById('photoModal').hidden=true;">Close</button> </div> </div> </div> <script>
 /* ORDERS.HTML BUILD MARKER: 2026-08-17-focus-override-fix-v2
    If you don't see this exact comment in View Page Source on the live
    site, the deploy did not pick up this file - re-upload/redeploy. */
@@ -157,7 +157,7 @@ cardsEl.hidden = false;
     + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
     + '</div>'
     + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
-    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + (o.community ? ' &mdash; <span style="color:var(--accent);font-weight:600;">' + escapeHtml(o.community) + '</span>' : '') + '</div>'
+    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + (o.community ? ' &mdash; <span style="color:var(--accent);font-weight:600;">' + escapeHtml(o.community) + '</span>' : '') + (o.has_photo ? ' &nbsp;<button onclick="viewPhoto(\'' + escapeHtml(o.id) + '\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;">&#128247; Photo</button>' : '') + '</div>'
     + '<div style="font-size:12px;margin-bottom:4px;">'
     + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
     + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
@@ -197,6 +197,7 @@ return '<tr>'
 + '<td>' + suggestedDisplay + '</td>'
 + '<td title="' + escapeHtml(statusFull) + '">' + escapeHtml(status) + '</td>'
 + '<td><div class="td-actions">'
++ (o.has_photo ? '<button class="btn btn-ghost btn-sm" onclick="viewPhoto(\'' + escapeHtml(o.id) + '\')">&#128247;</button>' : '')
 + '<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>'
 + '<button class="btn-danger" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id || o.id) + '\')">Delete</button>'
 + '</div></td>'
@@ -226,6 +227,17 @@ var err = document.getElementById('errorMsg');
 err.textContent = 'Could not load orders: ' + e.message;
 err.hidden = false;
 });
+}
+
+function viewPhoto(id) {
+  var modal = document.getElementById('photoModal');
+  var img = document.getElementById('photoModalImg');
+  img.src = '';
+  modal.hidden = false;
+  fetch('/api/order-photo/' + encodeURIComponent(id))
+    .then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
+    .then(function(data) { img.src = data.photo_data_url; })
+    .catch(function(e) { modal.hidden = true; alert('Could not load photo: ' + e.message); });
 }
 
 function deleteOrder(id, label) {
