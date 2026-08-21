@@ -117,12 +117,33 @@ export default async (req) => {
     const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
     const enteredZoneCode = extractZoneCode(raw.zone_full) || raw.zone;
 
+    // Wholesale deliveries use their own separate zone system (WPU, WAI,
+    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
+    // entered directly from Zoho). Checked BEFORE zone determination below:
+    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
+    // etc, and re-running a wholesale order's address through it could
+    // silently overwrite a correct wholesale code with an unrelated retail
+    // one - the same category of bug we already fixed for event-type codes.
+    const isWholesale = (raw.delivery_type === 'wholesale') ||
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
+
     // Auto-calculate zone if not entered or flagged as needing calculation
     let zoneCode = enteredZoneCode;
     let zoneSource = 'manual';
     let zoneSuggestion = null;
 
-    if (isEventZoneCode(enteredZoneCode)) {
+    if (isWholesale) {
+      // Wholesale zone codes are authoritative as entered - never
+      // re-suggested against the retail address matcher. If no zone was
+      // entered at all, this needs a human to fill in rather than guessing
+      // a retail zone that doesn't apply to wholesale pricing.
+      if (enteredZoneCode) {
+        zoneCode = enteredZoneCode.toUpperCase();
+        zoneSource = 'manual';
+      } else {
+        zoneSource = 'needs_review';
+      }
+    } else if (isEventZoneCode(enteredZoneCode)) {
       // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
       // never re-suggested/overwritten. Still look up the address for its
       // community name (for tracking/reports), but ignore any suggested
@@ -177,8 +198,6 @@ export default async (req) => {
     
 
     // Flag if manual zone differs from suggestion
-   const isWholesale = (raw.delivery_type === 'wholesale') || 
-      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
     const zoneConflict = !isWholesale &&
       !isEventZoneCode(enteredZoneCode) &&
       zoneSuggestion?.suggested &&
