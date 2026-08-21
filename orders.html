@@ -1,329 +1,276 @@
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <title>Smart Choice Delivery — Orders</title>
- <style> :root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#7A5C00;--amber-soft:#FFF8E1;--radius:10px;} *{box-sizing:border-box;}html,body{height:100%;margin:0;} [hidden]{display:none !important;} body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;} h1,h2{font-family:Georgia,serif;font-weight:600;margin:0;} .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;} .topbar h1{font-size:18px;}.topbar a{font-size:13px;color:var(--accent);text-decoration:none;} .toolbar{padding:10px 24px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;} .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block;} .btn:hover{opacity:0.9;}.btn:disabled{opacity:0.5;cursor:default;} .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);} .btn-sm{padding:4px 10px;font-size:12px;} .btn-danger{background:transparent;color:#B8472B;border:1px solid #E3B3AE;font-size:11px;padding:3px 8px;border-radius:6px;cursor:pointer;} .btn-danger:hover{background:#FBEAEA;} .filter-input{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;} .week-nav{display:flex;align-items:center;gap:6px;font-size:13px;} .week-nav button{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;} .week-nav button:hover{border-color:var(--accent);color:var(--accent);} .week-label{font-weight:600;min-width:160px;text-align:center;font-size:13px;} .stats{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;} .stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--ink-soft);} .stat strong{color:var(--ink);font-size:15px;display:block;} .main{flex:1;overflow:auto;} table{width:100%;border-collapse:collapse;font-size:13px;} thead{position:sticky;top:0;background:var(--card);z-index:10;} th{padding:9px 10px;text-align:left;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;background:var(--accent);color:#fff;white-space:nowrap;} td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} tr:hover td{background:#F9F5F0;} .badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;} .badge-auto{background:var(--green-soft);color:var(--green);} .badge-manual{background:#F0F0F0;color:#555;} .badge-review{background:var(--amber-soft);color:var(--amber);} .badge-conflict{background:#FFE0E0;color:#7A2E22;} .badge-override{background:#E8EAF6;color:#3949AB;} .zone-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);} .loading{text-align:center;padding:60px;color:var(--ink-soft);} .empty{text-align:center;padding:60px;color:var(--ink-soft);} .error-msg{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px 24px;font-size:13px;} .td-actions{display:flex;gap:4px;white-space:nowrap;} .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;} .modal{background:var(--card);border-radius:var(--radius);max-width:480px;width:100%;padding:24px;} .modal h2{font-size:16px;margin-bottom:12px;} .modal label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:3px;margin-top:10px;} .modal input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;} .modal-actions{display:flex;gap:8px;margin-top:14px;} .suggest-hint{font-size:12px;color:var(--green);margin-top:4px;}#ordersCards{padding:0 4px;}
-#ordersCards > div{width:100%;max-width:100%;}
-#ordersCards{padding:12px 24px;}
-@media(max-height:500px){.topbar{display:none;}.toolbar{padding:3px 8px;gap:4px;}.filter-input{padding:4px 6px;font-size:12px;}.btn-sm{padding:3px 6px;font-size:11px;}.week-nav button{padding:3px 6px;}.week-label{min-width:100px;font-size:11px;}#ordersCards{max-height:calc(100vh - 50px);overflow-y:auto;}}</style> </head> <body> <div class="topbar"> <h1>Smart Choice Delivery — Orders</h1> <a href="/">&larr; Quote tool</a> <div class="stats"> <div class="stat"><strong id="statTotal">—</strong>Showing</div> <div class="stat"><strong id="statReview">—</strong>Needs review</div> <div class="stat"><strong id="statConflict">—</strong>Conflicts</div> </div> </div> <div class="toolbar"> <div class="week-nav"> <button id="prevWeek">&larr;</button> <span class="week-label" id="weekLabel">Loading...</span> <button id="nextWeek">&rarr;</button> <button class="btn btn-ghost btn-sm" id="allWeeks">All</button> </div> <input class="filter-input" id="filterInput" placeholder="Name, address, shop, driver..." style="width:200px;"> <select id="filterSource" class="filter-input" style="width:150px;"> <option value="">All sources</option> <option value="auto">Auto</option> <option value="manual">Manual</option> <option value="override">Override</option> <option value="needs_review">Needs review</option> <option value="conflict">Zone conflict</option> </select> <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button> <a class="btn btn-ghost btn-sm" href="/api/export?format=detail" download>Export detail</a> </a><button class="btn btn-ghost btn-sm" onclick="qbExport()">QB Export</button><button class="btn btn-ghost btn-sm" onclick="openReport('driver')">Driver Reports</button><button class="btn btn-ghost btn-sm" onclick="sendDriverPay()">Send Pay Emails</button>
-<button class="btn btn-ghost btn-sm" onclick="openReport('shop')">Shop Reports</button></div> <div id="errorMsg" class="error-msg" hidden></div> <div class="main"> <div class="loading" id="loadingMsg">Loading orders&hellip;</div> <div class="empty" id="emptyMsg" hidden>No orders for this period.</div> <table id="ordersTable" hidden> <thead><tr> <th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th> <th>Shop</th><th>Driver</th><th>Pcs</th><th>Zone</th> <th>Source</th><th>Suggested</th><th>Status</th><th>Actions</th> </tr></thead> <tbody id="ordersBody"></tbody> </table> </div> <div class="modal-bg" id="overrideModal" hidden> <div class="modal"> <h2>Override zone</h2> <label>Order ID</label><input id="ovOrderId" readonly style="background:var(--bg);"> <label>Address</label><input id="ovAddress" readonly style="background:var(--bg);"> <label>Current zone</label><input id="ovCurrent" readonly style="background:var(--bg);"> <div class="suggest-hint" id="ovHint"></div> <label>New zone code</label><input id="ovNew" placeholder="e.g. C4, COC, BNF" style="text-transform:uppercase;"> <label>Note (optional)</label><input id="ovNote" placeholder="Reason for override"> <div class="modal-actions"> <button class="btn" id="ovSaveBtn">Save</button> <button class="btn btn-ghost" id="ovCancelBtn">Cancel</button> </div> </div> </div> <div class="modal-bg" id="photoModal" hidden onclick="if(event.target===this)this.hidden=true;"> <div class="modal" style="max-width:600px;text-align:center;"> <img id="photoModalImg" style="max-width:100%;max-height:70vh;border-radius:8px;" src=""> <div class="modal-actions" style="justify-content:center;"> <button class="btn btn-ghost" onclick="document.getElementById('photoModal').hidden=true;">Close</button> </div> </div> </div> <script>
-/* ORDERS.HTML BUILD MARKER: 2026-08-17-focus-override-fix-v2
-   If you don't see this exact comment in View Page Source on the live
-   site, the deploy did not pick up this file - re-upload/redeploy. */
-var allOrders = []; var currentOverrideId = null; var weekOffset = 0; var showAllWeeks = false;
+import { getStore } from '@netlify/blobs';
 
-function getWeekBounds(offset) {
-var now = new Date();
-var day = now.getDay();
-var monday = new Date(now);
-monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-monday.setHours(0,0,0,0);
-var sunday = new Date(monday);
-sunday.setDate(monday.getDate() + 6);
-sunday.setHours(23,59,59,999);
-return { start: monday, end: sunday };
-}
-
-function formatWeekLabel(bounds) {
-var opts = { month:'short', day:'numeric' };
-return bounds.start.toLocaleDateString('en-CA', opts) + ' — ' + bounds.end.toLocaleDateString('en-CA', opts);
-}
-
-function updateWeekLabel() {
-var label = document.getElementById('weekLabel');
-if (showAllWeeks) { label.textContent = 'All dates'; return; }
-label.textContent = formatWeekLabel(getWeekBounds(weekOffset));
-}
-
-function parseOrderDate(o) {
-var raw = o.date || o.received_at;
-if (!raw) return new Date(0);
-// Bare YYYY-MM-DD (date-only, no time/timezone - e.g. from driver.html's
-// <input type="date">) must be parsed as a LOCAL calendar date. JS treats
-// a bare ISO date string as UTC midnight per spec, which in timezones
-// behind UTC shifts it backward several hours - sometimes enough to land
-// on the previous calendar day and push the order across a week boundary
-// in this page's date-filtered table view, even though it still matches
-// in the unfiltered search/card view. Full timestamps (received_at) are
-// NOT affected by this and still parse normally below.
-var isoDateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-if (isoDateOnly) return new Date(parseInt(isoDateOnly[1]), parseInt(isoDateOnly[2]) - 1, parseInt(isoDateOnly[3]));
-var d = new Date(raw);
-if (!isNaN(d.getTime())) return d;
-var months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-var m = raw.match(/(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
-if (m) return new Date(parseInt(m[3]), months[m[2]] || 0, parseInt(m[1]));
-return new Date(0);
-}
-
-function escapeHtml(s) {
-if (s === null || s === undefined) return '';
-var d = document.createElement('div');
-d.textContent = String(s);
-return d.innerHTML;
-}
-
-function getDeliveryStatus(o) {
-if (!o.delivery_status) return '';
-if (Array.isArray(o.delivery_status)) return o.delivery_status[0] || '';
-return String(o.delivery_status).split(',')[0];
-}
-
-function getDeliveryStatusFull(o) {
-if (!o.delivery_status) return '';
-if (Array.isArray(o.delivery_status)) return o.delivery_status.join(', ');
-return String(o.delivery_status);
-}
-
-function sourceBadge(o) {
-if (o.zone_conflict) return '<span class="badge badge-conflict">Conflict</span>';
-var s = o.zone_source;
-if (s === 'auto') return '<span class="badge badge-auto">Auto</span>';
-if (s === 'override') return '<span class="badge badge-override">Override</span>';
-if (s === 'needs_review') return '<span class="badge badge-review">Review</span>';
-return '<span class="badge badge-manual">Manual</span>';
-}
-function focusCard(btn) {
-  var el = btn;
-  while (el && el.parentNode && el.parentNode.id !== 'ordersCards') {
-    el = el.parentNode;
-  }
-  if (!el) return;
-  var cards = document.querySelectorAll('#ordersCards > div');
-  var isFocused = el.getAttribute('data-focused') === '1';
-  cards.forEach(function(c) {
-    c.style.display = '';
-    c.removeAttribute('data-focused');
-    c.style.border = '1px solid var(--border)';
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
   });
-  if (!isFocused) {
-    cards.forEach(function(c) {
-      if (c !== el) c.style.display = 'none';
-    });
-    el.setAttribute('data-focused', '1');
-    el.style.border = '2px solid var(--accent)';
+}
+
+// Map Zoho's "Shop (with Group Name)" to shop code
+// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
+function extractShopCode(shopWithGroup) {
+  if (!shopWithGroup) return null;
+  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Map Zoho's "Zone (with Group Name)" to zone code
+// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
+function extractZoneCode(zoneWithGroup) {
+  if (!zoneWithGroup) return null;
+  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Determine if zone needs auto-calculation
+function needsZoneCalculation(zoneCode) {
+  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
+  return false;
+}
+
+// Event-type pricing codes from driver.html's Event Type overlay (Special
+// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
+// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
+// are tracked under their own code. None of them should ever be
+// re-suggested or overwritten by the address-based zone matcher below.
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
+function isEventZoneCode(zoneCode) {
+  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
+}
+
+async function suggestZone(address, shopLat, shopLng, key) {
+  try {
+    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
+    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?${params}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
   }
 }
- 
-function applyFilters() {
-var text = document.getElementById('filterInput').value.toLowerCase();
-var src = document.getElementById('filterSource').value;
-var bounds = showAllWeeks ? null : getWeekBounds(weekOffset);
-var filtered = allOrders.filter(function(o) {
-if (bounds && !text) {
-var d = parseOrderDate(o);
-if (d < bounds.start || d > bounds.end) return false;
-}
-if (text) {
-var hay = [o.name, o.address, o.formatted_address, o.shop_code, o.shop_full, o.driver, o.zone_code, o.order_id]
-.filter(Boolean).join(' ').toLowerCase();
-if (hay.indexOf(text) === -1) return false;
-}
-if (src) {
-if (src === 'conflict') return !!o.zone_conflict;
-if (src !== o.zone_source) return false;
-}
-return true;
-});
-document.getElementById('statTotal').textContent = filtered.length;
-document.getElementById('statReview').textContent = filtered.filter(function(o){ return o.zone_source === 'needs_review'; }).length;
-document.getElementById('statConflict').textContent = filtered.filter(function(o){ return !!o.zone_conflict; }).length;
-if (!filtered.length) {
-document.getElementById('ordersTable').hidden = true;
-document.getElementById('emptyMsg').hidden = false;
-var ce = document.getElementById('ordersCards');
-if (ce) ce.hidden = true;
-return;
-}
-document.getElementById('emptyMsg').hidden = true;
-if (text) {
-document.getElementById('ordersTable').hidden = true;
-var cardsEl = document.getElementById('ordersCards');
-if (!cardsEl) {
-cardsEl = document.createElement('div');
-cardsEl.id = 'ordersCards';
-document.getElementById('ordersTable').parentNode.insertBefore(cardsEl, document.getElementById('ordersTable'));
-}
-cardsEl.hidden = false;
- cardsEl.innerHTML = filtered.map(function(o) {
-  var statusArr = Array.isArray(o.delivery_status) ? o.delivery_status : (o.delivery_status ? [o.delivery_status] : []);
-  var mainStatus = statusArr.filter(function(s){ return ['Direct to Address','Neighboured','Redirect','Undeliverable'].indexOf(s) >= 0; }).join(', ');
-  var subStatus = statusArr.filter(function(s){ return ['Direct to Address','Neighboured','Redirect','Undeliverable'].indexOf(s) < 0; }).join(', ');
-  var statusLine = mainStatus + (subStatus ? ' — ' + subStatus : '') + (o.neighboured_to ? ' — ' + o.neighboured_to : '');
-  var bottomLine = [];
-  if (o.accepted_by) bottomLine.push('Accepted: ' + o.accepted_by);
-  if (o.delivery_time) bottomLine.push('Time: ' + o.delivery_time);
-  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;">'
-    + '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'
-    + '<span style="font-size:16px;font-weight:700;color:var(--accent);">' + escapeHtml(o.shop_code||'') + '</span>'
-    + '<span style="font-size:13px;color:var(--accent);margin-left:8px;font-weight:500;">' + escapeHtml(o.shop_full||o.shop||'') + '</span>'
-    + '<span style="font-size:11px;color:var(--ink-soft);">' + escapeHtml(o.date||(o.received_at||'').slice(0,10)) + ' #' + escapeHtml(o.order_id||'') + '</span>'
-    + '</div>'
-    + '<div style="font-size:13px;font-weight:600;margin-bottom:2px;">' + escapeHtml(o.name||'') + '</div>'
-    + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(o.formatted_address||o.address||'') + (o.community ? ' &mdash; <span style="color:var(--accent);font-weight:600;">' + escapeHtml(o.community) + '</span>' : '') + (o.has_photo ? ' &nbsp;<button onclick="viewPhoto(\'' + escapeHtml(o.id) + '\')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;">&#128247; Photo</button>' : '') + '</div>'
-    + '<div style="font-size:12px;margin-bottom:4px;">'
-    + '<span style="background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:700;margin-right:8px;">' + escapeHtml(o.zone_code||'') + '</span>'
-    + 'Driver: <strong>' + escapeHtml(o.driver||'') + '</strong>'
-    + ' &bull; Pcs: <strong>' + escapeHtml(String(o.total_pieces||1)) + '</strong>'
-        + '</div>'
-    + (statusLine ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:2px;">Status: ' + escapeHtml(statusLine) + '</div>' : '')
-    + (bottomLine.length ? '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;">' + escapeHtml(bottomLine.join(' • ')) + '</div>' : '')
-   + '<div style="display:flex;gap:8px;">'
-    + '<button class="btn btn-ghost btn-sm" style="min-height:44px;min-width:60px;touch-action:manipulation;" onclick="focusCard(this)">Focus</button>'
-    + '<button class="btn btn-ghost btn-sm" style="min-height:36px;" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>'
-    + '<button class="btn-danger" style="min-height:36px;touch-action:manipulation;" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id||o.id) + '\')">Delete</button>'
-    + '</div>'
-    + '</div>'
-}).join('');
-return;
-}
-var cardsEl2 = document.getElementById('ordersCards');
-if (cardsEl2) cardsEl2.hidden = true;
-document.getElementById('ordersTable').hidden = false;
-var rows = filtered.map(function(o) {
-try {
-var suggested = (o.zone_suggestion && o.zone_suggestion.suggested) ? o.zone_suggestion.suggested : '';
-var suggestedDisplay = (suggested && suggested !== o.zone_code) ? '<span style="color:var(--ink-soft);font-size:11px;">' + escapeHtml(suggested) + '</span>' : '';
-var status = getDeliveryStatus(o);
-var statusFull = getDeliveryStatusFull(o);
-return '<tr>'
-+ '<td>' + escapeHtml(o.date || (o.received_at || '').slice(0,10)) + '</td>'
-+ '<td>' + escapeHtml(o.order_id) + '</td>'
-+ '<td>' + escapeHtml(o.name) + '</td>'
-+ '<td title="' + escapeHtml(o.formatted_address || o.address) + '">' + escapeHtml(o.formatted_address || o.address) + '</td>'
-+ '<td>' + escapeHtml(o.community || '') + '</td>'
-+ '<td>' + escapeHtml(o.shop_code) + '</td>'
-+ '<td>' + escapeHtml(o.driver) + '</td>'
-+ '<td>' + escapeHtml(o.total_pieces) + '</td>'
-+ '<td><span class="zone-badge">' + escapeHtml(o.zone_code || '') + '</span></td>'
-+ '<td>' + sourceBadge(o) + '</td>'
-+ '<td>' + suggestedDisplay + '</td>'
-+ '<td title="' + escapeHtml(statusFull) + '">' + escapeHtml(status) + '</td>'
-+ '<td><div class="td-actions">'
-+ (o.has_photo ? '<button class="btn btn-ghost btn-sm" onclick="viewPhoto(\'' + escapeHtml(o.id) + '\')">&#128247;</button>' : '')
-+ '<button class="btn btn-ghost btn-sm" onclick="openOverride(\'' + escapeHtml(o.id) + '\')">Override</button>'
-+ '<button class="btn-danger" onclick="deleteOrder(\'' + escapeHtml(o.id) + '\',\'' + escapeHtml(o.order_id || o.id) + '\')">Delete</button>'
-+ '</div></td>'
-+ '</tr>';
-} catch(e) {
-return '<tr><td colspan="13" style="color:red;font-size:12px;">Row error: ' + e.message + '</td></tr>';
-}
-});
-document.getElementById('ordersBody').innerHTML = rows.join('');
+
+async function getShopLocation(shopCode) {
+  try {
+    const store = getStore('flower-shops');
+    const { blobs } = await store.list();
+    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
+    const match = shops.filter(Boolean).find(s =>
+      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
+    );
+    return match ? { lat: match.lat, lng: match.lng } : null;
+  } catch (e) {
+    return null;
+  }
 }
 
-function loadOrders() {
-document.getElementById('loadingMsg').hidden = false;
-document.getElementById('errorMsg').hidden = true;
-document.getElementById('ordersTable').hidden = true;
-document.getElementById('emptyMsg').hidden = true;
-fetch('/api/orders').then(function(res) {
-if (!res.ok) throw new Error('Status ' + res.status);
-return res.json();
-}).then(function(data) {
-allOrders = data;
-document.getElementById('loadingMsg').hidden = true;
-applyFilters();
-}).catch(function(e) {
-document.getElementById('loadingMsg').hidden = true;
-var err = document.getElementById('errorMsg');
-err.textContent = 'Could not load orders: ' + e.message;
-err.hidden = false;
-});
-}
+export default async (req) => {
+  // Handle GET — list all orders
+  if (req.method === 'GET') {
+    try {
+      const store = getStore('flower-orders');
+      const url = new URL(req.url);
+      const limitParam = parseInt(url.searchParams.get('limit') || '500');
+      const { blobs } = await store.list();
+      const orders = await Promise.all(
+        blobs.slice(-Math.min(limitParam, 1000)).map(b => store.get(b.key, { type: 'json' }))
+      );
+      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+    } catch (e) {
+      return json({ error: 'Could not load orders: ' + e.message }, 500);
+    }
+  }  
+  // Handle POST — receive Zoho webhook
+  if
+   (req.method === 'POST') {
+    const key = process.env.GOOGLE_MAPS_KEY;
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+   let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return json({ error: 'Invalid JSON payload' }, 400);
+    }
 
-function viewPhoto(id) {
-  var modal = document.getElementById('photoModal');
-  var img = document.getElementById('photoModalImg');
-  img.src = '';
-  modal.hidden = false;
-  fetch('/api/order-photo/' + encodeURIComponent(id))
-    .then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
-    .then(function(data) { img.src = data.photo_data_url; })
-    .catch(function(e) { modal.hidden = true; alert('Could not load photo: ' + e.message); });
-}
+      // Map Zoho field names to our internal structure
+    const raw = {
+      date:             body['Date']                     || body['date']              || null,
+      order_id:         body['Order ID']                 || body['order_id']          || null,
+      name:             body['Name']                     || body['name']              || null,
+      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
+      shop:             body['Shop']                     || body['shop']              || null,
+     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
+      driver:           body['Driver']                   || body['driver']            || null,
+      driver_pay: body.driver_pay || body['driver_pay'] || 0,
+     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
+      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
+      zone:             body['Zone']                     || body['zone']              || null,
+      zone_full:        body['Zone (with Group Name)']   || null,
+      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
+      delivery_time:    body['Delivery Time']            || null,
+      contact_method:   body['Recipient Contact Method'] || null,
+      neighboured_to:   body['Neighboured To']           || null,
+      accepted_by:      body['Delivery Accepted By']       || null,
+      comments:         body['Comments']                 || null,
+    };
 
-function deleteOrder(id, label) {
-if (!confirm('Delete order "' + label + '"? This cannot be undone.')) return;
-fetch('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' })
-.then(function() {
-allOrders = allOrders.filter(function(o){ return o.id !== id; });
-applyFilters();
-})
-.catch(function(e) { alert('Could not delete: ' + e.message); });
-}
+    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || raw.zone;
 
-function openOverride(id) {
-var order = allOrders.filter(function(o){ return o.id === id; })[0];
-if (!order) return;
-currentOverrideId = id;
-document.getElementById('ovOrderId').value = order.order_id || id;
-document.getElementById('ovAddress').value = order.formatted_address || order.address || '';
-document.getElementById('ovCurrent').value = order.zone_code || '';
-var hint = (order.zone_suggestion && order.zone_suggestion.suggested)
-? 'System suggests: ' + order.zone_suggestion.suggested + ' (' + order.zone_suggestion.confidence + ' — ' + order.zone_suggestion.message + ')'
-: '';
-document.getElementById('ovHint').textContent = hint;
-document.getElementById('ovNew').value = (order.zone_suggestion && order.zone_suggestion.suggested) ? order.zone_suggestion.suggested : '';
-document.getElementById('ovNote').value = '';
-document.getElementById('overrideModal').hidden = false;
-}
- 
-function sendDriverPay() {
-  var weekEnd = prompt('Week ending (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
-  if (!weekEnd) return;
-  var driverCode = prompt('Driver code (or "all" for all drivers):', 'KE');
-  if (!driverCode) return;
-  if (!confirm('Send pay email to ' + driverCode.toUpperCase() + ' for week ending ' + weekEnd + '?')) return;
-  fetch('/api/send-driver-pay', {
-    method: 'POST',
-    headers: {'content-type':'application/json'},
-    body: JSON.stringify({week_end: weekEnd, driver_code: driverCode.toUpperCase()})
-  }).then(function(r){ return r.json(); }).then(function(d){
-    alert('Done! ' + d.emails_sent.length + ' emails sent.\n' + d.emails_sent.map(function(e){ return e.driver + ': ' + e.status; }).join('\n'));
-  }).catch(function(e){ alert('Failed: ' + e.message); });
-}
- 
-document.getElementById('ovSaveBtn').addEventListener('click', function() {
-var newZone = document.getElementById('ovNew').value.trim().toUpperCase();
-var note = document.getElementById('ovNote').value.trim();
-if (!newZone) { alert('Enter a zone code.'); return; }
-var btn = document.getElementById('ovSaveBtn');
-btn.disabled = true; btn.textContent = 'Saving...';
-fetch('/api/orders/' + encodeURIComponent(currentOverrideId), {
-method: 'PUT',
-headers: { 'content-type': 'application/json' },
-body: JSON.stringify({ zone_code: newZone, zone_source: 'override', zone_override_note: note, zone_conflict: false })
-}).then(function(res) {
-if (!res.ok) throw new Error('Status ' + res.status);
-return res.json();
-}).then(function(updated) {
-var idx = allOrders.findIndex(function(o){ return o.id === currentOverrideId; });
-if (idx >= 0) allOrders[idx] = updated;
-document.getElementById('overrideModal').hidden = true;
-applyFilters();
-}).catch(function(e) { alert('Could not save: ' + e.message); })
-.finally(function() { btn.disabled = false; btn.textContent = 'Save'; });
-});
+    // Wholesale deliveries use their own separate zone system (WPU, WAI,
+    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
+    // entered directly from Zoho). Checked BEFORE zone determination below:
+    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
+    // etc, and re-running a wholesale order's address through it could
+    // silently overwrite a correct wholesale code with an unrelated retail
+    // one - the same category of bug we already fixed for event-type codes.
+    const isWholesale = (raw.delivery_type === 'wholesale') ||
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
 
-document.getElementById('ovCancelBtn').addEventListener('click', function() {
-document.getElementById('overrideModal').hidden = true;
-});
-document.getElementById('overrideModal').addEventListener('click', function(e) {
-if (e.target === this) this.hidden = true;
-});
-document.getElementById('prevWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset--; updateWeekLabel(); applyFilters();
-});
-document.getElementById('nextWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset++; updateWeekLabel(); applyFilters();
-});
-document.getElementById('allWeeks').addEventListener('click', function() {
-showAllWeeks = true; updateWeekLabel(); applyFilters();
-});
-document.getElementById('filterInput').addEventListener('input', applyFilters);
-document.getElementById('filterSource').addEventListener('change', applyFilters);
-document.getElementById('refreshBtn').addEventListener('click', loadOrders);
+    // Auto-calculate zone if not entered or flagged as needing calculation
+    let zoneCode = enteredZoneCode;
+    let zoneSource = 'manual';
+    let zoneSuggestion = null;
 
-updateWeekLabel();
-loadOrders();
-function qbExport(){var weekEnd=prompt('Week ending date (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var startInv=prompt('Starting invoice number:','');if(!startInv)return;fetch('/api/qb-export?week_end='+weekEnd+'&start_invoice='+startInv).then(function(r){return r.blob();}).then(function(blob){var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='qb-invoices-'+weekEnd+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}).catch(function(e){alert('QB export failed: '+e.message);});}
- function openReport(type){var weekEnd=prompt('Week ending (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(!weekEnd)return;var code=prompt('Code (or "all"):','all');if(code===null)return;window.open('/api/reports?type='+type+'&week_end='+weekEnd+'&code='+code,'_blank');} 
-</script></body></html>
+    if (isWholesale) {
+      // Wholesale zone codes are authoritative as entered - never
+      // re-suggested against the retail address matcher. If no zone was
+      // entered at all, this needs a human to fill in rather than guessing
+      // a retail zone that doesn't apply to wholesale pricing.
+      if (enteredZoneCode) {
+        zoneCode = enteredZoneCode.toUpperCase();
+        zoneSource = 'manual';
+      } else {
+        zoneSource = 'needs_review';
+      }
+    } else if (isEventZoneCode(enteredZoneCode)) {
+      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
+      // never re-suggested/overwritten. Still look up the address for its
+      // community name (for tracking/reports), but ignore any suggested
+      // zone code that comes back with it.
+      zoneCode = enteredZoneCode.toUpperCase();
+      zoneSource = 'manual';
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+      }
+    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
+      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+      zoneSuggestion = await suggestZone(
+        raw.address,
+        shopLoc?.lat || 51.0447,
+        shopLoc?.lng || -114.0719,
+        key
+      );
+      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
+        zoneCode = zoneSuggestion.suggested;
+        zoneSource = 'auto';
+      } else {
+        zoneSource = 'needs_review';
+      }
+  } else if (enteredZoneCode) {
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
+        } else {
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
+        }
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
+      }
+    }
+  
+    
+
+    // Flag if manual zone differs from suggestion
+    const zoneConflict = !isWholesale &&
+      !isEventZoneCode(enteredZoneCode) &&
+      zoneSuggestion?.suggested &&
+      enteredZoneCode &&
+      zoneSuggestion.suggested !== enteredZoneCode &&
+      zoneSuggestion.confidence === 'high';
+
+    const orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const order = {
+      id: orderId,
+      received_at: new Date().toISOString(),
+      date: raw.date,
+      order_id: raw.order_id,
+      name: raw.name,
+      address: raw.address,
+      formatted_address: zoneSuggestion?.formatted_address || raw.address,
+      community: zoneSuggestion?.community || null,
+      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
+      shop_code: shopCode,
+      shop_full: raw.shop_full || raw.shop || null,
+      driver: raw.driver,
+      driver_pay: (function() {
+        if (raw.driver_pay) return parseFloat(raw.driver_pay);
+        const r = ratesData ? ratesData[zoneCode] : null;
+        if (!r) return 0;
+        const pieces = parseInt(raw.total_pieces || 1);
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        const base = (zoneCode === 'RURALKM' && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
+      })(),
+      total_pieces: raw.total_pieces,
+      zone_entered: enteredZoneCode,
+      zone_code: zoneCode,
+      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
+      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
+      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
+      delivery_status: raw.delivery_status,
+      delivery_time: raw.delivery_time,
+      contact_method: raw.contact_method,
+      neighboured_to: raw.neighboured_to,
+      accepted_by: raw.accepted_by,
+      comments: raw.comments,
+      has_photo: !!body.photo_base64,
+    };
+
+    try {
+      const store = getStore('flower-orders');
+      await store.setJSON(orderId, order);
+      // Photo is stored in a separate blob store, not embedded in the order
+      // record itself - GET /api/orders loads every order's full JSON on
+      // every page view, so embedding potentially-large photo data there
+      // would slow that down for every order, viewed or not. The photo is
+      // only fetched on-demand when someone actually wants to view it.
+      if (body.photo_base64) {
+        try {
+          const photoStore = getStore('flower-order-photos');
+          await photoStore.set(orderId, body.photo_base64);
+        } catch (e) {
+          // Order itself already saved successfully - don't fail the whole
+          // submission just because the photo couldn't be stored, but the
+          // has_photo flag above would then be misleading. Downgrade it.
+          order.has_photo = false;
+          await store.setJSON(orderId, order);
+        }
+      }
+      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
+    } catch (e) {
+      return json({ error: 'Could not store order: ' + e.message }, 500);
+   }
+  }
+  return json({ error: 'Method not allowed' }, 405);
+};
+
+export const config = { path: '/api/orders' };
