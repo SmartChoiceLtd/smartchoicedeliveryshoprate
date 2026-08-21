@@ -415,9 +415,8 @@ function getNeighbourZones(code) {
   return base;
 }
 
-function getWholesaleZoneForShop(shop) {
-  if (!shop || !shop.lat || !shop.lng) return 'WPU';
-  var lat = shop.lat, lng = shop.lng;
+function getWholesaleZoneForPoint(lat, lng) {
+  if (lat == null || lng == null) return 'WPU';
   if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return 'WPU';
   var towns = [
     {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
@@ -440,6 +439,11 @@ function getWholesaleZoneForShop(shop) {
     if (hav({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return t.zone;
   }
   return 'WPU';
+}
+
+function getWholesaleZoneForShop(shop) {
+  if (!shop || !shop.lat || !shop.lng) return 'WPU';
+  return getWholesaleZoneForPoint(shop.lat, shop.lng);
 }
 
 function buildZoneButtons(suggested, showAll) {
@@ -520,14 +524,32 @@ function updatePay() {
   document.getElementById('payPreview').hidden = false;
 }
 
-function lookupZone(address) {
+function lookupZone(address, placeLat, placeLng) {
   document.getElementById('zoneResult').hidden = true;
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
   selectedZone = '';
 
   if (deliveryType === 'wholesale') {
+    var wShopId = document.getElementById('fShop').value;
+    var wShop = shops.find(function(s) { return s.id === wShopId; });
     document.getElementById('zoneLoading').hidden = true;
+    if (wShop) {
+      // Registered shop selected - unchanged behavior, zone from shop location.
+      var wZoneFromShop = getWholesaleZoneForShop(wShop);
+      setZone(wZoneFromShop, wZoneFromShop + ' - auto from ' + wShop.name, false);
+      return;
+    }
+    if (typeof placeLat === 'number' && typeof placeLng === 'number') {
+      // No registered shop - client not in our shop database (e.g. Safeway,
+      // a home-based shop). Determine wholesale zone from the actual
+      // delivery address instead.
+      var wZoneFromAddr = getWholesaleZoneForPoint(placeLat, placeLng);
+      setZone(wZoneFromAddr, wZoneFromAddr + ' - based on delivery address', false);
+      return;
+    }
+    // No shop and no coordinates yet (e.g. typed and tabbed away without
+    // picking an autocomplete suggestion) - fall back to manual selection.
     document.getElementById('zoneManual').hidden = false;
     buildZoneButtons(null);
     return;
@@ -559,10 +581,10 @@ function lookupZone(address) {
 /* Shop search dropdown */
 function populateShopDropdown() {
   if (deliveryType === 'wholesale') {
-    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop)';
+    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop) — optional';
     document.getElementById('wholesalerField').hidden = false;
-    document.getElementById('fAddress').placeholder = 'Auto-fills from shop selection';
-    document.getElementById('recipientNameField').hidden = true;
+    document.getElementById('fAddress').placeholder = 'Auto-fills from shop, or type address directly';
+    document.getElementById('recipientNameField').hidden = false;
     document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
@@ -696,7 +718,14 @@ async function submitDelivery() {
   var address = formattedAddress || document.getElementById('fAddress').value.trim();
   var shopId = document.getElementById('fShop').value;
   if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; return; }
-  if (!shopId) { errEl.textContent = 'Select a shop.'; errEl.hidden = false; return; }
+  if (deliveryType === 'wholesale') {
+    if (!shopId && !document.getElementById('fName').value.trim()) {
+      errEl.textContent = 'Select a receiving shop, or enter a recipient name.';
+      errEl.hidden = false; return;
+    }
+  } else if (!shopId) {
+    errEl.textContent = 'Select a shop.'; errEl.hidden = false; return;
+  }
   if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
   if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
   var photoFile = document.getElementById('fPhoto').files[0];
@@ -712,11 +741,37 @@ async function submitDelivery() {
   var pieces = parseInt(document.getElementById('fPieces').value) || 1;
   var driverPay = pay.total;
   var billingParty = '';
+  var wsName = document.getElementById('fName').value.trim();
+  var wsAddress = address;
+  var wsShopName = shop ? shop.name : shopId;
+  var wsShopCode = shop ? shop.name.split(' ')[0] : '';
   if (deliveryType === 'wholesale') {
     var active = document.querySelector('#billingToggle .toggle-btn.active');
     var billing = active ? active.dataset.billing : 'shop';
+    if (!shop) billing = 'wholesaler'; // no shop exists to bill under 'shop' billing
     var w = document.getElementById('fWholesaler').value;
+    var wOpt = document.querySelector('#fWholesaler option[value="' + w + '"]');
+    var wholesalerDisplayName = wOpt ? wOpt.textContent : w;
     billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
+    if (billing === 'wholesaler') {
+      // Wholesaler is billed - DSHOP = wholesaler (who gets invoiced).
+      // name/address show the receiving shop as reference info on that
+      // invoice (or a direct recipient if there's no receiving shop).
+      wsShopName = wholesalerDisplayName;
+      wsShopCode = w;
+      wsName = shop ? shop.name : document.getElementById('fName').value.trim();
+      wsAddress = shop ? shop.address : address;
+    } else {
+      // Shop is billed - DSHOP = receiving shop (who gets invoiced).
+      // name/address show the sending wholesaler as reference info. No
+      // wholesaler address is on file anywhere in the system currently, so
+      // the wholesaler's name is used in the address field as a fallback
+      // reference rather than leaving it blank.
+      wsShopName = shop ? shop.name : '';
+      wsShopCode = shop ? shop.name.split(' ')[0] : '';
+      wsName = wholesalerDisplayName;
+      wsAddress = wholesalerDisplayName;
+    }
   }
   var photoBase64 = null;
   if (photoFile) {
@@ -734,10 +789,10 @@ async function submitDelivery() {
   var payload = {
     date: document.getElementById('fDate').value,
     order_id: document.getElementById('fOrderId').value.trim() || '1',
-    name: document.getElementById('fName').value.trim(),
-    address: address,
-    shop: shop ? shop.name : shopId,
-    shop_code: shop ? shop.name.split(' ')[0] : '',
+    name: wsName,
+    address: wsAddress,
+    shop: wsShopName,
+    shop_code: wsShopCode,
     driver: driverCode,
     driver_name: driverName,
     total_pieces: pieces,
@@ -971,7 +1026,8 @@ function loadMaps(key) {
       var place = ac.getPlace();
       if (place.geometry) {
         formattedAddress = place.formatted_address;
-        lookupZone(place.formatted_address);
+        var loc = place.geometry.location;
+        lookupZone(place.formatted_address, loc.lat(), loc.lng());
       }
     });
   };
