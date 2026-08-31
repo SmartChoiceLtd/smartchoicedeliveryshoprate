@@ -103,6 +103,9 @@
 
     <div class="card">
       <h2>Delivery Details</h2>
+      <button type="button" class="btn btn-secondary" id="scanTagBtn" style="margin-bottom:14px;">&#128248; Scan Tag</button>
+      <input type="file" id="fTagPhoto" accept="image/*" capture="environment" hidden>
+      <div id="scanTagStatus" hidden style="font-size:12px;color:var(--ink-soft);margin:-8px 0 14px;"></div>
       <div class="field-row">
         <div class="field">
           <label>Date</label>
@@ -711,6 +714,50 @@ function compressPhotoToBase64(file) {
   });
 }
 
+// Scans a delivery tag photo via the vision API and auto-fills Order ID,
+// Recipient Name, and Delivery Address for the driver to review/edit
+// before submitting - never submits automatically, since OCR-style
+// extraction across many different tag layouts/handwriting can be wrong.
+async function scanTag(file) {
+  var statusEl = document.getElementById('scanTagStatus');
+  var btn = document.getElementById('scanTagBtn');
+  statusEl.hidden = false;
+  statusEl.textContent = 'Reading tag...';
+  btn.disabled = true;
+  try {
+    var photoBase64 = await compressPhotoToBase64(file);
+    var res = await fetch('/api/scan-tag', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ photo_base64: photoBase64 })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not read tag.');
+
+    var filled = [];
+    if (data.order_id) { document.getElementById('fOrderId').value = data.order_id; filled.push('Order ID'); }
+    if (data.name) { document.getElementById('fName').value = data.name; filled.push('Name'); }
+    if (data.address) {
+      document.getElementById('fAddress').value = data.address;
+      formattedAddress = data.address;
+      filled.push('Address');
+      // Trigger the normal address-based zone lookup, same as if the
+      // driver had typed/selected it manually.
+      lookupZone(data.address);
+    }
+
+    if (filled.length) {
+      statusEl.textContent = 'Filled from tag: ' + filled.join(', ') + '. Please review before submitting.';
+    } else {
+      statusEl.textContent = 'Could not read any fields from that tag. Please enter manually.';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Could not scan tag: ' + e.message + '. Please enter manually.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
@@ -865,7 +912,7 @@ async function init() {
     populateShopDropdown();
 
     var now = new Date();
-    document.getElementById('fDate').value = now.toISOString().slice(0,10);
+    document.getElementById('fDate').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
     document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
 
     var cfgRes = await fetch('/api/config');
@@ -998,6 +1045,14 @@ async function init() {
     });
 
     document.getElementById('submitBtn').addEventListener('click', submitDelivery);
+    document.getElementById('scanTagBtn').addEventListener('click', function() {
+      document.getElementById('fTagPhoto').click();
+    });
+    document.getElementById('fTagPhoto').addEventListener('change', function() {
+      var file = this.files[0];
+      if (file) scanTag(file);
+      this.value = ''; // allow scanning another tag later without re-selecting the same file
+    });
     document.getElementById('summaryBtn').addEventListener('click', function() {
       window.location.href = '/driver-summary/' + driverCode.toLowerCase();
     });
