@@ -98,6 +98,7 @@ export default async (req) => {
       order_id:         body['Order ID']                 || body['order_id']          || null,
       name:             body['Name']                     || body['name']              || null,
       address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
+      unit: body.unit || body['Unit'] || null,
       shop:             body['Shop']                     || body['shop']              || null,
      shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
       driver:           body['Driver']                   || body['driver']            || null,
@@ -115,7 +116,7 @@ export default async (req) => {
     };
 
     const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
-    const enteredZoneCode = extractZoneCode(raw.zone_full) || raw.zone;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
 
     // Wholesale deliveries use their own separate zone system (WPU, WAI,
     // WCO, etc. - determined by driver.html's own wholesale zone logic, or
@@ -213,6 +214,7 @@ export default async (req) => {
       order_id: raw.order_id,
       name: raw.name,
       address: raw.address,
+      unit: raw.unit || null,
       formatted_address: zoneSuggestion?.formatted_address || raw.address,
       community: zoneSuggestion?.community || null,
       distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
