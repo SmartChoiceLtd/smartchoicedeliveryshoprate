@@ -163,6 +163,7 @@
       <div class="field">
         <label>Delivery Address</label>
         <input type="text" id="fAddress" placeholder="Start typing address...">
+        <input type="text" id="fUnit" placeholder="Unit / Suite / Apt # (optional)" style="margin-top:8px;">
         <div id="zoneResult" hidden>
           <div class="zone-result">
             <div>
@@ -655,6 +656,7 @@ function resetForm() {
   document.getElementById('fOrderId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
+  document.getElementById('fUnit').value = '';
   document.getElementById('fPieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
@@ -857,6 +859,7 @@ async function submitDelivery() {
     order_id: document.getElementById('fOrderId').value.trim() || '1',
     name: wsName,
     address: wsAddress,
+    unit: document.getElementById('fUnit').value.trim(),
     shop: wsShopName,
     shop_code: wsShopCode,
     driver: driverCode,
