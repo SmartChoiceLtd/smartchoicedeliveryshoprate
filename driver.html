@@ -745,6 +745,25 @@ async function scanTag(file) {
       // driver had typed/selected it manually.
       lookupZone(data.address);
     }
+    if (data.shop_name) {
+      // Tags print the shop's full name, not its short code (e.g.
+      // "Kensington Flowers" vs the stored "KF KENSINGTON FLOWERS"), so
+      // match by substring against the loaded shop list. Only
+      // auto-select on exactly one confident match - billing depends on
+      // the right shop, so an ambiguous/no match falls back to just
+      // pre-filling the search box for the driver to confirm themselves
+      // rather than guessing.
+      var extractedUpper = data.shop_name.trim().toUpperCase();
+      var matches = shops.filter(function(s) { return s.name.toUpperCase().includes(extractedUpper); });
+      if (matches.length === 1) {
+        document.getElementById('fShop').value = matches[0].id;
+        document.getElementById('fShopSearch').value = matches[0].name;
+        filled.push('Shop (' + matches[0].name + ')');
+      } else {
+        document.getElementById('fShopSearch').value = data.shop_name;
+        filled.push('Shop name (please confirm/select from list)');
+      }
+    }
 
     if (filled.length) {
       statusEl.textContent = 'Filled from tag: ' + filled.join(', ') + '. Please review before submitting.';
