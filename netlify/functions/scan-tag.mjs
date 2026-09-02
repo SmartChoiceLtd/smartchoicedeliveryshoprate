@@ -7,13 +7,14 @@ function json(data, status = 200) {
 
 const EXTRACTION_PROMPT = `You are looking at a photo of a delivery tag attached to a flower/gift order. These tags come in many different shapes, sizes, and layouts - printed labels, handwritten cards, different fonts and orientations.
 
-Extract exactly these three fields from the tag:
+Extract exactly these four fields from the tag:
 - order_id: the order number/tag code (often near "Order #", "Tag", or just a standalone number)
 - name: the recipient's name
 - address: the delivery address (street address, as complete as legible)
+- shop_name: the sending/originating shop's full name if printed on the tag (usually NOT abbreviated to a short code - it's typically the full business name, e.g. "Kensington Flowers")
 
 Respond with ONLY a raw JSON object, no markdown formatting, no code fences, no explanation. Use this exact shape:
-{"order_id": "...", "name": "...", "address": "..."}
+{"order_id": "...", "name": "...", "address": "...", "shop_name": "..."}
 
 If a field is not legible or not present on the tag, use an empty string "" for that field rather than guessing or making up a value. Never fabricate information that isn't actually visible on the tag.`;
 
@@ -96,7 +97,8 @@ export default async (req) => {
     return json({
       order_id: extracted.order_id || '',
       name: extracted.name || '',
-      address: extracted.address || ''
+      address: extracted.address || '',
+      shop_name: extracted.shop_name || ''
     });
   } catch (e) {
     return json({ error: 'Could not process tag: ' + e.message }, 500);
