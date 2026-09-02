@@ -720,6 +720,23 @@ function compressPhotoToBase64(file) {
 // Recipient Name, and Delivery Address for the driver to review/edit
 // before submitting - never submits automatically, since OCR-style
 // extraction across many different tag layouts/handwriting can be wrong.
+// Generic business-name words tags commonly print but internal shop
+// shorthand usually doesn't (e.g. tag says "Deer Valley Florist", shop
+// record is stored as "DV DeerValley") - stripped before comparing so
+// these differences don't cause a real match to be missed.
+var SHOP_NAME_FILLER_WORDS = ['FLORIST','FLOWERS','FLOWER','SHOP','GIFTS','GIFT','BOUTIQUE','STUDIO','DESIGNS','DESIGN','INC','LTD','CO','LLC'];
+
+// Normalizes a shop name for fuzzy comparison: uppercase, strip filler
+// words, then collapse all remaining whitespace/punctuation so formatting
+// differences like "Deer Valley" vs "DeerValley" don't prevent a match.
+function normalizeShopNameForMatch(s) {
+  var upper = s.toUpperCase();
+  SHOP_NAME_FILLER_WORDS.forEach(function(w) {
+    upper = upper.replace(new RegExp('\\b' + w + '\\b', 'g'), '');
+  });
+  return upper.replace(/[^A-Z0-9]/g, '');
+}
+
 async function scanTag(file) {
   var statusEl = document.getElementById('scanTagStatus');
   var btn = document.getElementById('scanTagBtn');
@@ -748,15 +765,19 @@ async function scanTag(file) {
       lookupZone(data.address);
     }
     if (data.shop_name) {
-      // Tags print the shop's full name, not its short code (e.g.
-      // "Kensington Flowers" vs the stored "KF KENSINGTON FLOWERS"), so
-      // match by substring against the loaded shop list. Only
-      // auto-select on exactly one confident match - billing depends on
-      // the right shop, so an ambiguous/no match falls back to just
-      // pre-filling the search box for the driver to confirm themselves
-      // rather than guessing.
-      var extractedUpper = data.shop_name.trim().toUpperCase();
-      var matches = shops.filter(function(s) { return s.name.toUpperCase().includes(extractedUpper); });
+      // Tags print the shop's full customer-facing name, not the internal
+      // short code/shorthand (e.g. "Deer Valley Florist" on the tag vs
+      // "DV DeerValley" in our records) - normalize both sides before
+      // comparing so spacing and generic filler words don't cause a real
+      // match to be missed. Only auto-select on exactly one confident
+      // match - billing depends on the right shop, so an ambiguous/no
+      // match falls back to just pre-filling the search box for the
+      // driver to confirm themselves rather than guessing.
+      var extractedNorm = normalizeShopNameForMatch(data.shop_name.trim());
+      var matches = shops.filter(function(s) {
+        var shopNorm = normalizeShopNameForMatch(s.name);
+        return extractedNorm.length > 2 && (shopNorm.includes(extractedNorm) || extractedNorm.includes(shopNorm));
+      });
       if (matches.length === 1) {
         document.getElementById('fShop').value = matches[0].id;
         document.getElementById('fShopSearch').value = matches[0].name;
@@ -766,6 +787,7 @@ async function scanTag(file) {
         filled.push('Shop name (please confirm/select from list)');
       }
     }
+
 
     if (filled.length) {
       statusEl.textContent = 'Filled from tag: ' + filled.join(', ') + '. Please review before submitting.';
