@@ -769,19 +769,37 @@ async function scanTag(file) {
       // short code/shorthand (e.g. "Deer Valley Florist" on the tag vs
       // "DV DeerValley" in our records) - normalize both sides before
       // comparing so spacing and generic filler words don't cause a real
-      // match to be missed. Only auto-select on exactly one confident
-      // match - billing depends on the right shop, so an ambiguous/no
-      // match falls back to just pre-filling the search box for the
-      // driver to confirm themselves rather than guessing.
+      // match to be missed.
+      //
+      // Two different shops can legitimately share a word (e.g. "KF
+      // Kensington" and "FPK Funky Petals Kensington" both contain
+      // "Kensington") - a plain substring match would find both and
+      // refuse to pick either. To disambiguate, compare against each
+      // shop's name with its code prefix stripped (tags never print the
+      // code), and prefer an EXACT match over a merely partial one: an
+      // exact match is a much stronger signal of the real shop than a
+      // substring hit inside an unrelated longer name.
       var extractedNorm = normalizeShopNameForMatch(data.shop_name.trim());
-      var matches = shops.filter(function(s) {
-        var shopNorm = normalizeShopNameForMatch(s.name);
-        return extractedNorm.length > 2 && (shopNorm.includes(extractedNorm) || extractedNorm.includes(shopNorm));
+      var scored = shops.map(function(s) {
+        var codeStripped = s.name.trim().replace(/^\S+\s*/, '') || s.name;
+        var shopNorm = normalizeShopNameForMatch(codeStripped);
+        var fullNorm = normalizeShopNameForMatch(s.name);
+        var isExact = extractedNorm.length > 2 && shopNorm === extractedNorm;
+        var isPartial = extractedNorm.length > 2 && !isExact && (fullNorm.includes(extractedNorm) || extractedNorm.includes(fullNorm));
+        return { shop: s, isExact: isExact, isPartial: isPartial };
       });
-      if (matches.length === 1) {
-        document.getElementById('fShop').value = matches[0].id;
-        document.getElementById('fShopSearch').value = matches[0].name;
-        filled.push('Shop (' + matches[0].name + ')');
+      var exactMatches = scored.filter(function(x) { return x.isExact; });
+      var partialMatches = scored.filter(function(x) { return x.isPartial; });
+      var chosen = null;
+      if (exactMatches.length === 1) {
+        chosen = exactMatches[0].shop;
+      } else if (exactMatches.length === 0 && partialMatches.length === 1) {
+        chosen = partialMatches[0].shop;
+      }
+      if (chosen) {
+        document.getElementById('fShop').value = chosen.id;
+        document.getElementById('fShopSearch').value = chosen.name;
+        filled.push('Shop (' + chosen.name + ')');
       } else {
         document.getElementById('fShopSearch').value = data.shop_name;
         filled.push('Shop name (please confirm/select from list)');
