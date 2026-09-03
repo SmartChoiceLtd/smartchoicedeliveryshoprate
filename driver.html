@@ -724,7 +724,7 @@ function compressPhotoToBase64(file) {
 // shorthand usually doesn't (e.g. tag says "Deer Valley Florist", shop
 // record is stored as "DV DeerValley") - stripped before comparing so
 // these differences don't cause a real match to be missed.
-var SHOP_NAME_FILLER_WORDS = ['FLORIST','FLOWERS','FLOWER','SHOP','GIFTS','GIFT','BOUTIQUE','STUDIO','DESIGNS','DESIGN','INC','LTD','CO','LLC'];
+var SHOP_NAME_FILLER_WORDS = ['FLORIST','FLORISTS','FLOWERS','FLOWER','FLORAL','FLORALS','SHOP','SHOPPE','GIFTS','GIFT','BOUTIQUE','STUDIO','DESIGNS','DESIGN','BLOOMS','BLOOM','PETALS','GARDEN','GARDENS','INC','LTD','LLC','CO','CORP','CORPORATION','LIMITED','LLP','YOUR','THE','AND'];
 
 // Normalizes a shop name for fuzzy comparison: uppercase, strip filler
 // words, then collapse all remaining whitespace/punctuation so formatting
