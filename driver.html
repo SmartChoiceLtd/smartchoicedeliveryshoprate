@@ -95,10 +95,12 @@
   </div>
   <div class="container">
     <div id="errorMsg" class="error" hidden></div>
+    <div id="draftRestoredMsg" class="success" hidden></div>
 
     <div class="toggle-row" id="deliveryTypeToggle">
       <button class="toggle-btn active" data-type="store">Store to Door</button>
       <button class="toggle-btn" data-type="wholesale">Wholesale</button>
+      <button class="toggle-btn" data-type="events">Events</button>
     </div>
 
     <div class="card">
@@ -116,10 +118,10 @@
           <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="eventTypeField" hidden>
         <label>Event Type</label>
         <select id="fEventType">
-          <option value="">None</option>
+          <option value="" disabled selected>Select event type...</option>
           <option value="SPEC">Special Event</option>
           <option value="WED">Wedding</option>
           <option value="FUN">Funeral</option>
@@ -290,6 +292,120 @@ var formattedAddress = '';
 var matchedCommunity = '';
 var matchedDistanceKm = null;
 var deliveryType = 'store';
+
+// ===== DRAFT AUTO-SAVE/RESTORE =====
+// Mobile browsers commonly kill a backgrounded tab's memory to free up
+// RAM when the driver switches to take a call or check a text - on
+// return, the page isn't "resumed," it's freshly reloaded, silently
+// wiping any in-progress entry that only ever lived in JS memory. This
+// persists the form to localStorage as the driver fills it in, and
+// restores it automatically if the page reloads mid-entry. Cleared on
+// successful submission or "Next Delivery" so it never bleeds into the
+// next entry. The photo itself can't be persisted this way (file
+// references don't survive a reload) - if Doorstep was selected, the
+// driver is reminded to retake it.
+function draftStorageKey() {
+  return 'scd_driver_draft_' + (urlDriverCode || 'unknown');
+}
+
+function saveDraft() {
+  try {
+    var draft = {
+      savedAt: Date.now(),
+      deliveryType: deliveryType,
+      eventType: eventType,
+      selectedZone: selectedZone,
+      matchedCommunity: matchedCommunity,
+      matchedDistanceKm: matchedDistanceKm,
+      formattedAddress: formattedAddress,
+      selectedStatuses: selectedStatuses,
+      fields: {}
+    };
+    ['fDate','fOrderId','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) draft.fields[id] = el.value;
+    });
+    draft.directSub = Array.from(document.querySelectorAll('#directSubGrid .status-btn.selected')).map(function(b){ return b.dataset.sub; });
+    draft.undeliverableSub = Array.from(document.querySelectorAll('#undeliverableSubGrid .status-btn.selected')).map(function(b){ return b.dataset.unsub; });
+    var contactSel = document.querySelector('#contactMethodGrid .status-btn.selected');
+    draft.contactMethod = contactSel ? contactSel.dataset.contact : '';
+    var billingSel = document.querySelector('#billingToggle .toggle-btn.active');
+    draft.billing = billingSel ? billingSel.dataset.billing : '';
+    localStorage.setItem(draftStorageKey(), JSON.stringify(draft));
+  } catch (e) { /* localStorage unavailable/full - draft recovery just won't work this time */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(draftStorageKey()); } catch (e) {}
+}
+
+function hasMeaningfulDraft(draft) {
+  // Don't bother restoring/notifying for a draft that's just default
+  // values with nothing actually entered yet.
+  return !!(draft.fields.fOrderId || draft.fields.fName || draft.fields.fAddress || draft.selectedZone);
+}
+
+function restoreDraftIfPresent() {
+  var raw;
+  try { raw = localStorage.getItem(draftStorageKey()); } catch (e) { return; }
+  if (!raw) return;
+  var draft;
+  try { draft = JSON.parse(raw); } catch (e) { return; }
+  if (!draft || !hasMeaningfulDraft(draft)) return;
+
+  if (draft.deliveryType && draft.deliveryType !== deliveryType) {
+    var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + draft.deliveryType + '"]');
+    if (typeBtn) typeBtn.click(); // reuses the existing toggle handler for correct field visibility; clears shop fields as a side effect, restored right after below
+  }
+
+  Object.keys(draft.fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = draft.fields[id];
+  });
+
+  deliveryType = draft.deliveryType || deliveryType;
+  eventType = draft.eventType || '';
+  if (eventType) document.getElementById('fEventType').value = eventType;
+  formattedAddress = draft.formattedAddress || '';
+  matchedCommunity = draft.matchedCommunity || '';
+  matchedDistanceKm = (typeof draft.matchedDistanceKm === 'number') ? draft.matchedDistanceKm : null;
+  selectedZone = draft.selectedZone || '';
+  selectedStatuses = draft.selectedStatuses || [];
+
+  document.querySelectorAll('#statusGrid .status-btn').forEach(function(b) {
+    b.classList.toggle('selected', selectedStatuses.indexOf(b.dataset.status) >= 0);
+  });
+  (draft.directSub || []).forEach(function(sub) {
+    var b = document.querySelector('#directSubGrid .status-btn[data-sub="' + sub + '"]');
+    if (b) b.classList.add('selected');
+  });
+  (draft.undeliverableSub || []).forEach(function(sub) {
+    var b = document.querySelector('#undeliverableSubGrid .status-btn[data-unsub="' + sub + '"]');
+    if (b) b.classList.add('selected');
+  });
+  if (draft.contactMethod) {
+    var cb = document.querySelector('#contactMethodGrid .status-btn[data-contact="' + draft.contactMethod + '"]');
+    if (cb) cb.classList.add('selected');
+  }
+  if (draft.billing) {
+    document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.billing === draft.billing);
+    });
+  }
+  document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
+  document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+  document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
+  document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+  document.getElementById('contactMethodField').hidden = !document.getElementById('fAcceptedBy').value.trim();
+
+  if (selectedZone) { refreshZoneDisplay(); updatePay(); }
+
+  var doorstepSelected = !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+  var noteEl = document.getElementById('draftRestoredMsg');
+  noteEl.textContent = 'Restored your in-progress entry.' + (doorstepSelected ? ' Photo will need to be retaken.' : '');
+  noteEl.hidden = false;
+  setTimeout(function() { noteEl.hidden = true; }, 6000);
+}
 
 // Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
 // SPEC/WED/FUN rate from the rate table directly. Anything else (border
@@ -592,6 +708,7 @@ function populateShopDropdown() {
     document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
+    document.getElementById('eventTypeField').hidden = true;
   } else {
     document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
@@ -600,6 +717,7 @@ function populateShopDropdown() {
     document.getElementById('billingQueryField').hidden = true;
     document.getElementById('statusCard').hidden = false;
     document.getElementById('wholesaleStatusCard').hidden = true;
+    document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
   }
   document.getElementById('fShopSearch').value = '';
   document.getElementById('fShop').value = '';
@@ -650,6 +768,7 @@ function renderShopDropdown(search) {
 }
 
 function resetForm() {
+  clearDraft();
   selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
@@ -720,23 +839,6 @@ function compressPhotoToBase64(file) {
 // Recipient Name, and Delivery Address for the driver to review/edit
 // before submitting - never submits automatically, since OCR-style
 // extraction across many different tag layouts/handwriting can be wrong.
-// Generic business-name words tags commonly print but internal shop
-// shorthand usually doesn't (e.g. tag says "Deer Valley Florist", shop
-// record is stored as "DV DeerValley") - stripped before comparing so
-// these differences don't cause a real match to be missed.
-var SHOP_NAME_FILLER_WORDS = ['FLORIST','FLORISTS','FLOWERS','FLOWER','FLORAL','FLORALS','SHOP','SHOPPE','GIFTS','GIFT','BOUTIQUE','STUDIO','DESIGNS','DESIGN','BLOOMS','BLOOM','PETALS','GARDEN','GARDENS','INC','LTD','LLC','CO','CORP','CORPORATION','LIMITED','LLP','YOUR','THE','AND'];
-
-// Normalizes a shop name for fuzzy comparison: uppercase, strip filler
-// words, then collapse all remaining whitespace/punctuation so formatting
-// differences like "Deer Valley" vs "DeerValley" don't prevent a match.
-function normalizeShopNameForMatch(s) {
-  var upper = s.toUpperCase();
-  SHOP_NAME_FILLER_WORDS.forEach(function(w) {
-    upper = upper.replace(new RegExp('\\b' + w + '\\b', 'g'), '');
-  });
-  return upper.replace(/[^A-Z0-9]/g, '');
-}
-
 async function scanTag(file) {
   var statusEl = document.getElementById('scanTagStatus');
   var btn = document.getElementById('scanTagBtn');
@@ -745,10 +847,16 @@ async function scanTag(file) {
   btn.disabled = true;
   try {
     var photoBase64 = await compressPhotoToBase64(file);
+    // Send the shop list (just code + name, not full records) so the
+    // vision model can match the tag's printed shop name directly against
+    // our real shops - handles spelling variants, extra location words,
+    // "Your"/punctuation differences, etc. the way a human dispatcher
+    // would, instead of us trying to hand-code every naming edge case.
+    var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name }; });
     var res = await fetch('/api/scan-tag', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ photo_base64: photoBase64 })
+      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList })
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not read tag.');
@@ -764,46 +872,22 @@ async function scanTag(file) {
       // driver had typed/selected it manually.
       lookupZone(data.address);
     }
-    if (data.shop_name) {
-      // Tags print the shop's full customer-facing name, not the internal
-      // short code/shorthand (e.g. "Deer Valley Florist" on the tag vs
-      // "DV DeerValley" in our records) - normalize both sides before
-      // comparing so spacing and generic filler words don't cause a real
-      // match to be missed.
-      //
-      // Two different shops can legitimately share a word (e.g. "KF
-      // Kensington" and "FPK Funky Petals Kensington" both contain
-      // "Kensington") - a plain substring match would find both and
-      // refuse to pick either. To disambiguate, compare against each
-      // shop's name with its code prefix stripped (tags never print the
-      // code), and prefer an EXACT match over a merely partial one: an
-      // exact match is a much stronger signal of the real shop than a
-      // substring hit inside an unrelated longer name.
-      var extractedNorm = normalizeShopNameForMatch(data.shop_name.trim());
-      var scored = shops.map(function(s) {
-        var codeStripped = s.name.trim().replace(/^\S+\s*/, '') || s.name;
-        var shopNorm = normalizeShopNameForMatch(codeStripped);
-        var fullNorm = normalizeShopNameForMatch(s.name);
-        var isExact = extractedNorm.length > 2 && shopNorm === extractedNorm;
-        var isPartial = extractedNorm.length > 2 && !isExact && (fullNorm.includes(extractedNorm) || extractedNorm.includes(fullNorm));
-        return { shop: s, isExact: isExact, isPartial: isPartial };
-      });
-      var exactMatches = scored.filter(function(x) { return x.isExact; });
-      var partialMatches = scored.filter(function(x) { return x.isPartial; });
-      var chosen = null;
-      if (exactMatches.length === 1) {
-        chosen = exactMatches[0].shop;
-      } else if (exactMatches.length === 0 && partialMatches.length === 1) {
-        chosen = partialMatches[0].shop;
-      }
+    if (data.shop_code) {
+      var chosen = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === data.shop_code; });
       if (chosen) {
         document.getElementById('fShop').value = chosen.id;
         document.getElementById('fShopSearch').value = chosen.name;
-        filled.push('Shop (' + chosen.name + ')');
-      } else {
+        filled.push('Shop (' + chosen.name + (data.shop_name ? ' — tag read: "' + data.shop_name + '"' : '') + ')');
+      } else if (data.shop_name) {
         document.getElementById('fShopSearch').value = data.shop_name;
-        filled.push('Shop name (please confirm/select from list)');
+        filled.push('Shop name from tag: "' + data.shop_name + '" (please confirm/select)');
       }
+    } else if (data.shop_name) {
+      // No confident code match - tag naming conventions vary enough
+      // (even within one shop) that this won't always resolve cleanly.
+      // Surface the raw text as a head start rather than losing it.
+      document.getElementById('fShopSearch').value = data.shop_name;
+      filled.push('Shop name from tag: "' + data.shop_name + '" (please confirm/select)');
     }
 
 
@@ -833,6 +917,10 @@ async function submitDelivery() {
     }
   } else if (!shopId) {
     errEl.textContent = 'Select a shop.'; errEl.hidden = false; return;
+  }
+  if (deliveryType === 'events' && !eventType) {
+    errEl.textContent = 'Select an event type (Special Event, Wedding, or Funeral).';
+    errEl.hidden = false; return;
   }
   if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
   if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
@@ -939,12 +1027,14 @@ async function submitDelivery() {
     });
     var resData = await res.json();
     if (resData.queued) {
+      clearDraft();
       document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
       document.getElementById('app').hidden = true;
       document.getElementById('successScreen').hidden = false;
       return;
     }
     if (!res.ok) throw new Error('Status ' + res.status);
+    clearDraft();
     document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
     document.getElementById('app').hidden = true;
     document.getElementById('successScreen').hidden = false;
@@ -1004,7 +1094,7 @@ async function init() {
       document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
       populateShopDropdown();
       selectedZone = '';
-      if (deliveryType === 'wholesale') {
+      if (deliveryType !== 'events') {
         eventType = '';
         document.getElementById('fEventType').value = '';
         document.getElementById('eventTypeNote').hidden = true;
@@ -1125,6 +1215,15 @@ async function init() {
 
     document.getElementById('loadingScreen').hidden = true;
     document.getElementById('app').hidden = false;
+
+    restoreDraftIfPresent();
+    // Delegated listener - saves on any field edit anywhere in the form,
+    // rather than wiring up individual listeners per field.
+    document.getElementById('app').addEventListener('input', saveDraft);
+    document.getElementById('app').addEventListener('change', saveDraft);
+    document.getElementById('app').addEventListener('click', function(e) {
+      if (e.target.closest('.status-btn') || e.target.closest('.toggle-btn')) saveDraft();
+    });
 
   } catch(e) {
     console.error('init error:', e.message);
