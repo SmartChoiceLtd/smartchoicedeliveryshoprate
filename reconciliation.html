@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Reconciliation</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#7A5C00;--amber-soft:#FFF8E1;--radius:10px;}
+*{box-sizing:border-box;}html,body{height:100%;margin:0;}
+[hidden]{display:none !important;}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;}
+h1,h2{font-family:Georgia,serif;font-weight:600;margin:0;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-size:18px;}.topbar a{font-size:13px;color:var(--accent);text-decoration:none;}
+.toolbar{padding:10px 24px;background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block;}
+.btn:hover{opacity:0.9;}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+.btn-sm{padding:4px 10px;font-size:12px;}
+.stats{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap;}
+.stat{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--ink-soft);}
+.stat strong{color:var(--ink);font-size:15px;display:block;}
+.main{flex:1;overflow:auto;padding:16px 24px;}
+.section{margin-bottom:24px;}
+.section h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:8px;overflow:hidden;}
+th{padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:0.04em;background:var(--accent);color:#fff;white-space:nowrap;}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:hover td{background:#F9F5F0;}
+.badge{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;}
+.badge-pending{background:var(--amber-soft);color:var(--amber);}
+.badge-stale{background:#FFE0E0;color:#7A2E22;}
+.badge-fulfilled{background:var(--green-soft);color:var(--green);}
+.badge-abandoned{background:#F0F0F0;color:#666;}
+.empty{color:var(--ink-soft);font-size:13px;padding:16px;text-align:center;}
+.loading{text-align:center;padding:60px;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Smart Choice Delivery — Reconciliation</h1>
+  <a href="/orders.html">&larr; Orders</a>
+  <div class="stats">
+    <div class="stat"><strong id="statPending">—</strong>Pending</div>
+    <div class="stat"><strong id="statStale">—</strong>Stale (4h+)</div>
+    <div class="stat"><strong id="statFulfilled">—</strong>Fulfilled today</div>
+    <div class="stat"><strong id="statAbandoned">—</strong>Abandoned today</div>
+  </div>
+</div>
+<div class="toolbar">
+  <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+</div>
+<div class="main">
+  <div class="loading" id="loadingMsg">Loading stops&hellip;</div>
+  <div id="content" hidden>
+    <div class="section">
+      <h2>&#9888; Needs Attention &mdash; Pending Over 4 Hours</h2>
+      <div id="staleTableWrap"></div>
+    </div>
+    <div class="section">
+      <h2>Currently Pending (All)</h2>
+      <div id="pendingTableWrap"></div>
+    </div>
+    <div class="section">
+      <h2>Recently Completed</h2>
+      <div id="recentTableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var STALE_HOURS = 4;
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function ageLabel(createdAt) {
+  var ms = Date.now() - new Date(createdAt).getTime();
+  var hrs = ms / 3600000;
+  if (hrs < 1) return Math.round(ms / 60000) + 'm ago';
+  return hrs.toFixed(1) + 'h ago';
+}
+
+function isStale(stop) {
+  var hrs = (Date.now() - new Date(stop.created_at).getTime()) / 3600000;
+  return hrs >= STALE_HOURS;
+}
+
+function isToday(iso) {
+  if (!iso) return false;
+  return iso.slice(0,10) === new Date().toISOString().slice(0,10);
+}
+
+function renderStopTable(stops, opts) {
+  opts = opts || {};
+  if (!stops.length) return '<div class="empty">Nothing here.</div>';
+  var rows = stops.map(function(s) {
+    var badge = s.status === 'pending'
+      ? (isStale(s) ? '<span class="badge badge-stale">Stale</span>' : '<span class="badge badge-pending">Pending</span>')
+      : (s.status === 'fulfilled' ? '<span class="badge badge-fulfilled">Fulfilled</span>' : '<span class="badge badge-abandoned">Abandoned</span>');
+    return '<tr>'
+      + '<td>' + escapeHtml(s.order_id || '&mdash;') + '</td>'
+      + '<td>' + escapeHtml(s.shop_code || '') + '</td>'
+      + '<td>' + escapeHtml(s.driver || '') + '</td>'
+      + '<td>' + escapeHtml(s.name || '') + '</td>'
+      + '<td>' + escapeHtml(s.address || '') + '</td>'
+      + '<td>' + badge + '</td>'
+      + '<td>' + (opts.showAge ? ageLabel(s.created_at) : escapeHtml((s.fulfilled_at || s.created_at || '').slice(0,16).replace('T',' '))) + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<table><thead><tr><th>Order ID</th><th>Shop</th><th>Driver</th><th>Name</th><th>Address</th><th>Status</th><th>' + (opts.showAge ? 'Age' : 'When') + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function loadStops() {
+  document.getElementById('loadingMsg').hidden = false;
+  document.getElementById('content').hidden = true;
+  fetch('/api/stops')
+    .then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
+    .then(function(stops) {
+      var pending = stops.filter(function(s) { return s.status === 'pending'; });
+      var stale = pending.filter(isStale).sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); });
+      var fulfilledToday = stops.filter(function(s) { return s.status === 'fulfilled' && isToday(s.fulfilled_at); });
+      var abandonedToday = stops.filter(function(s) { return s.status === 'abandoned' && isToday(s.fulfilled_at || s.created_at); });
+      var recent = stops.filter(function(s) { return s.status !== 'pending'; })
+        .sort(function(a,b){ return new Date(b.fulfilled_at || b.created_at) - new Date(a.fulfilled_at || a.created_at); })
+        .slice(0, 30);
+
+      document.getElementById('statPending').textContent = pending.length;
+      document.getElementById('statStale').textContent = stale.length;
+      document.getElementById('statFulfilled').textContent = fulfilledToday.length;
+      document.getElementById('statAbandoned').textContent = abandonedToday.length;
+
+      document.getElementById('staleTableWrap').innerHTML = renderStopTable(stale, { showAge: true });
+      document.getElementById('pendingTableWrap').innerHTML = renderStopTable(
+        pending.sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); }),
+        { showAge: true }
+      );
+      document.getElementById('recentTableWrap').innerHTML = renderStopTable(recent, { showAge: false });
+
+      document.getElementById('loadingMsg').hidden = true;
+      document.getElementById('content').hidden = false;
+    })
+    .catch(function(e) {
+      document.getElementById('loadingMsg').textContent = 'Could not load stops: ' + e.message;
+    });
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadStops);
+loadStops();
+</script>
+</body>
+</html>
