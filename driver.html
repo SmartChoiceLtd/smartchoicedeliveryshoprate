@@ -1324,7 +1324,33 @@ async function init() {
     document.getElementById('loadingScreen').hidden = true;
     document.getElementById('app').hidden = false;
 
-    restoreDraftIfPresent();
+    // If arriving from route.html's "Complete" link, pre-fill from the
+    // known stop details instead of restoring whatever old draft might be
+    // sitting around - this is an explicit new starting point, not a
+    // recovery of an interrupted entry.
+    var urlParams = new URLSearchParams(location.search);
+    var linkedStopId = urlParams.get('stop_id');
+    if (linkedStopId) {
+      clearDraft();
+      currentStopId = linkedStopId;
+      if (urlParams.get('order_id')) document.getElementById('fOrderId').value = urlParams.get('order_id');
+      if (urlParams.get('name')) document.getElementById('fName').value = urlParams.get('name');
+      if (urlParams.get('address')) {
+        var addr = urlParams.get('address');
+        document.getElementById('fAddress').value = addr;
+        formattedAddress = addr;
+        lookupZone(addr);
+      }
+      if (urlParams.get('shop_code')) {
+        var linkedShop = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === urlParams.get('shop_code').toUpperCase(); });
+        if (linkedShop) {
+          document.getElementById('fShop').value = linkedShop.id;
+          document.getElementById('fShopSearch').value = linkedShop.name;
+        }
+      }
+    } else {
+      restoreDraftIfPresent();
+    }
     // Delegated listener - saves on any field edit anywhere in the form,
     // rather than wiring up individual listeners per field.
     document.getElementById('app').addEventListener('input', saveDraft);
