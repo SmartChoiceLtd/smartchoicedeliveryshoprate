@@ -32,3 +32,8 @@
   from = "/reconciliation"
   to = "/reconciliation.html"
   status = 200
+
+[[redirects]]
+  from = "/route/*"
+  to = "/route.html"
+  status = 200
