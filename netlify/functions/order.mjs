@@ -1,36 +1,280 @@
 import { getStore } from '@netlify/blobs';
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+// Map Zoho's "Shop (with Group Name)" to shop code
+// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
+function extractShopCode(shopWithGroup) {
+  if (!shopWithGroup) return null;
+  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Map Zoho's "Zone (with Group Name)" to zone code
+// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
+function extractZoneCode(zoneWithGroup) {
+  if (!zoneWithGroup) return null;
+  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Determine if zone needs auto-calculation
+function needsZoneCalculation(zoneCode) {
+  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
+  return false;
+}
+
+// Event-type pricing codes from driver.html's Event Type overlay (Special
+// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
+// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
+// are tracked under their own code. None of them should ever be
+// re-suggested or overwritten by the address-based zone matcher below.
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
+function isEventZoneCode(zoneCode) {
+  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
+}
+
+async function suggestZone(address, shopLat, shopLng, key) {
+  try {
+    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
+    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?${params}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getShopLocation(shopCode) {
+  try {
+    const store = getStore('flower-shops');
+    const { blobs } = await store.list();
+    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
+    const match = shops.filter(Boolean).find(s =>
+      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
+    );
+    return match ? { lat: match.lat, lng: match.lng } : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export default async (req) => {
-  const url = new URL(req.url);
-  const id = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop());
-  const store = getStore('flower-orders');
-
+  // Handle GET — list all orders
   if (req.method === 'GET') {
-    const order = await store.get(id, { type: 'json' });
-    if (!order) return json({ error: 'Order not found' }, 404);
-    return json(order);
-  }
+    try {
+      const store = getStore('flower-orders');
+      const url = new URL(req.url);
+      const limitParam = parseInt(url.searchParams.get('limit') || '500');
+      const { blobs } = await store.list();
+      const orders = await Promise.all(
+        blobs.slice(-Math.min(limitParam, 1000)).map(b => store.get(b.key, { type: 'json' }))
+      );
+      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+    } catch (e) {
+      return json({ error: 'Could not load orders: ' + e.message }, 500);
+    }
+  }  
+  // Handle POST — receive Zoho webhook
+  if
+   (req.method === 'POST') {
+    const key = process.env.GOOGLE_MAPS_KEY;
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+   let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return json({ error: 'Invalid JSON payload' }, 400);
+    }
 
-  if (req.method === 'PUT') {
-    const existing = await store.get(id, { type: 'json' });
-    if (!existing) return json({ error: 'Order not found' }, 404);
-    let body;
-    try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON' }, 400); }
-    const updated = { ...existing, ...body, id, updated_at: new Date().toISOString() };
-    await store.setJSON(id, updated);
-    return json(updated);
-  }
+      // Map Zoho field names to our internal structure
+    const raw = {
+      date:             body['Date']                     || body['date']              || null,
+      order_id:         body['Order ID']                 || body['order_id']          || null,
+      name:             body['Name']                     || body['name']              || null,
+      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
+      unit: body.unit || body['Unit'] || null,
+      time_request: body.time_request || body['Time Request'] || null,
+      shop:             body['Shop']                     || body['shop']              || null,
+     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
+      driver:           body['Driver']                   || body['driver']            || null,
+      driver_pay: body.driver_pay || body['driver_pay'] || 0,
+     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
+      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
+      zone:             body['Zone']                     || body['zone']              || null,
+      zone_full:        body['Zone (with Group Name)']   || null,
+      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
+      delivery_time:    body['Delivery Time']            || null,
+      contact_method:   body['Recipient Contact Method'] || null,
+      neighboured_to:   body['Neighboured To']           || null,
+      accepted_by:      body['Delivery Accepted By']       || null,
+      comments:         body['Comments']                 || null,
+    };
 
-  if (req.method === 'DELETE') {
-    await store.delete(id);
-    return new Response(null, { status: 204 });
-  }
+    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
 
+    // Wholesale deliveries use their own separate zone system (WPU, WAI,
+    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
+    // entered directly from Zoho). Checked BEFORE zone determination below:
+    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
+    // etc, and re-running a wholesale order's address through it could
+    // silently overwrite a correct wholesale code with an unrelated retail
+    // one - the same category of bug we already fixed for event-type codes.
+    const isWholesale = (raw.delivery_type === 'wholesale') ||
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
+
+    // Auto-calculate zone if not entered or flagged as needing calculation
+    let zoneCode = enteredZoneCode;
+    let zoneSource = 'manual';
+    let zoneSuggestion = null;
+
+    if (isWholesale) {
+      // Wholesale zone codes are authoritative as entered - never
+      // re-suggested against the retail address matcher. If no zone was
+      // entered at all, this needs a human to fill in rather than guessing
+      // a retail zone that doesn't apply to wholesale pricing.
+      if (enteredZoneCode) {
+        zoneCode = enteredZoneCode.toUpperCase();
+        zoneSource = 'manual';
+      } else {
+        zoneSource = 'needs_review';
+      }
+    } else if (isEventZoneCode(enteredZoneCode)) {
+      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
+      // never re-suggested/overwritten. Still look up the address for its
+      // community name (for tracking/reports), but ignore any suggested
+      // zone code that comes back with it.
+      zoneCode = enteredZoneCode.toUpperCase();
+      zoneSource = 'manual';
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+      }
+    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
+      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+      zoneSuggestion = await suggestZone(
+        raw.address,
+        shopLoc?.lat || 51.0447,
+        shopLoc?.lng || -114.0719,
+        key
+      );
+      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
+        zoneCode = zoneSuggestion.suggested;
+        zoneSource = 'auto';
+      } else {
+        zoneSource = 'needs_review';
+      }
+  } else if (enteredZoneCode) {
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
+        } else {
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
+        }
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
+      }
+    }
+  
+    
+
+    // Flag if manual zone differs from suggestion
+    const zoneConflict = !isWholesale &&
+      !isEventZoneCode(enteredZoneCode) &&
+      zoneSuggestion?.suggested &&
+      enteredZoneCode &&
+      zoneSuggestion.suggested !== enteredZoneCode &&
+      zoneSuggestion.confidence === 'high';
+
+    const orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const order = {
+      id: orderId,
+      received_at: new Date().toISOString(),
+      date: raw.date,
+      order_id: raw.order_id,
+      name: raw.name,
+      address: raw.address,
+      unit: raw.unit || null,
+      time_request: raw.time_request || null,
+      formatted_address: zoneSuggestion?.formatted_address || raw.address,
+      community: zoneSuggestion?.community || null,
+      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
+      shop_code: shopCode,
+      shop_full: raw.shop_full || raw.shop || null,
+      driver: raw.driver,
+      driver_pay: (function() {
+        if (raw.driver_pay) return parseFloat(raw.driver_pay);
+        const r = ratesData ? ratesData[zoneCode] : null;
+        if (!r) return 0;
+        const pieces = parseInt(raw.total_pieces || 1);
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        const base = ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
+      })(),
+      total_pieces: raw.total_pieces,
+      zone_entered: enteredZoneCode,
+      zone_code: zoneCode,
+      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
+      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
+      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
+      delivery_status: raw.delivery_status,
+      delivery_time: raw.delivery_time,
+      contact_method: raw.contact_method,
+      neighboured_to: raw.neighboured_to,
+      accepted_by: raw.accepted_by,
+      comments: raw.comments,
+      has_photo: !!body.photo_base64,
+    };
+
+    try {
+      const store = getStore('flower-orders');
+      await store.setJSON(orderId, order);
+      // Photo is stored in a separate blob store, not embedded in the order
+      // record itself - GET /api/orders loads every order's full JSON on
+      // every page view, so embedding potentially-large photo data there
+      // would slow that down for every order, viewed or not. The photo is
+      // only fetched on-demand when someone actually wants to view it.
+      if (body.photo_base64) {
+        try {
+          const photoStore = getStore('flower-order-photos');
+          await photoStore.set(orderId, body.photo_base64);
+        } catch (e) {
+          // Order itself already saved successfully - don't fail the whole
+          // submission just because the photo couldn't be stored, but the
+          // has_photo flag above would then be misleading. Downgrade it.
+          order.has_photo = false;
+          await store.setJSON(orderId, order);
+        }
+      }
+      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
+    } catch (e) {
+      return json({ error: 'Could not store order: ' + e.message }, 500);
+   }
+  }
   return json({ error: 'Method not allowed' }, 405);
 };
 
-export const config = { path: '/api/orders/:id' };
+export const config = { path: '/api/orders' };
