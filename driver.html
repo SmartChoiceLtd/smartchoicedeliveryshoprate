@@ -303,6 +303,7 @@ var formattedAddress = '';
 var matchedCommunity = '';
 var matchedDistanceKm = null;
 var deliveryType = 'store';
+var currentStopId = null;
 
 // ===== DRAFT AUTO-SAVE/RESTORE =====
 // Mobile browsers commonly kill a backgrounded tab's memory to free up
@@ -330,6 +331,7 @@ function saveDraft() {
       matchedDistanceKm: matchedDistanceKm,
       formattedAddress: formattedAddress,
       selectedStatuses: selectedStatuses,
+      currentStopId: currentStopId,
       fields: {}
     };
     ['fDate','fOrderId','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
@@ -382,6 +384,7 @@ function restoreDraftIfPresent() {
   matchedDistanceKm = (typeof draft.matchedDistanceKm === 'number') ? draft.matchedDistanceKm : null;
   selectedZone = draft.selectedZone || '';
   selectedStatuses = draft.selectedStatuses || [];
+  currentStopId = draft.currentStopId || null;
 
   document.querySelectorAll('#statusGrid .status-btn').forEach(function(b) {
     b.classList.toggle('selected', selectedStatuses.indexOf(b.dataset.status) >= 0);
@@ -634,6 +637,36 @@ function setZone(code, desc, manual, community, distanceKm) {
   matchedDistanceKm = manual ? null : (typeof distanceKm === 'number' ? distanceKm : null);
   refreshZoneDisplay(desc);
   updatePay();
+  trackStop();
+}
+
+// Creates a pending stop the first time a zone resolves for this entry, or
+// updates the existing one if the address/shop gets corrected before
+// submission - same trigger point regardless of whether the delivery was
+// started via Scan Tag or manual entry, so reconciliation coverage is
+// consistent either way. Best-effort: a network hiccup here shouldn't
+// block the driver from continuing their delivery.
+function trackStop() {
+  var shopId = document.getElementById('fShop').value;
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var payload = {
+    driver: driverCode,
+    shop_code: shop ? shop.name.split(' ')[0] : null,
+    address: formattedAddress || document.getElementById('fAddress').value.trim(),
+    name: document.getElementById('fName').value.trim(),
+    order_id: document.getElementById('fOrderId').value.trim() || null
+  };
+  if (currentStopId) {
+    fetch('/api/stops/' + encodeURIComponent(currentStopId), {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    }).catch(function() { /* best-effort */ });
+  } else {
+    fetch('/api/stops', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+      .then(function(stop) { if (stop && stop.id) currentStopId = stop.id; })
+      .catch(function() { /* best-effort */ });
+  }
 }
 
 function refreshZoneDisplay(baseDesc) {
@@ -791,8 +824,32 @@ function renderShopDropdown(search) {
   });
 }
 
+// Marks the current stop fulfilled and links it to the real order, or
+// abandoned if the driver resets without ever submitting - either way
+// clears currentStopId so the next delivery starts its own fresh stop.
+function fulfillStop(orderId) {
+  if (!currentStopId) return;
+  var id = currentStopId;
+  currentStopId = null;
+  fetch('/api/stops/' + encodeURIComponent(id), {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'fulfilled', order_id: orderId })
+  }).catch(function() { /* best-effort */ });
+}
+
+function abandonStop() {
+  if (!currentStopId) return;
+  var id = currentStopId;
+  currentStopId = null;
+  fetch('/api/stops/' + encodeURIComponent(id), {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'abandoned' })
+  }).catch(function() { /* best-effort */ });
+}
+
 function resetForm() {
   clearDraft();
+  abandonStop();
   selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
@@ -1062,6 +1119,7 @@ async function submitDelivery() {
     var resData = await res.json();
     if (resData.queued) {
       clearDraft();
+      fulfillStop(null);
       document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
       document.getElementById('app').hidden = true;
       document.getElementById('successScreen').hidden = false;
@@ -1069,6 +1127,7 @@ async function submitDelivery() {
     }
     if (!res.ok) throw new Error('Status ' + res.status);
     clearDraft();
+    fulfillStop(resData.order_id);
     document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
     document.getElementById('app').hidden = true;
     document.getElementById('successScreen').hidden = false;
