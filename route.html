@@ -139,8 +139,27 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+var MAX_ROUTE_STOPS = 10; // Google's practical waypoint limit for this deep-link format
+
 function navigateUrl(address) {
   return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(address);
+}
+
+// Full multi-stop route through the first MAX_ROUTE_STOPS pending stops (in
+// optimized order) - Google Maps supports multiple waypoints in one deep
+// link (pipe-separated), with the last stop as the final destination and
+// no explicit origin so it starts from wherever the driver currently is.
+// Capped rather than including everything: once the queue exceeds Maps'
+// practical waypoint limit, completing these first stops naturally rolls
+// the next ones into this same window on the next refresh - no separate
+// stop-picking UI needed.
+function fullRouteUrl(stops) {
+  var capped = stops.slice(0, MAX_ROUTE_STOPS);
+  if (!capped.length) return '#';
+  if (capped.length === 1) return navigateUrl(capped[0].address);
+  var destination = encodeURIComponent(capped[capped.length - 1].address);
+  var waypoints = capped.slice(0, -1).map(function(s) { return encodeURIComponent(s.address); }).join('|');
+  return 'https://www.google.com/maps/dir/?api=1&destination=' + destination + '&waypoints=' + waypoints + '&travelmode=driving';
 }
 
 function completeUrl(stop) {
@@ -158,7 +177,15 @@ function completeUrl(stop) {
 
 function renderStops(stops) {
   document.getElementById('countLabel').textContent = stops.length + ' stop' + (stops.length === 1 ? '' : 's') + ' remaining';
-  document.getElementById('stopsList').innerHTML = stops.map(function(s, i) {
+  var capped = Math.min(stops.length, MAX_ROUTE_STOPS);
+  var routeLabel = stops.length > MAX_ROUTE_STOPS
+    ? '&#128506; Navigate Full Route (first ' + capped + ' of ' + stops.length + ' stops)'
+    : '&#128506; Navigate Full Route (' + capped + ' stop' + (capped === 1 ? '' : 's') + ')';
+  var fullRouteBtn = stops.length > 1
+    ? '<a class="btn" href="' + fullRouteUrl(stops) + '" target="_blank" rel="noopener" style="display:block;width:100%;margin-bottom:14px;text-align:center;">' + routeLabel + '</a>'
+    + (stops.length > MAX_ROUTE_STOPS ? '<div style="font-size:12px;color:var(--ink-soft);margin:-8px 0 14px;">Complete these first, then refresh &mdash; the next stops will roll into your route automatically.</div>' : '')
+    : '';
+  document.getElementById('stopsList').innerHTML = fullRouteBtn + stops.map(function(s, i) {
     return '<div class="stop-card">'
       + '<div><span class="stop-num">' + (i+1) + '</span><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span></div>'
       + '<div class="stop-addr">' + escapeHtml(s.address || '') + (s.order_id ? ' &bull; Order #' + escapeHtml(s.order_id) : '') + '</div>'
@@ -173,23 +200,45 @@ function renderStops(stops) {
 // Optimizes stop order via Google's Directions API (waypoint optimization).
 // Falls back to the original order if the API call fails for any reason -
 // an unoptimized but usable list beats no list at all.
-function optimizeOrder(stops, mapsKey) {
+function optimizeOrder(stops, mapsKey, originLatLng) {
   if (stops.length < 2 || !mapsKey) return Promise.resolve(stops);
-  var origin = encodeURIComponent(stops[0].address);
-  var destination = encodeURIComponent(stops[stops.length - 1].address);
-  var waypoints = stops.slice(1, -1).map(function(s) { return encodeURIComponent(s.address); });
+  var hasRealOrigin = !!originLatLng;
+  var origin = hasRealOrigin ? (originLatLng.lat + ',' + originLatLng.lng) : encodeURIComponent(stops[0].address);
+  var destinationIdx = stops.length - 1;
+  // With a real GPS origin, every stop can be treated as an optimizable
+  // waypoint (nothing needs to be "sacrificed" as a fake starting point).
+  // Without one, fall back to the old approach: stop 0 anchors the start
+  // since we have no better reference for where the route begins.
+  var waypointStops = hasRealOrigin ? stops.slice(0, -1) : stops.slice(1, -1);
+  var destination = encodeURIComponent(stops[destinationIdx].address);
+  var waypoints = waypointStops.map(function(s) { return encodeURIComponent(s.address); });
   var url = 'https://maps.googleapis.com/maps/api/directions/json?origin=' + origin
     + '&destination=' + destination
     + (waypoints.length ? '&waypoints=optimize:true|' + waypoints.join('|') : '')
     + '&key=' + mapsKey;
   return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (data.status !== 'OK' || !data.routes || !data.routes[0]) return stops;
-    var order = data.routes[0].waypoint_order; // indices into the middle slice
+    var order = data.routes[0].waypoint_order;
     if (!order) return stops;
-    var middle = stops.slice(1, -1);
-    var reordered = order.map(function(idx) { return middle[idx]; });
-    return [stops[0]].concat(reordered, [stops[stops.length - 1]]);
+    var reordered = order.map(function(idx) { return waypointStops[idx]; });
+    return hasRealOrigin
+      ? reordered.concat([stops[destinationIdx]])
+      : [stops[0]].concat(reordered, [stops[destinationIdx]]);
   }).catch(function() { return stops; });
+}
+
+// Best-effort current location - resolves null (not a rejection) on any
+// failure or denial, so the caller can cleanly fall back rather than
+// needing its own try/catch for a permissions problem.
+function getCurrentLocation() {
+  return new Promise(function(resolve) {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      function() { resolve(null); },
+      { timeout: 5000, maximumAge: 60000 }
+    );
+  });
 }
 
 function loadRoute() {
@@ -199,10 +248,12 @@ function loadRoute() {
 
   Promise.all([
     fetch('/api/stops').then(function(r) { return r.json(); }),
-    fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
+    fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
+    getCurrentLocation()
   ]).then(function(results) {
     var allStops = results[0];
     var mapsKey = results[1] && results[1].key;
+    var currentLocation = results[2];
     var mine = allStops.filter(function(s) { return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode; });
 
     if (!mine.length) {
@@ -211,7 +262,7 @@ function loadRoute() {
       return;
     }
 
-    return optimizeOrder(mine, mapsKey).then(function(ordered) {
+    return optimizeOrder(mine, mapsKey, currentLocation).then(function(ordered) {
       renderStops(ordered);
       document.getElementById('loadingMsg').hidden = true;
       document.getElementById('content').hidden = false;
