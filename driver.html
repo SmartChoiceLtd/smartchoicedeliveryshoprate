@@ -117,6 +117,10 @@
           <label>Order ID</label>
           <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
+        <div class="field">
+          <label>Time Request</label>
+          <input type="text" id="fTimeRequest" placeholder="e.g. <2, >3" maxlength="20">
+        </div>
       </div>
       <div class="field" id="eventTypeField" hidden>
         <label>Event Type</label>
@@ -321,7 +325,7 @@ function saveDraft() {
       selectedStatuses: selectedStatuses,
       fields: {}
     };
-    ['fDate','fOrderId','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
+    ['fDate','fOrderId','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) draft.fields[id] = el.value;
     });
@@ -445,7 +449,7 @@ function getEffectiveZone() {
 // distance) as a special case. All other zones just use their flat drate.
 function getZoneBasePay(zoneCode) {
   var r = rates[zoneCode] || {};
-  if (zoneCode === 'RURALKM' && matchedDistanceKm != null) {
+  if ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && matchedDistanceKm != null) {
     return (r.drate || 0) + (r.perkm || 0) * matchedDistanceKm;
   }
   return r.drate || 0;
@@ -535,9 +539,27 @@ function getNeighbourZones(code) {
   return base;
 }
 
+function haversineKm(a, b) {
+  var R=6371, rd=function(d){return d*Math.PI/180;};
+  var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+// Calgary reference point for measuring wholesale-rural distance - there's
+// no real wholesaler address on file to measure from (just a code/display
+// name in the dropdown), so this uses the same city-center approximation
+// suggest-zone.mjs falls back to for retail deliveries.
+var CALGARY_CENTER = { lat: 51.0447, lng: -114.0719 };
+
+// Returns {zone, distanceKm}. distanceKm is only meaningful for WRU
+// (Wholesale Rural) - the true catch-all when a delivery doesn't match
+// citywide or any named wholesale town. This is an infrequent case, but
+// still needs real distance-based pay (base + perkm x distance), same
+// formula as retail's RURALKM, rather than a flat rate.
 function getWholesaleZoneForPoint(lat, lng) {
-  if (lat == null || lng == null) return 'WPU';
-  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return 'WPU';
+  if (lat == null || lng == null) return { zone: 'WPU', distanceKm: null };
+  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return { zone: 'WPU', distanceKm: null };
   var towns = [
     {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
     {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
@@ -548,28 +570,23 @@ function getWholesaleZoneForPoint(lat, lng) {
     {zone:'WLY', lat:51.1000, lng:-113.5000, r:6},
     {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
   ];
-  function hav(a, b) {
-    var R=6371, rd=function(d){return d*Math.PI/180;};
-    var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
-    var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
-    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-  }
   for (var i=0; i<towns.length; i++) {
     var t = towns[i];
-    if (hav({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return t.zone;
+    if (haversineKm({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return { zone: t.zone, distanceKm: null };
   }
-  return 'WPU';
+  var distanceKm = haversineKm(CALGARY_CENTER, { lat: lat, lng: lng });
+  return { zone: 'WRU', distanceKm: Math.round(distanceKm * 10) / 10 };
 }
 
 function getWholesaleZoneForShop(shop) {
-  if (!shop || !shop.lat || !shop.lng) return 'WPU';
+  if (!shop || !shop.lat || !shop.lng) return { zone: 'WPU', distanceKm: null };
   return getWholesaleZoneForPoint(shop.lat, shop.lng);
 }
 
 function buildZoneButtons(suggested, showAll) {
   var list;
   if (deliveryType === 'wholesale') {
-    list = ['WPU', 'WPH'];
+    list = Object.keys(rates).filter(isWholesaleZone).sort();
   } else if (showAll) {
     list = getAllNonWholesaleZones();
   } else {
@@ -656,16 +673,16 @@ function lookupZone(address, placeLat, placeLng) {
     document.getElementById('zoneLoading').hidden = true;
     if (wShop) {
       // Registered shop selected - unchanged behavior, zone from shop location.
-      var wZoneFromShop = getWholesaleZoneForShop(wShop);
-      setZone(wZoneFromShop, wZoneFromShop + ' - auto from ' + wShop.name, false);
+      var wResultShop = getWholesaleZoneForShop(wShop);
+      setZone(wResultShop.zone, wResultShop.zone + ' - auto from ' + wShop.name, false, null, wResultShop.distanceKm);
       return;
     }
     if (typeof placeLat === 'number' && typeof placeLng === 'number') {
       // No registered shop - client not in our shop database (e.g. Safeway,
       // a home-based shop). Determine wholesale zone from the actual
       // delivery address instead.
-      var wZoneFromAddr = getWholesaleZoneForPoint(placeLat, placeLng);
-      setZone(wZoneFromAddr, wZoneFromAddr + ' - based on delivery address', false);
+      var wResultAddr = getWholesaleZoneForPoint(placeLat, placeLng);
+      setZone(wResultAddr.zone, wResultAddr.zone + ' - based on delivery address', false, null, wResultAddr.distanceKm);
       return;
     }
     // No shop and no coordinates yet (e.g. typed and tabbed away without
@@ -760,8 +777,8 @@ function renderShopDropdown(search) {
         var addr = shop.address || '';
         document.getElementById('fAddress').value = addr;
         formattedAddress = addr;
-        var wZone = getWholesaleZoneForShop(shop);
-        setZone(wZone, wZone + ' - auto from ' + shop.name, false);
+        var wResult = getWholesaleZoneForShop(shop);
+        setZone(wResult.zone, wResult.zone + ' - auto from ' + shop.name, false, null, wResult.distanceKm);
       }
     });
   });
@@ -776,6 +793,7 @@ function resetForm() {
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
   document.getElementById('fUnit').value = '';
+  document.getElementById('fTimeRequest').value = '';
   document.getElementById('fPieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
@@ -852,7 +870,7 @@ async function scanTag(file) {
     // our real shops - handles spelling variants, extra location words,
     // "Your"/punctuation differences, etc. the way a human dispatcher
     // would, instead of us trying to hand-code every naming edge case.
-    var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name }; });
+    var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name, aliases: s.aliases || [] }; });
     var res = await fetch('/api/scan-tag', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -988,6 +1006,7 @@ async function submitDelivery() {
     name: wsName,
     address: wsAddress,
     unit: document.getElementById('fUnit').value.trim(),
+    time_request: document.getElementById('fTimeRequest').value.trim(),
     shop: wsShopName,
     shop_code: wsShopCode,
     driver: driverCode,
