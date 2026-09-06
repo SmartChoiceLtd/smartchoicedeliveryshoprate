@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — My Route</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
+*{box-sizing:border-box;}html,body{height:100%;margin:0;}
+[hidden]{display:none !important;}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;}
+.main{padding:16px;max-width:600px;margin:0 auto;}
+.loading,.empty,.notfound{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;text-decoration:none;display:inline-block;text-align:center;}
+.btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+.btn:hover{opacity:0.9;}
+.stop-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+.stop-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:13px;margin-right:8px;}
+.stop-name{font-size:15px;font-weight:700;}
+.stop-addr{font-size:13px;color:var(--ink-soft);margin:4px 0 10px;}
+.stop-actions{display:flex;gap:8px;}
+.stop-actions .btn{flex:1;min-height:44px;touch-action:manipulation;}
+.refresh-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.refresh-row button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>My Route</h1></div>
+<div class="main">
+  <div class="loading" id="loadingMsg">Loading your route&hellip;</div>
+  <div class="notfound" id="notFoundMsg" hidden>Driver link not found. Check your link or contact your dispatcher.</div>
+  <div class="empty" id="emptyMsg" hidden>No pending deliveries right now. Scan a tag on the delivery form to add one.</div>
+  <div id="content" hidden>
+    <div class="refresh-row">
+      <span id="countLabel" style="font-size:13px;color:var(--ink-soft);"></span>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+    <div id="stopsList"></div>
+  </div>
+</div>
+
+<script>
+var pathParts = location.pathname.split('/').filter(Boolean);
+var driverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function navigateUrl(address) {
+  return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(address);
+}
+
+function completeUrl(stop) {
+  // Hands off to the driver form, pre-filled with what's already known
+  // about this stop, so completing it doesn't mean re-typing or
+  // re-scanning anything that was already captured.
+  var params = new URLSearchParams();
+  if (stop.order_id) params.set('order_id', stop.order_id);
+  if (stop.name) params.set('name', stop.name);
+  if (stop.address) params.set('address', stop.address);
+  if (stop.shop_code) params.set('shop_code', stop.shop_code);
+  params.set('stop_id', stop.id);
+  return '/driver/' + driverCode.toLowerCase() + '?' + params.toString();
+}
+
+function renderStops(stops) {
+  document.getElementById('countLabel').textContent = stops.length + ' stop' + (stops.length === 1 ? '' : 's') + ' remaining';
+  document.getElementById('stopsList').innerHTML = stops.map(function(s, i) {
+    return '<div class="stop-card">'
+      + '<div><span class="stop-num">' + (i+1) + '</span><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span></div>'
+      + '<div class="stop-addr">' + escapeHtml(s.address || '') + (s.order_id ? ' &bull; Order #' + escapeHtml(s.order_id) : '') + '</div>'
+      + '<div class="stop-actions">'
+      + '<a class="btn btn-ghost" href="' + navigateUrl(s.address) + '" target="_blank" rel="noopener">Navigate</a>'
+      + '<a class="btn" href="' + completeUrl(s) + '">Complete</a>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// Optimizes stop order via Google's Directions API (waypoint optimization).
+// Falls back to the original order if the API call fails for any reason -
+// an unoptimized but usable list beats no list at all.
+function optimizeOrder(stops, mapsKey) {
+  if (stops.length < 2 || !mapsKey) return Promise.resolve(stops);
+  var origin = encodeURIComponent(stops[0].address);
+  var destination = encodeURIComponent(stops[stops.length - 1].address);
+  var waypoints = stops.slice(1, -1).map(function(s) { return encodeURIComponent(s.address); });
+  var url = 'https://maps.googleapis.com/maps/api/directions/json?origin=' + origin
+    + '&destination=' + destination
+    + (waypoints.length ? '&waypoints=optimize:true|' + waypoints.join('|') : '')
+    + '&key=' + mapsKey;
+  return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.status !== 'OK' || !data.routes || !data.routes[0]) return stops;
+    var order = data.routes[0].waypoint_order; // indices into the middle slice
+    if (!order) return stops;
+    var middle = stops.slice(1, -1);
+    var reordered = order.map(function(idx) { return middle[idx]; });
+    return [stops[0]].concat(reordered, [stops[stops.length - 1]]);
+  }).catch(function() { return stops; });
+}
+
+function loadRoute() {
+  document.getElementById('loadingMsg').hidden = false;
+  document.getElementById('content').hidden = true;
+  document.getElementById('emptyMsg').hidden = true;
+
+  Promise.all([
+    fetch('/api/stops').then(function(r) { return r.json(); }),
+    fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
+  ]).then(function(results) {
+    var allStops = results[0];
+    var mapsKey = results[1] && results[1].key;
+    var mine = allStops.filter(function(s) { return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode; });
+
+    if (!mine.length) {
+      document.getElementById('loadingMsg').hidden = true;
+      document.getElementById('emptyMsg').hidden = false;
+      return;
+    }
+
+    return optimizeOrder(mine, mapsKey).then(function(ordered) {
+      renderStops(ordered);
+      document.getElementById('loadingMsg').hidden = true;
+      document.getElementById('content').hidden = false;
+    });
+  }).catch(function(e) {
+    document.getElementById('loadingMsg').textContent = 'Could not load your route: ' + e.message;
+  });
+}
+
+if (!driverCode) {
+  document.getElementById('loadingMsg').hidden = true;
+  document.getElementById('notFoundMsg').hidden = false;
+} else {
+  document.getElementById('refreshBtn').addEventListener('click', loadRoute);
+  loadRoute();
+}
+</script>
+</body>
+</html>
