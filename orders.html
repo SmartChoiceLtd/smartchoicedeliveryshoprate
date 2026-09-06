@@ -243,7 +243,8 @@ function viewPhoto(id) {
 function deleteOrder(id, label) {
 if (!confirm('Delete order "' + label + '"? This cannot be undone.')) return;
 fetch('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' })
-.then(function() {
+.then(function(res) {
+if (!res.ok && res.status !== 204) throw new Error('Status ' + res.status);
 allOrders = allOrders.filter(function(o){ return o.id !== id; });
 applyFilters();
 })
