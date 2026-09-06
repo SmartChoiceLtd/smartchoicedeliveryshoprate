@@ -27,7 +27,13 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
 </style>
 </head>
 <body>
-<div class="topbar"><h1>My Route</h1></div>
+<div class="topbar">
+  <h1>My Route</h1>
+  <button class="btn" id="scanTagBtn" style="margin-top:10px;width:100%;">&#128248; Scan Tag &mdash; Add to Route</button>
+  <input type="file" id="fTagPhoto" accept="image/*" capture="environment" hidden>
+  <div id="scanStatus" hidden style="font-size:13px;color:var(--ink-soft);margin-top:8px;"></div>
+  <a class="btn btn-ghost" id="manualEntryLink" style="margin-top:8px;width:100%;">Manual Entry (no tag to scan)</a>
+</div>
 <div class="main">
   <div class="loading" id="loadingMsg">Loading your route&hellip;</div>
   <div class="notfound" id="notFoundMsg" hidden>Driver link not found. Check your link or contact your dispatcher.</div>
@@ -42,8 +48,89 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
 </div>
 
 <script>
+function compressPhotoToBase64(file) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      img.onload = function() {
+        var maxSide = 1200;
+        var w = img.width, h = img.height;
+        if (w > maxSide || h > maxSide) {
+          if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+          else { w = Math.round(w * (maxSide / h)); h = maxSide; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = function() { reject(new Error('Could not read photo.')); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error('Could not read photo file.')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function scanTagForRoute(file) {
+  var statusEl = document.getElementById('scanStatus');
+  var btn = document.getElementById('scanTagBtn');
+  statusEl.hidden = false;
+  statusEl.textContent = 'Reading tag...';
+  btn.disabled = true;
+  try {
+    var photoBase64 = await compressPhotoToBase64(file);
+    var shopsRes = await fetch('/api/shops');
+    var shops = shopsRes.ok ? await shopsRes.json() : [];
+    var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name, aliases: s.aliases || [] }; });
+
+    var res = await fetch('/api/scan-tag', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not read tag.');
+
+    if (!data.address) {
+      statusEl.textContent = 'Could not read an address from that tag. Please try again with a clearer photo.';
+      return;
+    }
+
+    var stopRes = await fetch('/api/stops', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        driver: driverCode,
+        shop_code: data.shop_code || null,
+        address: data.address,
+        name: data.name || null,
+        order_id: data.order_id || null
+      })
+    });
+    var stop = await stopRes.json();
+    if (!stopRes.ok) throw new Error(stop.error || 'Could not add to route.');
+
+    statusEl.textContent = 'Added: ' + (data.name || 'delivery') + (data.order_id ? ' (Order #' + data.order_id + ')' : '') + '. Scan the next one, or view your route below.';
+    loadRoute();
+  } catch (e) {
+    statusEl.textContent = 'Could not add tag: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('scanTagBtn').addEventListener('click', function() {
+  document.getElementById('fTagPhoto').click();
+});
+document.getElementById('fTagPhoto').addEventListener('change', function() {
+  var file = this.files[0];
+  if (file) scanTagForRoute(file);
+  this.value = '';
+});
+
 var pathParts = location.pathname.split('/').filter(Boolean);
 var driverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+document.getElementById('manualEntryLink').href = '/driver/' + driverCode.toLowerCase();
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
