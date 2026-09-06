@@ -408,7 +408,11 @@ async function editShop(shopId) {
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode');
-    await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng, aliases: aliases }) });
+    var putRes = await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng, aliases: aliases }) });
+    if (!putRes.ok) {
+      var errBody = await putRes.json().catch(function(){ return {}; });
+      throw new Error(errBody.error || ('Save failed, status ' + putRes.status));
+    }
     shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng; shop.aliases = aliases;
     renderShops(); alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
