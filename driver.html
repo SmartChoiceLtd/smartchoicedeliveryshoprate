@@ -868,6 +868,14 @@ async function scanTag(file) {
   btn.disabled = true;
   try {
     var photoBase64 = await compressPhotoToBase64(file);
+    // Refresh the shop list right before scanning, rather than relying on
+    // whatever was loaded when the page first opened - aliases/shops added
+    // in admin after the driver's tab was opened would otherwise be
+    // silently missed until a manual page reload.
+    try {
+      var freshShopsRes = await fetch('/api/shops');
+      if (freshShopsRes.ok) shops = await freshShopsRes.json();
+    } catch (e) { /* fall back to whatever's already in memory if this fails */ }
     // Send the shop list (just code + name, not full records) so the
     // vision model can match the tag's printed shop name directly against
     // our real shops - handles spelling variants, extra location words,
