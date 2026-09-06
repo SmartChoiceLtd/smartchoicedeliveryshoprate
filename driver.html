@@ -117,10 +117,6 @@
           <label>Order ID</label>
           <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
         </div>
-        <div class="field">
-          <label>Time Request</label>
-          <input type="text" id="fTimeRequest" placeholder="e.g. <2, >3" maxlength="20">
-        </div>
       </div>
       <div class="field" id="eventTypeField" hidden>
         <label>Event Type</label>
@@ -169,7 +165,14 @@
       <div class="field">
         <label>Delivery Address</label>
         <input type="text" id="fAddress" placeholder="Start typing address...">
-        <input type="text" id="fUnit" placeholder="Unit / Suite / Apt # (optional)" style="margin-top:8px;">
+        <div class="field-row" style="margin-top:8px;">
+          <div class="field" style="margin-bottom:0;">
+            <input type="text" id="fUnit" placeholder="Unit / Suite / Apt #">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <input type="text" id="fTimeRequest" placeholder="Time req. e.g. <2, >3" maxlength="20">
+          </div>
+        </div>
         <div id="zoneResult" hidden>
           <div class="zone-result">
             <div>
