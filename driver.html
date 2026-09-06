@@ -105,9 +105,7 @@
 
     <div class="card">
       <h2>Delivery Details</h2>
-      <button type="button" class="btn btn-secondary" id="scanTagBtn" style="margin-bottom:14px;">&#128248; Scan Tag</button>
-      <input type="file" id="fTagPhoto" accept="image/*" capture="environment" hidden>
-      <div id="scanTagStatus" hidden style="font-size:12px;color:var(--ink-soft);margin:-8px 0 14px;"></div>
+      <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:14px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
       <div class="field-row">
         <div class="field">
           <label>Date</label>
@@ -921,78 +919,6 @@ function compressPhotoToBase64(file) {
 // Recipient Name, and Delivery Address for the driver to review/edit
 // before submitting - never submits automatically, since OCR-style
 // extraction across many different tag layouts/handwriting can be wrong.
-async function scanTag(file) {
-  var statusEl = document.getElementById('scanTagStatus');
-  var btn = document.getElementById('scanTagBtn');
-  statusEl.hidden = false;
-  statusEl.textContent = 'Reading tag...';
-  btn.disabled = true;
-  try {
-    var photoBase64 = await compressPhotoToBase64(file);
-    // Refresh the shop list right before scanning, rather than relying on
-    // whatever was loaded when the page first opened - aliases/shops added
-    // in admin after the driver's tab was opened would otherwise be
-    // silently missed until a manual page reload.
-    try {
-      var freshShopsRes = await fetch('/api/shops');
-      if (freshShopsRes.ok) shops = await freshShopsRes.json();
-    } catch (e) { /* fall back to whatever's already in memory if this fails */ }
-    // Send the shop list (just code + name, not full records) so the
-    // vision model can match the tag's printed shop name directly against
-    // our real shops - handles spelling variants, extra location words,
-    // "Your"/punctuation differences, etc. the way a human dispatcher
-    // would, instead of us trying to hand-code every naming edge case.
-    var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name, aliases: s.aliases || [] }; });
-    var res = await fetch('/api/scan-tag', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList })
-    });
-    var data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Could not read tag.');
-
-    var filled = [];
-    if (data.order_id) { document.getElementById('fOrderId').value = data.order_id; filled.push('Order ID'); }
-    if (data.name) { document.getElementById('fName').value = data.name; filled.push('Name'); }
-    if (data.address) {
-      document.getElementById('fAddress').value = data.address;
-      formattedAddress = data.address;
-      filled.push('Address');
-      // Trigger the normal address-based zone lookup, same as if the
-      // driver had typed/selected it manually.
-      lookupZone(data.address);
-    }
-    if (data.shop_code) {
-      var chosen = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === data.shop_code; });
-      if (chosen) {
-        document.getElementById('fShop').value = chosen.id;
-        document.getElementById('fShopSearch').value = chosen.name;
-        filled.push('Shop (' + chosen.name + (data.shop_name ? ' — tag read: "' + data.shop_name + '"' : '') + ')');
-      } else if (data.shop_name) {
-        document.getElementById('fShopSearch').value = data.shop_name;
-        filled.push('Shop name from tag: "' + data.shop_name + '" (please confirm/select)');
-      }
-    } else if (data.shop_name) {
-      // No confident code match - tag naming conventions vary enough
-      // (even within one shop) that this won't always resolve cleanly.
-      // Surface the raw text as a head start rather than losing it.
-      document.getElementById('fShopSearch').value = data.shop_name;
-      filled.push('Shop name from tag: "' + data.shop_name + '" (please confirm/select)');
-    }
-
-
-    if (filled.length) {
-      statusEl.textContent = 'Filled from tag: ' + filled.join(', ') + '. Please review before submitting.';
-    } else {
-      statusEl.textContent = 'Could not read any fields from that tag. Please enter manually.';
-    }
-  } catch (e) {
-    statusEl.textContent = 'Could not scan tag: ' + e.message + '. Please enter manually.';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 async function submitDelivery() {
   var btn = document.getElementById('submitBtn');
   var errEl = document.getElementById('errorMsg');
@@ -1305,14 +1231,7 @@ async function init() {
     });
 
     document.getElementById('submitBtn').addEventListener('click', submitDelivery);
-    document.getElementById('scanTagBtn').addEventListener('click', function() {
-      document.getElementById('fTagPhoto').click();
-    });
-    document.getElementById('fTagPhoto').addEventListener('change', function() {
-      var file = this.files[0];
-      if (file) scanTag(file);
-      this.value = ''; // allow scanning another tag later without re-selecting the same file
-    });
+    document.getElementById('backToRouteLink').href = '/route/' + driverCode.toLowerCase();
     document.getElementById('summaryBtn').addEventListener('click', function() {
       window.location.href = '/driver-summary/' + driverCode.toLowerCase();
     });
