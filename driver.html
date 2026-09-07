@@ -35,7 +35,7 @@
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
 .card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 14px;}
 .toggle-row{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.toggle-btn{flex:1;padding:10px;font-size:14px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
+.toggle-btn{flex:1;padding:8px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
 .toggle-btn.active{background:var(--accent);color:#fff;font-weight:700;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
@@ -97,7 +97,9 @@
     <div id="errorMsg" class="error" hidden></div>
     <div id="draftRestoredMsg" class="success" hidden></div>
 
-    <div class="toggle-row" id="deliveryTypeToggle">
+    <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:12px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
+
+    <div class="toggle-row" id="deliveryTypeToggle" style="margin-bottom:16px;">
       <button class="toggle-btn active" data-type="store">Store to Door</button>
       <button class="toggle-btn" data-type="wholesale">Wholesale</button>
       <button class="toggle-btn" data-type="events">Events</button>
@@ -105,7 +107,6 @@
 
     <div class="card">
       <h2>Delivery Details</h2>
-      <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:14px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
       <div class="field-row">
         <div class="field">
           <label>Date</label>
@@ -652,7 +653,8 @@ function trackStop() {
     shop_code: shop ? shop.name.split(' ')[0] : null,
     address: formattedAddress || document.getElementById('fAddress').value.trim(),
     name: document.getElementById('fName').value.trim(),
-    order_id: document.getElementById('fOrderId').value.trim() || null
+    order_id: document.getElementById('fOrderId').value.trim() || null,
+    delivery_type: deliveryType
   };
   if (currentStopId) {
     fetch('/api/stops/' + encodeURIComponent(currentStopId), {
@@ -1252,6 +1254,11 @@ async function init() {
     if (linkedStopId) {
       clearDraft();
       currentStopId = linkedStopId;
+      var linkedType = urlParams.get('delivery_type');
+      if (linkedType && linkedType !== deliveryType) {
+        var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + linkedType + '"]');
+        if (typeBtn) typeBtn.click(); // reuses the real toggle handler so field visibility (Wholesaler/Event Type fields, shop label, etc.) is set up correctly for the restored type
+      }
       if (urlParams.get('order_id')) document.getElementById('fOrderId').value = urlParams.get('order_id');
       if (urlParams.get('name')) document.getElementById('fName').value = urlParams.get('name');
       if (urlParams.get('address')) {
