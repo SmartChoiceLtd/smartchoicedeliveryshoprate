@@ -203,6 +203,7 @@ function renderStops(stops) {
       + '<div class="stop-actions">'
       + '<a class="btn btn-ghost" href="' + navigateUrl(s.address) + '" target="_blank" rel="noopener">Navigate</a>'
       + '<a class="btn" href="' + completeUrl(s) + '">Complete</a>'
+      + '<button class="btn btn-ghost" onclick="removeStop(\'' + s.id + '\', this)" style="color:var(--warm);border-color:var(--warm);flex:0 0 auto;padding:10px 14px;">&#10005;</button>'
       + '</div>'
       + '</div>';
   }).join('');
@@ -250,6 +251,17 @@ function getCurrentLocation() {
       { timeout: 5000, maximumAge: 60000 }
     );
   });
+}
+
+function removeStop(stopId, btn) {
+  if (!confirm('Remove this delivery from your route? This doesn\'t submit it - use this for wrong scans or cancelled deliveries.')) return;
+  btn.disabled = true;
+  fetch('/api/stops/' + encodeURIComponent(stopId), {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'abandoned' })
+  }).then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
+    .then(function() { loadRoute(); })
+    .catch(function(e) { alert('Could not remove: ' + e.message); btn.disabled = false; });
 }
 
 function loadRoute() {
