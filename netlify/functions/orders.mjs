@@ -62,9 +62,21 @@ async function getShopLocation(shopCode) {
   }
 }
 
+async function requireAuth(req) {
+  const cookieHeader = req.headers.get('cookie') || '';
+  const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+  if (!match) return null;
+  const sessionsStore = getStore('flower-sessions');
+  const session = await sessionsStore.get(match[1], { type: 'json' });
+  if (!session || new Date(session.expires_at) < new Date()) return null;
+  return session.username;
+}
+
 export default async (req) => {
-  // Handle GET — list all orders
+  // Handle GET — list all orders (dashboard viewing only - requires login)
   if (req.method === 'GET') {
+    const username = await requireAuth(req);
+    if (!username) return json({ error: 'Not authenticated' }, 401);
     try {
       const store = getStore('flower-orders');
       const url = new URL(req.url);
@@ -240,6 +252,13 @@ export default async (req) => {
       zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
       zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
       zone_suggestion: zoneSuggestion,  // full suggestion object for reference
+      // Snapshot of the rate table entry actually in effect for this zone
+      // at the moment this order was created. Reports should prefer this
+      // over a live rate-table lookup - otherwise, changing a rate later
+      // would silently rewrite what an already-invoiced order says every
+      // time a shop report gets re-run, which is a real billing-integrity
+      // problem, not just a cosmetic one.
+      rate_snapshot: (ratesData && ratesData[zoneCode]) ? ratesData[zoneCode] : null,
       delivery_status: raw.delivery_status,
       delivery_time: raw.delivery_time,
       contact_method: raw.contact_method,
