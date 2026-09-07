@@ -921,7 +921,40 @@ function getExifOrientation(arrayBuffer) {
   return 1;
 }
 
+var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 function compressPhotoToBase64(file) {
+  // EXIF orientation correction is iOS-only: Android photos were working
+  // correctly before this existed, and applying the same correction logic
+  // there caused new scrambled-read problems instead of fixing anything -
+  // likely a parsing edge case specific to how Android's camera pipeline
+  // writes JPEG/EXIF data. Rather than debug that blind, Android keeps
+  // running the exact simple path that had zero issues.
+  if (!isIOS) {
+    return new Promise(function(resolve, reject) {
+      var img = new Image();
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        img.onload = function() {
+          var maxSide = 1200;
+          var w = img.width, h = img.height;
+          if (w > maxSide || h > maxSide) {
+            if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+            else { w = Math.round(w * (maxSide / h)); h = maxSide; }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+        img.onerror = function() { reject(new Error('Could not read photo.')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function() { reject(new Error('Could not read photo file.')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
   return new Promise(function(resolve, reject) {
     var bufReader = new FileReader();
     bufReader.onload = function(bufEvent) {
