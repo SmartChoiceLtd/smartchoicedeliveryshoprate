@@ -1,312 +1,95 @@
 import { getStore } from '@netlify/blobs';
 
-function parseDate(raw) {
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
-  const mo = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-  const m = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
-  if (m) return `${m[3]}-${mo[m[2]]||'01'}-${m[1].padStart(2,'0')}`;
-  const d = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (d) return `${d[3]}-${d[2].padStart(2,'0')}-${d[1].padStart(2,'0')}`;
-  return raw.slice(0,10);
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
 
-function getWeekRange(weekEnd) {
-  const d = new Date(weekEnd + 'T12:00:00');
-  d.setDate(d.getDate() - 6);
-  return { start: d.toISOString().slice(0,10), end: weekEnd };
+async function requireAuth(req) {
+  const cookieHeader = req.headers.get('cookie') || '';
+  const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+  if (!match) return null;
+  const sessionsStore = getStore('flower-sessions');
+  const session = await sessionsStore.get(match[1], { type: 'json' });
+  if (!session || new Date(session.expires_at) < new Date()) return null;
+  return session.username;
 }
-
-function fmt(iso) {
-  if (!iso) return '';
-  const [y,m,d] = iso.split('-');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${parseInt(d)}-${months[parseInt(m)-1]}-${y.slice(2)}`;
-}
-
-// Extract display name — remove code prefix if present
-function displayName(code, storedName) {
-  if (!storedName || storedName.trim().toUpperCase() === code.toUpperCase()) return code;
-  // Remove leading code prefix (e.g. "KF KENSINGTON FLOWERS" -> "KENSINGTON FLOWERS")
-const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const stripped = storedName.replace(new RegExp('^' + escaped + '\\s+', 'i'), '').trim();
-  return stripped || storedName;
-}
-
-const CSS = `
-  body{font-family:Arial,sans-serif;font-size:9px;margin:0;color:#000;}
-  .page{width:270mm;padding:8mm;page-break-after:always;box-sizing:border-box;}
-  .page:last-child{page-break-after:auto;}
-  .header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px;}
-  .header-left .title{font-size:14px;font-weight:bold;}
-  .header-left .sub{font-size:10px;color:#444;margin-top:2px;}
-  .header-right{text-align:right;font-size:10px;font-weight:bold;}
-  .stats{display:flex;gap:10px;margin-bottom:8px;}
-  .stat{border:1px solid #ddd;padding:4px 10px;border-radius:4px;text-align:center;}
-  .stat-val{font-size:13px;font-weight:bold;color:#0C769E;}
-  .stat-lbl{font-size:8px;color:#666;}
-  .content{display:flex;gap:10px;}
-  .summary{min-width:155px;max-width:155px;}
-  .stbl{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;}
-  .stbl th{background:#0C769E;color:#fff;padding:3px 5px;text-align:left;}
-  .stbl td{padding:2px 5px;border-bottom:1px solid #eee;}
-  .stbl .tot td{font-weight:bold;border-top:2px solid #000;background:#f0f0f0;}
-  .grand{font-size:11px;font-weight:bold;padding:5px 6px;background:#F4DCC9;border:1px solid #A8CFA8;border-radius:3px;margin-top:4px;}
-  .detail{flex:1;overflow:hidden;}
-  .dtbl{width:100%;border-collapse:collapse;font-size:8px;}
-  .dtbl th{background:#0C769E;color:#fff;padding:2px 4px;text-align:left;white-space:nowrap;}
-  .dtbl td{padding:2px 4px;border-bottom:1px solid #eee;white-space:nowrap;overflow:hidden;max-width:90px;text-overflow:ellipsis;}
-  .dtbl tr:nth-child(even){background:#f9f9f9;}
-  .dtbl .chk{text-align:center;}
-  .invoice-band{background:#F4DCC9;padding:5px 8px;border-radius:3px;margin-bottom:7px;font-size:9px;color:#B8472B;font-weight:600;}
-  @media print{body{margin:0;}@page{size:landscape;margin:5mm;}}
-`;
 
 export default async (req) => {
+  const username = await requireAuth(req);
+  if (!username) return json({ error: 'Not authenticated' }, 401);
+
   const url = new URL(req.url);
-  const weekEnd = url.searchParams.get('week_end');
-  const type = url.searchParams.get('type') || 'driver';
-  const code = url.searchParams.get('code') || 'all';
-
-  if (!weekEnd) {
-    return new Response(JSON.stringify({error:'week_end required (YYYY-MM-DD)'}), {status:400,headers:{'content-type':'application/json'}});
-  }
-
+  const id = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop());
   const store = getStore('flower-orders');
-  const {blobs} = await store.list();
-  const allOrders = (await Promise.all(blobs.map(b => store.get(b.key,{type:'json'})))).filter(Boolean);
 
-  const {start, end} = getWeekRange(weekEnd);
-  const weekOrders = allOrders.filter(o => {
-    const d = parseDate(o.date || o.received_at || '');
-    return d && d >= start && d <= end;
-  });
-
-  const ratesStore = getStore('flower-rates');
-  let rates = {};
-  try { rates = await ratesStore.get('rates',{type:'json'}) || {}; } catch(e) {}
-
-  // Load driver names from drivers store
-  const driverNames = {};
-  try {
-    const driversStore = getStore('flower-drivers');
-    const {blobs: dBlobs} = await driversStore.list();
-    const dList = (await Promise.all(dBlobs.map(b => driversStore.get(b.key,{type:'json'})))).filter(Boolean);
-    dList.forEach(d => { if (d.code) driverNames[d.code.toUpperCase()] = d.name; });
-  } catch(e) {}
-
-  // Load shop names from shops store
-  const shopNames = {};
-  try {
-    const shopsStore = getStore('flower-shops');
-    const {blobs: sBlobs} = await shopsStore.list();
-    const sList = (await Promise.all(sBlobs.map(b => shopsStore.get(b.key,{type:'json'})))).filter(Boolean);
-    sList.forEach(s => {
-      if (s.name) {
-        const code = s.name.trim().split(/\s+/)[0].toUpperCase();
-        shopNames[code] = s.name;
-      }
-    });
-  } catch(e) {}
-
-  const weekLabel = fmt(weekEnd);
-  let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reports ${weekLabel}</title><style>${CSS}</style></head><body>`;
-
-  if (type === 'driver') {
-    const drivers = {};
-    weekOrders.forEach(o => {
-      const dc = (o.driver || '').toUpperCase();
-      if (!dc || dc === 'SCD') return;
-      if (!drivers[dc]) drivers[dc] = {orders:[]};
-      drivers[dc].orders.push(o);
-    });
-
-    const targets = code !== 'all' ? [code.toUpperCase()] : Object.keys(drivers).sort();
-
-    targets.forEach(dc => {
-      const drv = drivers[dc];
-      if (!drv) return;
-      // Get full driver name from store, fallback to order field, fallback to code
-      const driverFullName = driverNames[dc] || drv.orders[0]?.driver_name || dc;
-      const driverTitle = `${dc} ${driverFullName !== dc ? driverFullName : ''}`.trim();
-
-      const orders = drv.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
-
-      const orderPay = orders.map(o => {
-        const zone = (o.zone_code||'').toUpperCase();
-        const pieces = parseInt(o.total_pieces||1);
-        const r = rates[zone] || {};
-        const gdpi = parseFloat(r.gdpi) || 0;
-        let drate, total;
-        if (o.driver_pay) {
-          total = parseFloat(o.driver_pay);
-          drate = total - gdpi;
-        } else {
-          const base = ((zone === 'RURALKM' || zone === 'WRU') && o.distance_km != null)
-            ? (r.drate||0) + (r.perkm||0) * o.distance_km
-            : (r.drate||0);
-          drate = base + (pieces-1)*(r.dratex||0);
-          total = drate + gdpi;
-        }
-        return {o, zone, pieces, drate, gdpi, total};
-      });
-
-      const zoneDrate = {}, zoneGdpi = {};
-      let sumDrate = 0, sumGdpi = 0;
-      orderPay.forEach(({zone, drate, gdpi}) => {
-        zoneDrate[zone] = (zoneDrate[zone]||0) + drate;
-        zoneGdpi[zone] = (zoneGdpi[zone]||0) + gdpi;
-        sumDrate += drate;
-        sumGdpi += gdpi;
-      });
-      const totalDue = sumDrate + sumGdpi;
-      const allZones = [...new Set(Object.keys(zoneDrate))].sort();
-
-      html += `<div class="page">
-        <div class="header">
-          <div class="header-left">
-            <div class="title">${driverTitle} &mdash; Week Ending ${weekLabel}</div>
-            <div class="sub">SMART CHOICE DELIVERY DRIVER DETAIL</div>
-          </div>
-          <div class="header-right">SMART CHOICE DELIVERY<br>Driver Weekly Detail</div>
-        </div>
-        <div class="stats">
-          <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">DELIVERIES</div></div>
-          <div class="stat"><div class="stat-val">$${sumDrate.toFixed(2)}</div><div class="stat-lbl">BASE PAY</div></div>
-          <div class="stat"><div class="stat-val">$${sumGdpi.toFixed(2)}</div><div class="stat-lbl">FUEL PREMIUM</div></div>
-          <div class="stat"><div class="stat-val">$${totalDue.toFixed(2)}</div><div class="stat-lbl">TOTAL DUE</div></div>
-        </div>
-        <div class="content">
-          <div class="summary">
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>drate</th></tr></thead>
-              <tbody>
-                ${allZones.map(z=>`<tr><td>${z}</td><td>$${(zoneDrate[z]||0).toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Grand Total</td><td>$${sumDrate.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>GDPI</th></tr></thead>
-              <tbody>
-                ${allZones.filter(z=>zoneGdpi[z]>0).map(z=>`<tr><td>${z}</td><td>$${(zoneGdpi[z]||0).toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Total GDPI</td><td>$${sumGdpi.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <div class="grand">Total $ Due: $${totalDue.toFixed(2)}</div>
-          </div>
-          <div class="detail">
-            <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>DSHOP</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
-              <tbody>
-                ${orderPay.map(({o,zone,pieces,drate,gdpi,total})=>`<tr>
-                  <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
-                  <td>${o.order_id||1}</td>
-                  <td>${(o.name||'').slice(0,18)}</td>
-                  <td>${(o.formatted_address||o.address||'').slice(0,28)}</td>
-                  <td>${(o.community||'').slice(0,18)}</td>
-                  <td>${o.shop_code||''}</td>
-                  <td>${zone}</td>
-                  <td>${(zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
-                  <td>${pieces}</td>
-                  <td>$${drate.toFixed(2)}</td>
-                  <td>$${gdpi.toFixed(2)}</td>
-                  <td>$${total.toFixed(2)}</td>
-                  <td class="chk">&#9744;</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>`;
-    });
-
-  } else if (type === 'shop') {
-    const shops = {};
-    weekOrders.forEach(o => {
-      const sc = (o.shop_code||'').toUpperCase();
-      if (!sc || sc === 'SCD') return;
-      if (!shops[sc]) shops[sc] = {orders:[]};
-      shops[sc].orders.push(o);
-    });
-
-    const targets = code !== 'all' ? [code.toUpperCase()] : Object.keys(shops).sort();
-
-    targets.forEach(sc => {
-      const shop = shops[sc];
-      if (!shop) return;
-
-      // Get full shop name — from store, or from order fields
-      const storedShopName = shopNames[sc] || shop.orders[0]?.shop_full || shop.orders[0]?.shop || sc;
-      const shopFullName = displayName(sc, storedShopName);
-      const shopTitle = `${sc} ${shopFullName}`;
-
-      const orders = shop.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
-
-      const orderAmts = orders.map(o => {
-        const zone = (o.zone_code||'').toUpperCase();
-        const pieces = parseInt(o.total_pieces||1);
-        const r = rates[zone] || {};
-        const base = ((zone === 'RURALKM' || zone === 'WRU') && o.distance_km != null)
-          ? (r.srate||0) + (r.sperkm||0) * o.distance_km
-          : (r.srate||0);
-        const amount = base + (pieces-1)*(r.sratex||0);
-        return {o, zone, pieces, amount};
-      });
-
-      const zoneSums = {};
-      let grandTotal = 0;
-      orderAmts.forEach(({zone,amount}) => {
-        zoneSums[zone] = (zoneSums[zone]||0) + amount;
-        grandTotal += amount;
-      });
-
-      html += `<div class="page">
-        <div class="header">
-          <div class="header-left">
-            <div class="title">${shopTitle} &mdash; Week Ending ${weekLabel}</div>
-            <div class="sub">SMART CHOICE DELIVERY SHOP DETAIL &bull; INVOICE PERIOD ${weekEnd}</div>
-          </div>
-          <div class="header-right">SMART CHOICE DELIVERY<br>Shop Weekly Detail</div>
-        </div>
-        <div class="invoice-band">WEEK ENDING ${weekEnd} &nbsp;&bull;&nbsp; DSHOP ${sc} &nbsp;&bull;&nbsp; Invoice Total: $${grandTotal.toFixed(2)}</div>
-        <div class="content">
-          <div class="summary">
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>Srate</th></tr></thead>
-              <tbody>
-                ${Object.keys(zoneSums).sort().map(z=>`<tr><td>${z}</td><td>$${zoneSums[z].toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Grand Total</td><td>$${grandTotal.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <div class="grand">Invoice Total: $${grandTotal.toFixed(2)}</div>
-          </div>
-          <div class="detail">
-            <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>Driver</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
-              <tbody>
-                ${orderAmts.map(({o,zone,pieces,amount})=>`<tr>
-                  <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
-                  <td>${o.order_id||1}</td>
-                  <td>${(o.name||'').slice(0,20)}</td>
-                  <td>${(o.formatted_address||o.address||'').slice(0,30)}</td>
-                  <td>${(o.community||'').slice(0,20)}</td>
-                  <td>${o.driver||''}</td>
-                  <td>${zone}</td>
-                  <td>${(zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
-                  <td>${pieces}</td>
-                  <td>$${amount.toFixed(2)}</td>
-                  <td class="chk">&#9744;</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>`;
-    });
+  if (req.method === 'GET') {
+    const order = await store.get(id, { type: 'json' });
+    if (!order) return json({ error: 'Order not found' }, 404);
+    return json(order);
   }
 
-  html += '</body></html>';
-  return new Response(html, {status:200, headers:{'content-type':'text/html; charset=utf-8'}});
+  if (req.method === 'PUT') {
+    const existing = await store.get(id, { type: 'json' });
+    if (!existing) return json({ error: 'Order not found' }, 404);
+    let body;
+    try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
+    let updated = { ...existing, ...body, id };
+
+    // If pieces or zone changed, recompute driver_pay from current rates
+    // rather than leaving the old stored value in place - reports.mjs
+    // prefers a stored driver_pay over recalculating, so a stale value
+    // here would silently ignore a corrected piece count or zone.
+    const piecesChanged = body.total_pieces !== undefined && body.total_pieces !== existing.total_pieces;
+    const zoneChanged = body.zone_code !== undefined && body.zone_code !== existing.zone_code;
+    if (piecesChanged || zoneChanged) {
+      try {
+        let r;
+        if (zoneChanged) {
+          // No historical rate exists for a zone the order never used
+          // before - current rates are the only option here. Update the
+          // snapshot too, so this becomes the new historical record for
+          // this order going forward rather than silently drifting on
+          // every future report run.
+          const ratesStore = getStore('flower-rates');
+          const rates = await ratesStore.get('rates', { type: 'json' }) || {};
+          r = rates[updated.zone_code] || {};
+          updated.rate_snapshot = r;
+        } else {
+          // Pieces-only correction: use the rate actually in effect when
+          // this order was originally created, not today's rate table -
+          // otherwise correcting a typo months later would retroactively
+          // apply a rate change that had nothing to do with the mistake.
+          // Falls back to current rates only for older orders that predate
+          // rate snapshotting entirely.
+          if (existing.rate_snapshot) {
+            r = existing.rate_snapshot;
+          } else {
+            const ratesStore = getStore('flower-rates');
+            const rates = await ratesStore.get('rates', { type: 'json' }) || {};
+            r = rates[updated.zone_code] || {};
+          }
+        }
+        const pieces = parseInt(updated.total_pieces || 1);
+        const dist = updated.distance_km ?? null;
+        const base = ((updated.zone_code === 'RURALKM' || updated.zone_code === 'WRU') && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        updated.driver_pay = base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0);
+      } catch (e) { /* keep existing driver_pay if rates lookup fails */ }
+    }
+
+    await store.setJSON(id, updated);
+    return json(updated);
+  }
+
+  if (req.method === 'DELETE') {
+    const existing = await store.get(id, { type: 'json' });
+    if (!existing) return json({ error: 'Order not found' }, 404);
+    await store.delete(id);
+    return new Response(null, { status: 204 });
+  }
+
+  return json({ error: 'Method not allowed' }, 405);
 };
 
-export const config = { path: '/api/reports' };
+export const config = { path: '/api/orders/*' };
