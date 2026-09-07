@@ -195,11 +195,7 @@
       <div class="field-row">
         <div class="field">
           <label>Total Pieces</label>
-          <div style="display:flex;align-items:stretch;gap:6px;">
-            <button type="button" id="piecesMinus" style="min-width:44px;min-height:44px;font-size:20px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--accent);touch-action:manipulation;">&minus;</button>
-            <input type="number" id="fPieces" min="1" value="1" style="text-align:center;flex:1;min-width:0;">
-            <button type="button" id="piecesPlus" style="min-width:44px;min-height:44px;font-size:20px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--accent);touch-action:manipulation;">&plus;</button>
-          </div>
+          <input type="number" id="fPieces" min="1" value="1">
         </div>
         <div class="field">
           <label>Delivery Time</label>
@@ -1188,20 +1184,6 @@ async function init() {
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
     document.getElementById('fPieces').addEventListener('input', updatePay);
-    document.getElementById('piecesMinus').addEventListener('click', function() {
-      var el = document.getElementById('fPieces');
-      var v = (parseInt(el.value) || 1) - 1;
-      el.value = Math.max(1, v);
-      updatePay();
-      saveDraft();
-    });
-    document.getElementById('piecesPlus').addEventListener('click', function() {
-      var el = document.getElementById('fPieces');
-      var v = (parseInt(el.value) || 1) + 1;
-      el.value = v;
-      updatePay();
-      saveDraft();
-    });
 
     document.getElementById('fAcceptedBy').addEventListener('input', function() {
       document.getElementById('contactMethodField').hidden = !this.value.trim();
