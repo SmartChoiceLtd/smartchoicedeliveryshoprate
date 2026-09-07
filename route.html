@@ -29,7 +29,13 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
 <body>
 <div class="topbar">
   <h1>My Route</h1>
-  <button class="btn" id="scanTagBtn" style="margin-top:10px;width:100%;">&#128248; Scan Tag &mdash; Add to Route</button>
+  <label style="font-size:12px;color:var(--ink-soft);display:block;margin-top:10px;">Scanning as:</label>
+  <select id="scanDeliveryType" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-top:2px;">
+    <option value="store" selected>Store to Door</option>
+    <option value="wholesale">Wholesale</option>
+    <option value="events">Events</option>
+  </select>
+  <button class="btn" id="scanTagBtn" style="margin-top:8px;width:100%;">&#128248; Scan Tag &mdash; Add to Route</button>
   <input type="file" id="fTagPhoto" accept="image/*" capture="environment" hidden>
   <div id="scanStatus" hidden style="font-size:13px;color:var(--ink-soft);margin-top:8px;"></div>
   <a class="btn btn-ghost" id="manualEntryLink" style="margin-top:8px;width:100%;">Manual Entry (no tag to scan)</a>
@@ -104,7 +110,8 @@ async function scanTagForRoute(file) {
         shop_code: data.shop_code || null,
         address: data.address,
         name: data.name || null,
-        order_id: data.order_id || null
+        order_id: data.order_id || null,
+        delivery_type: document.getElementById('scanDeliveryType').value
       })
     });
     var stop = await stopRes.json();
@@ -171,6 +178,7 @@ function completeUrl(stop) {
   if (stop.name) params.set('name', stop.name);
   if (stop.address) params.set('address', stop.address);
   if (stop.shop_code) params.set('shop_code', stop.shop_code);
+  if (stop.delivery_type) params.set('delivery_type', stop.delivery_type);
   params.set('stop_id', stop.id);
   return '/driver/' + driverCode.toLowerCase() + '?' + params.toString();
 }
@@ -186,8 +194,11 @@ function renderStops(stops) {
     + (stops.length > MAX_ROUTE_STOPS ? '<div style="font-size:12px;color:var(--ink-soft);margin:-8px 0 14px;">Complete these first, then refresh &mdash; the next stops will roll into your route automatically.</div>' : '')
     : '';
   document.getElementById('stopsList').innerHTML = fullRouteBtn + stops.map(function(s, i) {
+    var typeLabel = s.delivery_type === 'wholesale' ? ' <span style="background:var(--accent-soft);color:var(--accent);font-size:11px;padding:2px 6px;border-radius:6px;font-weight:600;">Wholesale</span>'
+      : s.delivery_type === 'events' ? ' <span style="background:var(--warm-soft);color:var(--warm);font-size:11px;padding:2px 6px;border-radius:6px;font-weight:600;">Event</span>'
+      : '';
     return '<div class="stop-card">'
-      + '<div><span class="stop-num">' + (i+1) + '</span><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span></div>'
+      + '<div><span class="stop-num">' + (i+1) + '</span><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span>' + typeLabel + '</div>'
       + '<div class="stop-addr">' + escapeHtml(s.address || '') + (s.order_id ? ' &bull; Order #' + escapeHtml(s.order_id) : '') + '</div>'
       + '<div class="stop-actions">'
       + '<a class="btn btn-ghost" href="' + navigateUrl(s.address) + '" target="_blank" rel="noopener">Navigate</a>'
