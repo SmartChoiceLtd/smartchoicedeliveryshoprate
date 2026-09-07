@@ -49,6 +49,7 @@ tr:hover td{background:#F9F5F0;}
 </div>
 <div class="toolbar">
   <button class="btn btn-ghost btn-sm" id="refreshBtn">Refresh</button>
+  <button class="btn btn-ghost btn-sm" id="logoutBtn">Log Out</button>
 </div>
 <div class="main">
   <div class="loading" id="loadingMsg">Loading stops&hellip;</div>
@@ -150,7 +151,21 @@ function loadStops() {
 }
 
 document.getElementById('refreshBtn').addEventListener('click', loadStops);
-loadStops();
+document.getElementById('logoutBtn').addEventListener('click', function() {
+  fetch('/api/auth?action=logout', { method: 'POST' }).finally(function() { window.location.href = '/login.html'; });
+});
+fetch('/api/auth?action=check')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.authenticated) {
+      window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
+      return;
+    }
+    loadStops();
+  })
+  .catch(function() {
+    window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
+  });
 </script>
 </body>
 </html>
