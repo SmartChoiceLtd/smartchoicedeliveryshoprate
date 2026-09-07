@@ -43,7 +43,7 @@
 <div class="topbar">
   <h1>Delivery Summary</h1>
   <span class="driver-badge" id="driverBadge"></span>
-  <a class="back-btn" id="backBtn" href="#">Back to form</a>
+  <a class="back-btn" id="backBtn" href="#">Back to My Route</a>
 </div>
 
 <div class="container">
@@ -83,7 +83,7 @@
     <div id="emptyDiv" class="empty" hidden>No deliveries for this period.</div>
 
     <button class="btn" onclick="window.print()">Print Summary</button>
-    <button class="btn btn-secondary" id="backBtn2">Back to form</button>
+    <button class="btn btn-secondary" id="backBtn2">Back to My Route</button>
   </div>
 </div>
 
@@ -96,7 +96,8 @@ var pathParts = location.pathname.split('/').filter(Boolean);
 var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
 
 function getToday() {
-  return new Date().toISOString().slice(0,10);
+  var now = new Date();
+  return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
 }
 
 function getWeekStart() {
@@ -108,9 +109,19 @@ function getWeekStart() {
   return monday;
 }
 
+// Bare YYYY-MM-DD strings (from driver.html's <input type="date">) must be
+// parsed as a LOCAL calendar date. JS treats a bare ISO date string as UTC
+// midnight per spec - in timezones behind UTC (like Mountain Time), that's
+// several hours earlier than local midnight for the same calendar day,
+// which was enough to make every delivery placed on the first day of the
+// week fail the "is this within the current week" comparison entirely,
+// even though it plainly should have counted. Full timestamps
+// (received_at) aren't affected and still parse normally below.
 function parseDate(o) {
   var raw = o.date || o.received_at || '';
   if (!raw) return new Date(0);
+  var isoDateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateOnly) return new Date(parseInt(isoDateOnly[1]), parseInt(isoDateOnly[2]) - 1, parseInt(isoDateOnly[3]));
   var d = new Date(raw);
   if (!isNaN(d.getTime())) return d;
   var mo = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
@@ -196,9 +207,9 @@ async function init() {
     driverCode = driver.code;
     document.getElementById('driverBadge').textContent = driver.name;
     document.title = driver.name + ' - Summary';
-    document.getElementById('backBtn').href = '/driver/' + urlDriverCode.toLowerCase();
+    document.getElementById('backBtn').href = '/route/' + urlDriverCode.toLowerCase();
     document.getElementById('backBtn2').onclick = function() {
-      window.location.href = '/driver/' + urlDriverCode.toLowerCase();
+      window.location.href = '/route/' + urlDriverCode.toLowerCase();
     };
 
     var oRes = await fetch('/api/orders');
