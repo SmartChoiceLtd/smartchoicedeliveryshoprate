@@ -47,6 +47,7 @@ tr.inactive td{color:var(--ink-soft);}
   <h1>Admin Panel</h1>
   <a href="/">Quote tool</a>
   <a href="/orders">Orders</a>
+  <a href="#" onclick="fetch('/api/auth?action=logout',{method:'POST'}).finally(function(){window.location.href='/login.html';});return false;">Log Out</a>
 </div>
 <div class="tabs">
   <button class="tab active" onclick="showTab('drivers')">Drivers</button>
@@ -669,9 +670,20 @@ document.getElementById('saveTemplateBtn').addEventListener('click', function() 
 });
 
 /* ===== INIT ===== */
-loadDrivers();
-loadShops();
-loadRates();
+fetch('/api/auth?action=check')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.authenticated) {
+      window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
+      return;
+    }
+    loadDrivers();
+    loadShops();
+    loadRates();
+  })
+  .catch(function() {
+    window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
+  });
 </script>
 </body>
 </html>
