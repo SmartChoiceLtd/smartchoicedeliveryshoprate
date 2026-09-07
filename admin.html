@@ -281,11 +281,11 @@ wireAddRowControl({
     drivers.push(driver);
     renderDrivers();
   },
-  successText: function(driver) { return 'Driver added. Link: ' + location.origin + '/driver/' + driver.code.toLowerCase(); }
+  successText: function(driver) { return 'Driver added. Link: ' + location.origin + '/route/' + driver.code.toLowerCase(); }
 });
 
 function copyDriverLink(code) {
-  var url = location.origin + '/driver/' + code.toLowerCase();
+  var url = location.origin + '/route/' + code.toLowerCase();
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(function() { alert('Copied: ' + url); });
   else window.prompt('Copy link:', url);
 }
@@ -637,7 +637,7 @@ async function hireApplicant(name, email, phone, vehicle) {
     if (!res.ok) throw new Error('Could not create driver');
     var driver = await res.json();
     drivers.push(driver);
-    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/driver/' + code.toLowerCase());
+    alert('Driver ' + code + ' added!\nLink: ' + location.origin + '/route/' + code.toLowerCase());
     showTab('drivers');
   } catch(e) { alert('Could not hire: ' + e.message); }
 }
