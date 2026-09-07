@@ -97,7 +97,8 @@
     <div id="errorMsg" class="error" hidden></div>
     <div id="draftRestoredMsg" class="success" hidden></div>
 
-    <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:12px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
+    <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:6px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
+    <a href="#" id="clearFormLink" style="display:block;text-align:center;font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Clear form and start over</a>
 
     <div class="toggle-row" id="deliveryTypeToggle" style="margin-bottom:16px;">
       <button class="toggle-btn active" data-type="store">Store to Door</button>
@@ -1234,6 +1235,12 @@ async function init() {
 
     document.getElementById('submitBtn').addEventListener('click', submitDelivery);
     document.getElementById('backToRouteLink').href = '/route/' + driverCode.toLowerCase();
+    document.getElementById('clearFormLink').addEventListener('click', function(e) {
+      e.preventDefault();
+      if (confirm('Clear this form and start over? Anything entered so far will be lost.')) {
+        resetForm();
+      }
+    });
     document.getElementById('summaryBtn').addEventListener('click', function() {
       window.location.href = '/driver-summary/' + driverCode.toLowerCase();
     });
