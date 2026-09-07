@@ -32,7 +32,7 @@ export default async (req) => {
         s.shop_code === body.shop_code
       );
       if (match) {
-        const updated = { ...match, driver: body.driver || match.driver, address: body.address || match.address, name: body.name || match.name };
+        const updated = { ...match, driver: body.driver || match.driver, address: body.address || match.address, name: body.name || match.name, delivery_type: body.delivery_type || match.delivery_type };
         await store.setJSON(match.id, updated);
         return json(updated);
       }
@@ -47,6 +47,7 @@ export default async (req) => {
       address: body.address || null,
       name: body.name || null,
       order_id: body.order_id || null,
+      delivery_type: body.delivery_type || 'store',
       status: 'pending', // 'pending' | 'fulfilled' | 'abandoned'
       fulfilled_at: null,
     };
