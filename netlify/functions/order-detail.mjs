@@ -4,7 +4,20 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
 
+async function requireAuth(req) {
+  const cookieHeader = req.headers.get('cookie') || '';
+  const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+  if (!match) return null;
+  const sessionsStore = getStore('flower-sessions');
+  const session = await sessionsStore.get(match[1], { type: 'json' });
+  if (!session || new Date(session.expires_at) < new Date()) return null;
+  return session.username;
+}
+
 export default async (req) => {
+  const username = await requireAuth(req);
+  if (!username) return json({ error: 'Not authenticated' }, 401);
+
   const url = new URL(req.url);
   const id = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop());
   const store = getStore('flower-orders');
@@ -30,9 +43,32 @@ export default async (req) => {
     const zoneChanged = body.zone_code !== undefined && body.zone_code !== existing.zone_code;
     if (piecesChanged || zoneChanged) {
       try {
-        const ratesStore = getStore('flower-rates');
-        const rates = await ratesStore.get('rates', { type: 'json' }) || {};
-        const r = rates[updated.zone_code] || {};
+        let r;
+        if (zoneChanged) {
+          // No historical rate exists for a zone the order never used
+          // before - current rates are the only option here. Update the
+          // snapshot too, so this becomes the new historical record for
+          // this order going forward rather than silently drifting on
+          // every future report run.
+          const ratesStore = getStore('flower-rates');
+          const rates = await ratesStore.get('rates', { type: 'json' }) || {};
+          r = rates[updated.zone_code] || {};
+          updated.rate_snapshot = r;
+        } else {
+          // Pieces-only correction: use the rate actually in effect when
+          // this order was originally created, not today's rate table -
+          // otherwise correcting a typo months later would retroactively
+          // apply a rate change that had nothing to do with the mistake.
+          // Falls back to current rates only for older orders that predate
+          // rate snapshotting entirely.
+          if (existing.rate_snapshot) {
+            r = existing.rate_snapshot;
+          } else {
+            const ratesStore = getStore('flower-rates');
+            const rates = await ratesStore.get('rates', { type: 'json' }) || {};
+            r = rates[updated.zone_code] || {};
+          }
+        }
         const pieces = parseInt(updated.total_pieces || 1);
         const dist = updated.distance_km ?? null;
         const base = ((updated.zone_code === 'RURALKM' || updated.zone_code === 'WRU') && dist != null)
