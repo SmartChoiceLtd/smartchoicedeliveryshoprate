@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Login</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--radius:12px;}
+*{box-sizing:border-box;}html,body{height:100%;margin:0;}
+[hidden]{display:none !important;}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;align-items:center;justify-content:center;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:360px;width:100%;margin:20px;border-top:4px solid var(--warm);}
+h1{font-family:Georgia,serif;font-size:20px;margin:0 0 4px;}
+.sub{font-size:13px;color:var(--ink-soft);margin-bottom:20px;}
+label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;margin-top:14px;}
+input{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+.btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-top:20px;}
+.btn:hover{opacity:0.9;}
+.error{color:var(--warm);font-size:13px;margin-top:12px;}
+.note{font-size:12px;color:var(--ink-soft);margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="cardTitle">Sign In</h1>
+  <p class="sub" id="cardSub">Smart Choice Delivery</p>
+  <div id="errorMsg" class="error" hidden></div>
+  <label>Username</label>
+  <input type="text" id="fUsername" autocomplete="username">
+  <label>Password</label>
+  <input type="password" id="fPassword" autocomplete="current-password">
+  <button class="btn" id="submitBtn">Sign In</button>
+  <p class="note" id="setupNote" hidden>No account exists yet - choose a username and password to create the first one.</p>
+</div>
+
+<script>
+var redirectTo = new URLSearchParams(location.search).get('redirect') || '/hub.html';
+
+fetch('/api/auth?action=needs-setup')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.needs_setup) {
+      document.getElementById('cardTitle').textContent = 'Create Your Account';
+      document.getElementById('submitBtn').textContent = 'Create Account';
+      document.getElementById('setupNote').hidden = false;
+    }
+  })
+  .catch(function() {});
+
+document.getElementById('submitBtn').addEventListener('click', function() {
+  var username = document.getElementById('fUsername').value.trim();
+  var password = document.getElementById('fPassword').value;
+  var errEl = document.getElementById('errorMsg');
+  errEl.hidden = true;
+  if (!username || !password) {
+    errEl.textContent = 'Enter both a username and password.';
+    errEl.hidden = false;
+    return;
+  }
+  fetch('/api/auth?action=login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: username, password: password })
+  }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(result) {
+      if (!result.ok) {
+        errEl.textContent = result.data.error || 'Could not sign in.';
+        errEl.hidden = false;
+        return;
+      }
+      window.location.href = redirectTo;
+    })
+    .catch(function(e) {
+      errEl.textContent = 'Could not reach the server: ' + e.message;
+      errEl.hidden = false;
+    });
+});
+
+document.getElementById('fPassword').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('submitBtn').click();
+});
+</script>
+</body>
+</html>
