@@ -48,6 +48,7 @@ export default async (req) => {
       name: body.name || null,
       order_id: body.order_id || null,
       delivery_type: body.delivery_type || 'store',
+      skipped: false,
       status: 'pending', // 'pending' | 'fulfilled' | 'abandoned'
       fulfilled_at: null,
     };
