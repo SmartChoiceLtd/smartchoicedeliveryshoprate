@@ -207,7 +207,8 @@ async function scanTagForRoute(file) {
         address: data.address,
         name: data.name || null,
         order_id: data.order_id || null,
-        delivery_type: document.getElementById('scanDeliveryType').value
+        delivery_type: document.getElementById('scanDeliveryType').value,
+        local_date: (function() { var n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); })()
       })
     });
     var stop = await stopRes.json();
