@@ -202,6 +202,10 @@
           <input type="time" id="fTime">
         </div>
       </div>
+      <div class="field" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="fRush" style="width:20px;height:20px;">
+        <label for="fRush" style="margin:0;font-weight:600;">Rush / Hotshot Delivery (adds premium)</label>
+      </div>
     </div>
 
     <div class="card" id="statusCard">
@@ -493,7 +497,11 @@ function computePay() {
     var receivingShop = shops.find(function(s){ return s.id === shopId; });
     if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
   }
-  return { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, total: base + extra + gdpi + byPremium, pieces: pieces };
+  var rushPremium = 0;
+  if (document.getElementById('fRush').checked) {
+    rushPremium = (rates['HOT'] || {}).drate || 0;
+  }
+  return { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium, pieces: pieces };
 }
 
 var pathParts = location.pathname.split('/').filter(Boolean);
@@ -694,7 +702,8 @@ function updatePay() {
   var breakdown = 'Base $' + pay.base.toFixed(2) +
     (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
     ' + fuel $' + pay.gdpi.toFixed(2) +
-    (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '');
+    (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '') +
+    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : '');
   document.getElementById('payBreakdown').textContent = breakdown;
   document.getElementById('payPreview').hidden = false;
 }
@@ -856,6 +865,7 @@ function resetForm() {
   document.getElementById('fAddress').value = '';
   document.getElementById('fUnit').value = '';
   document.getElementById('fTimeRequest').value = '';
+  document.getElementById('fRush').checked = false;
   document.getElementById('fPieces').value = '1';
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
@@ -1090,6 +1100,7 @@ async function submitDelivery() {
     address: wsAddress,
     unit: document.getElementById('fUnit').value.trim(),
     time_request: document.getElementById('fTimeRequest').value.trim(),
+    rush: document.getElementById('fRush').checked,
     shop: wsShopName,
     shop_code: wsShopCode,
     driver: driverCode,
@@ -1270,6 +1281,7 @@ async function init() {
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
     document.getElementById('fPieces').addEventListener('input', updatePay);
+    document.getElementById('fRush').addEventListener('change', updatePay);
 
     document.getElementById('fAcceptedBy').addEventListener('input', function() {
       document.getElementById('contactMethodField').hidden = !this.value.trim();
