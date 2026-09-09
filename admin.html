@@ -521,7 +521,13 @@ var ZONE_KM = {
 // Flat event-type codes aren't distance-based — GDPI doesn't apply to them
 // directly (WEDO/FUNO borrow GDPI from their underlying geographic zone at
 // calculation time, and don't have their own rate-table row at all).
-var NON_DISTANCE_ZONES = ['SPEC', 'WED', 'FUN'];
+// RURALKM/WRU are excluded for a different reason: every delivery under
+// these codes is a genuinely different distance (that's the whole point
+// of them), so there's no single representative km to calculate from -
+// their km field defaults to 0, which would make this calculator suggest
+// a nonsensical $0 GDPI. These need a real, manually-set flat value
+// representing a typical rural fuel premium, same as SPEC/WED/FUN.
+var NON_DISTANCE_ZONES = ['SPEC', 'WED', 'FUN', 'RURALKM', 'WRU'];
 
 function kmForZone(zone) {
   var r = rates[zone];
