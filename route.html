@@ -424,12 +424,10 @@ function loadRoute() {
 
   Promise.all([
     fetch('/api/stops').then(function(r) { return r.json(); }),
-    fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; }),
-    getCurrentLocation()
+    fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
   ]).then(function(results) {
     var allStops = results[0];
     var mapsKey = results[1] && results[1].key;
-    var currentLocation = results[2];
     var mine = allStops.filter(function(s) { return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode; });
 
     if (!mine.length) {
@@ -441,13 +439,26 @@ function loadRoute() {
     var active = mine.filter(function(s) { return !s.skipped; });
     var skipped = mine.filter(function(s) { return s.skipped; });
 
-    return optimizeOrder(active, mapsKey, currentLocation).then(function(ordered) {
+    // Show stops immediately in their existing order - never make the
+    // driver wait on GPS just to see and act on their route. A slow or
+    // stuck location permission prompt (a real inconsistency on some iOS
+    // Safari versions) must never block this from appearing at all.
+    lastActiveStops = active;
+    lastSkippedStops = skipped;
+    renderStops(active, skipped);
+    document.getElementById('loadingMsg').hidden = true;
+    document.getElementById('content').hidden = false;
+
+    // Attempt geolocation + re-optimization separately, in the background.
+    // If it succeeds, silently re-render with a better order. If it's
+    // slow, stuck, or denied, the driver already has a fully usable route
+    // and never notices anything was waiting on it.
+    getCurrentLocation().then(function(currentLocation) {
+      return optimizeOrder(active, mapsKey, currentLocation);
+    }).then(function(ordered) {
       lastActiveStops = ordered;
-      lastSkippedStops = skipped;
       renderStops(ordered, skipped);
-      document.getElementById('loadingMsg').hidden = true;
-      document.getElementById('content').hidden = false;
-    });
+    }).catch(function() { /* best-effort - already showing a usable route */ });
   }).catch(function(e) {
     document.getElementById('loadingMsg').textContent = 'Could not load your route: ' + e.message;
   });
