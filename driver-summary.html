@@ -170,11 +170,23 @@ function render() {
     var pay = parseFloat(o.driver_pay) || 0;
     var status = Array.isArray(o.delivery_status) ? o.delivery_status[0] : (o.delivery_status || '');
     var time = o.delivery_time || '';
+    var isWholesale = o.delivery_type === 'wholesale';
+    // For wholesale, name/shop mean something different than for a normal
+    // delivery (receiving shop vs whoever's actually billed) - without
+    // explicit labels, a driver has no way to tell which piece of text is
+    // which, especially since the same two fields mean something totally
+    // different for a Store to Door delivery.
+    var titleHtml = isWholesale
+      ? '<div class="delivery-name">Shop: ' + esc(o.name || 'Unknown') + '</div>'
+      : '<div class="delivery-name">' + esc(o.name || 'Unknown') + '</div>';
+    var subHtml = isWholesale
+      ? '<div style="font-size:11px;color:var(--ink-soft);">Billed to: ' + esc(o.shop || '') + (time ? ' &bull; ' + esc(time) : '') + '</div>'
+      : '<div style="font-size:11px;color:var(--ink-soft);">' + esc(o.shop || '') + (time ? ' &bull; ' + esc(time) : '') + '</div>';
     return '<div class="delivery-card">' +
       '<div class="delivery-header">' +
         '<div>' +
-          '<div class="delivery-name">' + esc(o.name || 'Unknown') + '</div>' +
-          '<div style="font-size:11px;color:var(--ink-soft);">' + esc(o.shop || '') + (time ? ' &bull; ' + esc(time) : '') + '</div>' +
+          titleHtml +
+          subHtml +
         '</div>' +
         '<div class="delivery-pay">$' + pay.toFixed(2) + '</div>' +
       '</div>' +
