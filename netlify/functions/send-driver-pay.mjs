@@ -35,25 +35,21 @@ function fmtWeekEnd(weekEnd) {
 async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // Week totals
   const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
   const weekDel = orders.length;
   const weekAvg = weekDel > 0 ? weekPay / weekDel : 0;
 
-  // GDPI this week
   const weekGdpi = orders.reduce((s, o) => {
     const r = rates[o.zone_code] || {};
     return s + (parseFloat(r.gdpi) || 0);
   }, 0);
 
-  // YTD
   const ytdStartPay = parseFloat(driver.ytd_start_pay) || 0;
   const ytdStartDel = parseInt(driver.ytd_start_deliveries) || 0;
   const ytdPay = ytdStartPay + weekPay;
   const ytdDel = ytdStartDel + weekDel;
   const ytdAvg = ytdDel > 0 ? ytdPay / ytdDel : 0;
 
-  // Zone breakdown
   const zoneBreak = {};
   orders.forEach(o => {
     const z = o.zone_code || 'UNK';
@@ -74,23 +70,17 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   }).join('');
 
   const firstName = (driver.name || '').split(' ')[0];
-  
   const driverLink = `https://smartchoicedeliveryshoprate.netlify.app/api/reports?type=driver&week_end=${weekEnd}&code=${(driver.code || '').toLowerCase()}`;
 
   const html = `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100% !important;min-width:280px;">
-
-  <!-- Header -->
- <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;width:100% !important;box-sizing:border-box;">
+  <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;width:100% !important;box-sizing:border-box;">
     <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:20px;">Smart Choice Delivery</h1>
     <p style="color:#D6EEF7;margin:4px 0 0;font-size:12px;">Driver Pay Statement</p>
   </div>
-
   <div style="padding:20px 24px;background:#fff;">
     <p style="font-size:15px;margin:0 0 4px;">Hi ${firstName},</p>
     <p style="font-size:13px;color:#6B6256;margin:0 0 20px;">Week Ending <strong style="color:#2B2620;">${fmtWeekEnd(weekEnd)}</strong></p>
-
-    <!-- This Week Summary -->
     <div style="background:#D6EEF7;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
       <div style="font-size:11px;font-weight:700;color:#0C769E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">This Week</div>
       <table style="width:100%;border-collapse:collapse;">
@@ -114,8 +104,6 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
         </tr>
       </table>
     </div>
-
-    <!-- YTD -->
     <div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:14px 20px;margin-bottom:16px;">
       <div style="font-size:11px;font-weight:700;color:#2C6B2C;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Year to Date — Dec 29, 2025</div>
       <table style="width:100%;border-collapse:collapse;">
@@ -135,8 +123,6 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
         </tr>
       </table>
     </div>
-
-    <!-- Zone Breakdown -->
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;font-weight:700;color:#2B2620;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;border-bottom:2px solid #B8472B;padding-bottom:4px;">Zone Breakdown</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -159,22 +145,16 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
         </tfoot>
       </table>
     </div>
-
-    <!-- Payment & Link -->
     <div style="background:#FAF7F2;border:1px solid #E6DECF;border-radius:8px;padding:14px 16px;font-size:13px;margin-bottom:16px;">
       <p style="margin:0 0 8px;"><strong>Payment:</strong> E-transfer sent Sunday to <strong>${driver.email}</strong></p>
       <a href="${driverLink}" style="color:#0C769E;font-weight:600;font-size:13px;">View full delivery detail →</a>
     </div>
-
     <p style="font-size:12px;color:#6B6256;margin:0;">Questions? Reply to this email or call Kevin at 403-880-9822.</p>
     <p style="font-size:13px;margin:12px 0 0;">Cheers,<br><strong>Kevin Michaud</strong><br>Smart Choice Delivery</p>
   </div>
-
-  <!-- Footer -->
   <div style="background:#0C769E;padding:10px 24px;text-align:center;">
     <p style="color:#D6EEF7;font-size:11px;margin:0;">Smart Choice Delivery &mdash; Calgary, AB &mdash; Your Delivery Service Partner</p>
   </div>
-
 </div>`;
 
   return await resend.emails.send({
@@ -232,11 +212,25 @@ export default async (req) => {
     ? activeDrivers
     : activeDrivers.filter(d => (d.code || '').toUpperCase() === filterCode);
 
+  if (filterCode && filterCode !== 'ALL' && driversToSend.length === 0) {
+    // The requested driver code doesn't match any active driver with an
+    // email on file at all - surface this clearly rather than silently
+    // returning an empty, easy-to-miss result.
+    return json({ success: true, week_end, emails_sent: [], warning: `No active driver found with code "${filterCode}" and an email on file.` });
+  }
+
   const results = [];
   for (const driver of driversToSend) {
     const code = (driver.code || '').toUpperCase();
     const orders = byDriver[code] || [];
-    if (!orders.length) continue;
+    if (!orders.length) {
+      // Previously this silently skipped with no record at all - the
+      // outer response still said "success" with an empty emails_sent
+      // list, which looked identical to a real send if you didn't read
+      // the detail closely. Record explicitly why nothing was sent.
+      results.push({ driver: code, status: 'skipped_no_deliveries', deliveries: 0 });
+      continue;
+    }
     try {
       await sendDriverPayEmail(driver, orders, week_end, rates);
       results.push({ driver: code, status: 'sent', deliveries: orders.length });
