@@ -157,12 +157,20 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   </div>
 </div>`;
 
-  return await resend.emails.send({
+  const result = await resend.emails.send({
     from: 'pay@smartchoicedelivery.ca',
     to: driver.email,
     subject: `Smart Choice Delivery — Pay Statement Week Ending ${fmtWeekEnd(weekEnd)}`,
     html
   });
+  // The Resend SDK doesn't always throw for API-level failures (unverified
+  // sender domain, invalid recipient, etc.) - it can resolve normally with
+  // an .error field set instead. Treat that the same as a thrown error,
+  // rather than letting it silently look like a successful send.
+  if (result && result.error) {
+    throw new Error(result.error.message || JSON.stringify(result.error));
+  }
+  return result;
 }
 
 export default async (req) => {
