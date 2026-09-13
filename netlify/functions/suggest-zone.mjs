@@ -74,8 +74,12 @@ const OUT_OF_TOWN_ZONES = [
   { code:'MDF', name:'MD Foothills',                         lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'MIL', name:'Millarville',                          lat:50.7567, lng:-114.3194, radiusKm:12 },
   { code:'DVA', name:'Diamond Valley',                       lat:50.6833, lng:-114.2833, radiusKm:10 },
-  { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:1 },
-  { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:1 },
+  // RVN/RVS removed from here (2026-09-12) - a flat radius circle can't
+  // respect the city's actual irregular shape, and a 10km radius was
+  // swallowing genuine Calgary territory on the east side up to Deerfoot.
+  // Real RVS/RVN assignment now happens solely via the geographic
+  // corridor check further below, which requires confirmed exclusion
+  // from the real Calgary boundary polygon rather than a crude circle.
   { code:'AIR', name:'Airdrie',                              lat:51.2920, lng:-114.0144, radiusKm:8  },
   { code:'CHE', name:'Chestermere',                          lat:51.0487, lng:-113.8225, radiusKm:7  },
   { code:'OKO', name:'Okotoks',                              lat:50.7258, lng:-113.9758, radiusKm:8  },
@@ -243,7 +247,7 @@ async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
 }
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify({ ...data, _build: 'google-neighborhood-signal-v1' }), {
+  return new Response(JSON.stringify({ ...data, _build: 'rvs-rvn-radius-removed-2026-09-12' }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
@@ -351,9 +355,16 @@ export default async (req) => {
       community });
   }
 
-  // RVS/RVN geographic corridor — east of Stoney, outside Calgary
-  // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south)
-  if (!isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
+  // RVS/RVN geographic corridor — east of Stoney Trail, outside Calgary.
+  // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south).
+  // isLikelyInCalgary() is the primary gate here (a point must be
+  // confirmed outside the real city boundary polygon); the longitude
+  // bound below is a secondary sanity check narrowing this to the
+  // correct general area. -113.90 is a starting estimate for Stoney
+  // Trail's approximate alignment in this area, not a verified survey
+  // coordinate - tighten further if testing still finds real Calgary
+  // addresses incorrectly landing in this branch.
+  if (!isLikelyInCalgary(lat, lng) && lng > -113.90 && lng < -113.600) {
     if (lat >= 51.055) {
       return json({ suggested:'RVN', confidence:'medium',
         message:'Rocky View County North (north of Trans-Canada)',
