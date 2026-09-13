@@ -74,14 +74,8 @@ const OUT_OF_TOWN_ZONES = [
   { code:'MDF', name:'MD Foothills',                         lat:50.7500, lng:-114.0000, radiusKm:10 },
   { code:'MIL', name:'Millarville',                          lat:50.7567, lng:-114.3194, radiusKm:12 },
   { code:'DVA', name:'Diamond Valley',                       lat:50.6833, lng:-114.2833, radiusKm:10 },
-  // TEMPORARY DIAGNOSTIC (2026-09-12): RVN/RVS removed from this list to
-  // test whether the deployed code actually reflects source changes at
-  // all - if this same address still returns RVS after this change is
-  // live, that's definitive proof of a deploy/infrastructure problem
-  // rather than anything in the matching logic. RESTORE these two lines
-  // once the deploy issue is confirmed/resolved.
-  // { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:10 },
-  // { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:10 },
+  { code:'RVN', name:'Rocky View County North',              lat:51.0900, lng:-113.8500, radiusKm:1 },
+  { code:'RVS', name:'Rocky View County South',              lat:50.9000, lng:-113.8500, radiusKm:1 },
   { code:'AIR', name:'Airdrie',                              lat:51.2920, lng:-114.0144, radiusKm:8  },
   { code:'CHE', name:'Chestermere',                          lat:51.0487, lng:-113.8225, radiusKm:7  },
   { code:'OKO', name:'Okotoks',                              lat:50.7258, lng:-113.9758, radiusKm:8  },
@@ -249,7 +243,7 @@ async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
 }
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify({ ...data, _build: 'DIAGNOSTIC-rvs-rvn-disabled' }), {
+  return new Response(JSON.stringify({ ...data, _build: 'google-neighborhood-signal-v1' }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
@@ -357,13 +351,9 @@ export default async (req) => {
       community });
   }
 
-  // TEMPORARY DIAGNOSTIC (2026-09-12): disabled entirely (condition forced
-  // false) to test whether the deployed code reflects source changes at
-  // all. RESTORE the real condition below once the deploy issue is
-  // confirmed/resolved.
   // RVS/RVN geographic corridor — east of Stoney, outside Calgary
   // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south)
-  if (false && !isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
+  if (!isLikelyInCalgary(lat, lng) && lng > -114.060 && lng < -113.600) {
     if (lat >= 51.055) {
       return json({ suggested:'RVN', confidence:'medium',
         message:'Rocky View County North (north of Trans-Canada)',
