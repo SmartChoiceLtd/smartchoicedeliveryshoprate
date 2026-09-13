@@ -243,7 +243,7 @@ async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
 }
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify({ ...data, _build: 'bpw-radius-4km-2026-08-18' }), {
+  return new Response(JSON.stringify({ ...data, _build: 'google-neighborhood-signal-v1' }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
@@ -357,12 +357,12 @@ export default async (req) => {
     if (lat >= 51.055) {
       return json({ suggested:'RVN', confidence:'medium',
         message:'Rocky View County North (north of Trans-Canada)',
-        formatted_address: formatted });
+        formatted_address: formatted, _debug_neighborhood: neighborhood, _debug_locality: locality });
     }
     if (lat >= 50.840 && lat < 51.055) {
       return json({ suggested:'RVS', confidence:'medium',
         message:'Rocky View County South (south of Trans-Canada)',
-        formatted_address: formatted });
+        formatted_address: formatted, _debug_neighborhood: neighborhood, _debug_locality: locality });
     }
   }
 
@@ -410,7 +410,8 @@ export default async (req) => {
       message: `Matched to ${bestTown.name} (${bestTown.code})`,
       formatted_address: formatted,
       distance_to_zone_km: Math.round(bestDist * 10) / 10,
-      community: bestTown.name
+      community: bestTown.name,
+      _debug_neighborhood: neighborhood, _debug_locality: locality, _debug_resolved_community: resolvedCommunity
     });
   }
 
