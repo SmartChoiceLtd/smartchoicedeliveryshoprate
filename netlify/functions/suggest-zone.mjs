@@ -152,13 +152,15 @@ function isLikelyInCalgary(lat, lng) {
 }
 
 // Checks whether a point/address matches any name in a given community
-// list. Prefers the resolved community (from real point-in-polygon lookup
-// against the same dataset the boundary/quote tool use) as the primary
-// signal - Google's geocoded formatted_address generally does NOT include
-// neighborhood names for a standard street address, so the older
-// text-in-formatted-address check below almost never matches for genuine
-// addresses and is kept only as a harmless legacy fallback.
-function matchesCommunityList(formatted, resolvedCommunity, list) {
+// list. Checks in order of reliability: Google's own structured
+// neighborhood field (actively maintained, correctly knows about newer
+// developments), then the resolved community from real point-in-polygon
+// lookup against the 2016 dataset (which can have real gaps for newer
+// streets), then a plain text search within formatted_address as a last
+// resort (Google generally omits neighborhood names there entirely, so
+// this rarely matches on its own for a genuine address).
+function matchesCommunityList(googleNeighborhood, formatted, resolvedCommunity, list) {
+  if (googleNeighborhood && list.some(c => c.toUpperCase() === googleNeighborhood.toUpperCase())) return true;
   if (resolvedCommunity && list.some(c => c.toUpperCase() === resolvedCommunity.toUpperCase())) return true;
   if (formatted) {
     const upper = formatted.toUpperCase();
@@ -168,10 +170,9 @@ function matchesCommunityList(formatted, resolvedCommunity, list) {
 }
 
 // Returns the exact community name that matched (for inclusion in the
-// response/tracking) - prefers the resolved (geometry-based) name, since
-// that's the more precise/authoritative source, falling back to a text
-// match only if no polygon match was found at all.
-function matchCommunityName(formatted, resolvedCommunity, list) {
+// response/tracking) - same priority order as matchesCommunityList above.
+function matchCommunityName(googleNeighborhood, formatted, resolvedCommunity, list) {
+  if (googleNeighborhood && list.some(c => c.toUpperCase() === googleNeighborhood.toUpperCase())) return googleNeighborhood;
   if (resolvedCommunity && list.some(c => c.toUpperCase() === resolvedCommunity.toUpperCase())) return resolvedCommunity;
   if (!formatted) return null;
   const upper = formatted.toUpperCase();
@@ -212,11 +213,23 @@ async function geocode(address, key, biasLat, biasLng) {
   const data = await res.json();
   if (data.status !== 'OK' || !data.results[0]) return null;
   const r = data.results[0];
+  // Google's structured address_components often include a 'neighborhood'
+  // (or occasionally 'sublocality_level_1') entry with the actual
+  // community/neighborhood name - separate from formatted_address, which
+  // is a single display line that generally omits this. Google's own data
+  // is actively maintained, so unlike the static 2016 community polygon
+  // file, it should correctly recognize newer developments.
+  const components = r.address_components || [];
+  const neighborhoodComponent = components.find(c => (c.types || []).includes('neighborhood'))
+    || components.find(c => (c.types || []).includes('sublocality_level_1'));
+  const localityComponent = components.find(c => (c.types || []).includes('locality'));
   return {
     lat: r.geometry.location.lat,
     lng: r.geometry.location.lng,
     formatted: r.formatted_address,
-    types: r.types || []
+    types: r.types || [],
+    neighborhood: neighborhoodComponent ? neighborhoodComponent.long_name : null,
+    locality: localityComponent ? localityComponent.long_name : null
   };
 }
 
@@ -261,7 +274,7 @@ export default async (req) => {
     });
   }
 
-  const { lat, lng, formatted } = geo;
+  const { lat, lng, formatted, neighborhood, locality } = geo;
 
   // Resolve the actual community via real point-in-polygon lookup FIRST -
   // this is the same dataset the quote tool and CALGARY_BOUNDARY are
@@ -273,35 +286,35 @@ export default async (req) => {
   const resolvedCommunity = await findCommunityName(lat, lng);
 
   // TSA — named community check
-  if (matchesCommunityList(formatted, resolvedCommunity, TSA_COMMUNITIES)) {
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, TSA_COMMUNITIES)) {
     return json({ suggested:'TSA', confidence:'high',
       message:"Tsuu T'ina Adjacent area — out-of-town rate applies",
       formatted_address: formatted,
-      community: matchCommunityName(formatted, resolvedCommunity, TSA_COMMUNITIES) });
+      community: matchCommunityName(neighborhood, formatted, resolvedCommunity, TSA_COMMUNITIES) });
   }
 
   // BPW — named acreage development within Bearspaw
-  if (matchesCommunityList(formatted, resolvedCommunity, BPW_COMMUNITIES)) {
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, BPW_COMMUNITIES)) {
     return json({ suggested:'BPW', confidence:'high',
       message:'Bearspaw area — out-of-town rate applies',
       formatted_address: formatted,
-      community: matchCommunityName(formatted, resolvedCommunity, BPW_COMMUNITIES) });
+      community: matchCommunityName(neighborhood, formatted, resolvedCommunity, BPW_COMMUNITIES) });
   }
 
   // RVN — Rocky View County North by name
-  if (matchesCommunityList(formatted, resolvedCommunity, RVN_COMMUNITIES)) {
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, RVN_COMMUNITIES)) {
     return json({ suggested:'RVN', confidence:'high',
       message:'Rocky View County North',
       formatted_address: formatted,
-      community: matchCommunityName(formatted, resolvedCommunity, RVN_COMMUNITIES) });
+      community: matchCommunityName(neighborhood, formatted, resolvedCommunity, RVN_COMMUNITIES) });
   }
 
   // RVS — Rocky View County South by name
-  if (matchesCommunityList(formatted, resolvedCommunity, RVS_COMMUNITIES)) {
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, RVS_COMMUNITIES)) {
     return json({ suggested:'RVS', confidence:'high',
       message:'Rocky View County South',
       formatted_address: formatted,
-      community: matchCommunityName(formatted, resolvedCommunity, RVS_COMMUNITIES) });
+      community: matchCommunityName(neighborhood, formatted, resolvedCommunity, RVS_COMMUNITIES) });
   }
 
   // C5 border communities — a genuine resolved-community match against this
@@ -312,18 +325,18 @@ export default async (req) => {
   // also agree only added a chance of failure at dissolve-seam gaps
   // between adjacent community polygons, which is what was actually
   // causing Mahogany/Auburn Bay to fall through incorrectly.
-  if (matchesCommunityList(formatted, resolvedCommunity, C5_NORTH_COMMUNITIES)) {
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, C5_NORTH_COMMUNITIES)) {
     return json({ suggested:'C5', confidence:'high',
       message:'Calgary border community — C5 rate applies',
       formatted_address: formatted,
-      community: matchCommunityName(formatted, resolvedCommunity, C5_NORTH_COMMUNITIES) });
+      community: matchCommunityName(neighborhood, formatted, resolvedCommunity, C5_NORTH_COMMUNITIES) });
   }
 
   // SE Calgary deep communities — intercept before rural radius matching
   const SE_C5 = ['Seton','Auburn','Mahogany','Chaparral','Cranston',
     'Wolf Willow','Ranchview','Ricardo Ranch','Legacy'];
-  if (matchesCommunityList(formatted, resolvedCommunity, SE_C5)) {
-    const community = matchCommunityName(formatted, resolvedCommunity, SE_C5);
+  if (matchesCommunityList(neighborhood, formatted, resolvedCommunity, SE_C5)) {
+    const community = matchCommunityName(neighborhood, formatted, resolvedCommunity, SE_C5);
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
     if (drivingKm !== null) {
       const zone = cityZoneForKm(drivingKm);
@@ -362,9 +375,13 @@ export default async (req) => {
   // Also claimed here if a real community polygon match was found above,
   // even if isLikelyInCalgary()'s separately-dissolved boundary disagrees -
   // a genuine community match is itself sufficient evidence of being
-  // inside the city.
-  if (isLikelyInCalgary(lat, lng) || resolvedCommunity) {
-    const community = resolvedCommunity;
+  // inside the city. Also claimed if Google's own locality determination
+  // says this address is in Calgary specifically - this catches
+  // communities not in any named list at all (e.g. Copperfield) and isn't
+  // dependent on any static dataset being complete for newer streets.
+  const isInCalgaryPerGoogle = locality && locality.toUpperCase() === 'CALGARY';
+  if (isLikelyInCalgary(lat, lng) || resolvedCommunity || isInCalgaryPerGoogle) {
+    const community = resolvedCommunity || neighborhood;
     const drivingKm = await getDrivingKm(shopLat, shopLng, lat, lng, key);
     if (drivingKm !== null) {
       const zone = cityZoneForKm(drivingKm);
