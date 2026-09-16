@@ -654,13 +654,15 @@ function setZone(code, desc, manual, community, distanceKm) {
 function trackStop() {
   var shopId = document.getElementById('fShop').value;
   var shop = shops.find(function(s) { return s.id === shopId; });
+  var now = new Date();
   var payload = {
     driver: driverCode,
     shop_code: shop ? shop.name.split(' ')[0] : null,
     address: formattedAddress || document.getElementById('fAddress').value.trim(),
     name: document.getElementById('fName').value.trim(),
     order_id: document.getElementById('fOrderId').value.trim() || null,
-    delivery_type: deliveryType
+    delivery_type: deliveryType,
+    local_date: now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0')
   };
   if (currentStopId) {
     fetch('/api/stops/' + encodeURIComponent(currentStopId), {
