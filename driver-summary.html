@@ -50,7 +50,9 @@
   <div class="period-toggle">
     <button class="period-btn active" data-period="today" id="btnToday">Today</button>
     <button class="period-btn" data-period="week" id="btnWeek">This Week</button>
+    <button class="period-btn" data-period="day" id="btnPickDay">Pick a Day</button>
   </div>
+  <input type="date" id="dayPicker" hidden style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:16px;">
 
   <div id="loadingDiv" class="loading">
     <div class="spinner"></div>
@@ -130,6 +132,8 @@ function parseDate(o) {
   return new Date(0);
 }
 
+var selectedDay = null;
+
 function filterOrders() {
   var today = getToday();
   var weekStart = getWeekStart();
@@ -138,6 +142,8 @@ function filterOrders() {
     var d = parseDate(o);
     if (currentPeriod === 'today') {
       return (o.date || o.received_at || '').slice(0,10) === today;
+    } else if (currentPeriod === 'day') {
+      return selectedDay && (o.date || o.received_at || '').slice(0,10) === selectedDay;
     } else {
       return d >= weekStart;
     }
@@ -154,7 +160,7 @@ function render() {
   document.getElementById('statPieces').textContent = totalPieces;
   document.getElementById('statPay').textContent = '$' + totalPay.toFixed(2);
   document.getElementById('totalPay').textContent = '$' + totalPay.toFixed(2);
-  document.getElementById('totalLabel').textContent = currentPeriod === 'today' ? "Today's total pay" : "This week's total pay";
+  document.getElementById('totalLabel').textContent = currentPeriod === 'today' ? "Today's total pay" : currentPeriod === 'day' ? (selectedDay ? selectedDay + "'s total pay" : "Total pay") : "This week's total pay";
 
   var list = document.getElementById('deliveryList');
   var emptyDiv = document.getElementById('emptyDiv');
@@ -236,17 +242,38 @@ async function init() {
   }
 }
 
+function setActiveButton(btn) {
+  [document.getElementById('btnToday'), document.getElementById('btnWeek'), document.getElementById('btnPickDay')].forEach(function(b) {
+    b.classList.toggle('active', b === btn);
+  });
+}
+
 document.getElementById('btnToday').addEventListener('click', function() {
   currentPeriod = 'today';
-  document.getElementById('btnToday').classList.add('active');
-  document.getElementById('btnWeek').classList.remove('active');
+  setActiveButton(this);
+  document.getElementById('dayPicker').hidden = true;
   render();
 });
 
 document.getElementById('btnWeek').addEventListener('click', function() {
   currentPeriod = 'week';
-  document.getElementById('btnWeek').classList.add('active');
-  document.getElementById('btnToday').classList.remove('active');
+  setActiveButton(this);
+  document.getElementById('dayPicker').hidden = true;
+  render();
+});
+
+document.getElementById('btnPickDay').addEventListener('click', function() {
+  currentPeriod = 'day';
+  setActiveButton(this);
+  var picker = document.getElementById('dayPicker');
+  picker.hidden = false;
+  if (!picker.value) picker.value = getToday();
+  selectedDay = picker.value;
+  render();
+});
+
+document.getElementById('dayPicker').addEventListener('change', function() {
+  selectedDay = this.value;
   render();
 });
 
