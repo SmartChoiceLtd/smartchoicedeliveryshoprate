@@ -746,7 +746,7 @@ function lookupZone(address, placeLat, placeLng) {
   var params = 'address=' + encodeURIComponent(address);
   if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
 
-  fetch('/api/suggest-zone?' + params)
+  fetch('/api/suggest-zone-v2?' + params)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       document.getElementById('zoneLoading').hidden = true;
