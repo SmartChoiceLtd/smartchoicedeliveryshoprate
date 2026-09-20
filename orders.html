@@ -302,8 +302,17 @@ function sendDriverPay() {
     var failed = d.emails_sent.filter(function(e){ return e.status === 'failed'; });
     var msg = sent.length + ' email' + (sent.length===1?'':'s') + ' actually sent.';
     if (skipped.length) msg += '\n' + skipped.length + ' skipped (no deliveries that week): ' + skipped.map(function(e){return e.driver;}).join(', ');
-    if (failed.length) msg += '\n⚠ ' + failed.length + ' FAILED: ' + failed.map(function(e){return e.driver + ' (' + e.error + ')';}).join(', ');
+    if (failed.length) msg += '\n⚠ ' + failed.length + ' FAILED: ' + failed.map(function(e){return e.driver + ' (' + e.error + ', took ' + e.send_ms + 'ms)';}).join(', ');
     if (!d.emails_sent.length) msg = '⚠ No matching active driver(s) found with an email on file.';
+    if (d._timings) {
+      msg += '\n\n--- Timing diagnostics ---';
+      msg += '\nOrders in store: ' + d._timings.orders_list_count;
+      msg += '\nOrders fetch: ' + d._timings.orders_fetch_ms + 'ms';
+      msg += '\nDrivers fetch: ' + d._timings.drivers_fetch_ms + 'ms';
+      msg += '\nRates fetch: ' + d._timings.rates_fetch_ms + 'ms';
+      msg += '\nTotal before any send: ' + d._timings.total_before_send_ms + 'ms';
+      msg += '\nTotal request time: ' + d._timings.total_ms + 'ms';
+    }
     alert(msg);
   }).catch(function(e){ alert('Failed: ' + e.message); });
 }
