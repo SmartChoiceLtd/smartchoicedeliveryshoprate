@@ -17,6 +17,19 @@ function getWeekRange(weekEnd) {
   return { start: d.toISOString().slice(0,10), end: weekEnd };
 }
 
+// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
+// the given date - same helper as orders.mjs/stops.mjs, kept consistent
+// so order keys can be found via prefix filtering regardless of which
+// function created them.
+function weekEndingSunday(dateStr) {
+  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  const day = d.getDay();
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 function fmt(iso) {
   if (!iso) return '';
   const [y,m,d] = iso.split('-');
@@ -89,8 +102,28 @@ export default async (req) => {
   }
 
   const store = getStore('flower-orders');
-  const {blobs} = await store.list();
-  const allOrders = (await Promise.all(blobs.map(b => store.get(b.key,{type:'json'})))).filter(Boolean);
+
+  // Both 'week' and 'day' modes ultimately fall within some Mon-Sun week,
+  // whose Sunday lets us use the same fast prefix lookup either way - day
+  // mode just applies one more filter afterward to narrow to the single
+  // day. This avoids fetching every order ever created regardless of how
+  // large the store grows.
+  const targetWeekEnd = period === 'day' ? weekEndingSunday(weekEnd) : weekEnd;
+  const weekBoundsForFetch = getWeekRange(targetWeekEnd);
+  const fetchStartMs = new Date(weekBoundsForFetch.start + 'T00:00:00').getTime();
+  const fetchEndMs = new Date(weekBoundsForFetch.end + 'T23:59:59').getTime();
+
+  const { blobs: newFormatBlobs } = await store.list({ prefix: `order_${targetWeekEnd}_` });
+  const { blobs: allBlobs } = await store.list();
+  const oldFormatCandidates = allBlobs.filter(b => {
+    if (b.key.startsWith(`order_${targetWeekEnd}_`)) return false;
+    const match = b.key.match(/^order_(\d+)_/);
+    if (!match) return false;
+    const ts = parseInt(match[1]);
+    return ts >= fetchStartMs && ts <= fetchEndMs;
+  });
+  const relevantBlobs = newFormatBlobs.concat(oldFormatCandidates);
+  const allOrders = (await Promise.all(relevantBlobs.map(b => store.get(b.key,{type:'json'})))).filter(Boolean);
 
   const {start, end} = period === 'day' ? {start: weekEnd, end: weekEnd} : getWeekRange(weekEnd);
   const weekOrders = allOrders.filter(o => {
