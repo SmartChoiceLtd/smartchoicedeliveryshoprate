@@ -32,16 +32,13 @@ async function getTemplate() {
   }
 }
 
-async function sendAcknowledgement(app) {
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const t = await getTemplate();
+// Builds the application-acknowledgement content as a standalone HTML
+// string, reusable for both the actual email send and a view-only page -
+// so if the email is never received, the exact same content can still be
+// opened directly, printed, or forwarded another way.
+function buildApplicationHtml(app, t) {
   const first = firstName(app.name);
-  try {
-    const data = await resend.emails.send({
-      from: 'applications@smartchoicedelivery.ca',
-      to: app.email,
-      subject: 'Smart Choice Delivery — Application Received',
-      html: `
+  return `
         <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;background:#FAF7F2;">
           <div style="background:#0C769E;padding:20px 24px;border-bottom:4px solid #B8472B;">
             <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:22px;">Smart Choice Delivery</h1>
@@ -97,7 +94,19 @@ async function sendAcknowledgement(app) {
             <p style="color:#D6EEF7;font-size:11px;margin:0;">Smart Choice Delivery &mdash; Calgary, AB &mdash; Your Delivery Service Partner</p>
           </div>
         </div>
-      `
+      `;
+}
+
+async function sendAcknowledgement(app) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const t = await getTemplate();
+  const html = buildApplicationHtml(app, t);
+  try {
+    const data = await resend.emails.send({
+      from: 'applications@smartchoicedelivery.ca',
+      to: app.email,
+      subject: 'Smart Choice Delivery — Application Received',
+      html
     });
     console.log('Email sent:', data);
     return data;
@@ -127,6 +136,26 @@ export default async (req) => {
     }
   }
 
+  // View-only page: lets an applicant (or Kevin, on their behalf) see the
+  // exact same acknowledgement content even if the email was never
+  // received, or serves as a printable/shareable page to send another
+  // way. No email/Resend involved at all - pure lookup and render.
+  if (req.method === 'GET' && urlObj.searchParams.get('view') === 'html') {
+    const id = urlObj.searchParams.get('id');
+    if (!id) {
+      return new Response('id is required.', { status: 400, headers: { 'content-type': 'text/plain' } });
+    }
+    const store = getStore('driver-applications');
+    const app = await store.get(id, { type: 'json' });
+    if (!app) {
+      return new Response('No application found with that id.', { status: 404, headers: { 'content-type': 'text/plain' } });
+    }
+    const t = await getTemplate();
+    const html = buildApplicationHtml(app, t);
+    const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Application Received - ${app.name || ''}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
+    return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
+  }
+
   if (req.method === 'POST') {
     let body;
     try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
@@ -149,3 +178,4 @@ export default async (req) => {
 };
 
 export const config = { path: '/api/onboard' };
+
