@@ -193,7 +193,27 @@ export default async (req) => {
   const ordersStore = getStore('flower-orders');
   const { blobs } = await ordersStore.list();
   timings.orders_list_count = blobs.length;
-  const allOrders = await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })));
+
+  // Order keys are `order_<timestamp>_<random>` - the creation timestamp
+  // is embedded directly in the key, letting us narrow down to a relevant
+  // window using just the key list (fast - no data fetch needed) before
+  // ever fetching each blob's actual content. Fetching every single order
+  // ever created, regardless of age, was the real cause of the 14+ second
+  // fetch time that exhausted the function's execution budget before the
+  // email send could even begin - not anything about Resend or email
+  // configuration. 35 days back from week_end comfortably covers one
+  // week plus a generous buffer for clock/timezone edge cases.
+  const weekEndMs = new Date(week_end + 'T23:59:59').getTime();
+  const lookbackMs = 35 * 24 * 60 * 60 * 1000;
+  const relevantBlobs = blobs.filter(b => {
+    const match = b.key.match(/^order_(\d+)_/);
+    if (!match) return true; // unexpected key shape - keep it rather than risk silently dropping a real order
+    const ts = parseInt(match[1]);
+    return ts >= (weekEndMs - lookbackMs) && ts <= (weekEndMs + 24 * 60 * 60 * 1000);
+  });
+  timings.orders_relevant_count = relevantBlobs.length;
+
+  const allOrders = await Promise.all(relevantBlobs.map(b => ordersStore.get(b.key, { type: 'json' })));
   timings.orders_fetch_ms = Date.now() - t0;
 
   const weekOrders = allOrders.filter(o => {
