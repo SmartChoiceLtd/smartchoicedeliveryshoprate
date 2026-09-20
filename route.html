@@ -38,7 +38,7 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
     <option value="events">Events</option>
   </select>
   <button class="btn" id="scanTagBtn" style="margin-top:8px;width:100%;">&#128248; Scan Tag &mdash; Add to Route</button>
-  <input type="file" id="fTagPhoto" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fTagPhoto" accept="image/*" hidden>
   <div id="scanStatus" hidden style="font-size:13px;color:var(--ink-soft);margin-top:8px;"></div>
   <a class="btn btn-ghost" id="manualEntryLink" style="margin-top:8px;width:100%;">Manual Entry (no tag to scan)</a>
 </div>
@@ -177,6 +177,8 @@ function compressPhotoToBase64(file) {
 var lastActiveStops = [];
 var lastSkippedStops = [];
 
+var pendingShopList = [];
+
 async function scanTagForRoute(file) {
   var statusEl = document.getElementById('scanStatus');
   var btn = document.getElementById('scanTagBtn');
@@ -192,6 +194,7 @@ async function scanTagForRoute(file) {
     var shopsRes = await fetch('/api/shops');
     var shops = shopsRes.ok ? await shopsRes.json() : [];
     var shopList = shops.map(function(s) { return { code: s.name.split(' ')[0], name: s.name, aliases: s.aliases || [] }; });
+    pendingShopList = shopList;
 
     statusEl.textContent = 'Extracting delivery details\u2026';
     var res = await fetch('/api/scan-tag', {
@@ -207,14 +210,75 @@ async function scanTagForRoute(file) {
       return;
     }
 
+    statusEl.hidden = true;
+    showScanReview(data);
+  } catch (e) {
+    statusEl.style.color = 'var(--warm)';
+    statusEl.textContent = 'Could not add tag: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalBtnText;
+  }
+}
+
+// Shows the extracted fields as editable inputs before anything gets
+// queued - lets a driver catch and fix a misread name, address, or order
+// number right away, while the tag is still in hand, rather than
+// discovering the error later at Complete time or after submission.
+function showScanReview(data) {
+  var shopOptions = '<option value="">No shop match</option>' + pendingShopList.map(function(s) {
+    var selected = s.code === data.shop_code ? ' selected' : '';
+    return '<option value="' + escapeHtml(s.code) + '"' + selected + '>' + escapeHtml(s.name) + '</option>';
+  }).join('');
+
+  var reviewHtml = '<div id="scanReviewCard" class="stop-card" style="border-color:var(--accent);">' +
+    '<div style="font-weight:700;margin-bottom:8px;color:var(--accent);">Check details before adding</div>' +
+    '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Name</label>' +
+    '<input type="text" id="reviewName" value="' + escapeHtml(data.name || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
+    '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Address</label>' +
+    '<input type="text" id="reviewAddress" value="' + escapeHtml(data.address || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
+    '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Order ID</label>' +
+    '<input type="text" id="reviewOrderId" value="' + escapeHtml(data.order_id || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
+    '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Shop</label>' +
+    '<select id="reviewShopCode" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;font-size:14px;">' + shopOptions + '</select>' +
+    '<div style="display:flex;gap:8px;">' +
+    '<button class="btn btn-ghost" id="scanReviewDiscardBtn" style="flex:1;">Discard</button>' +
+    '<button class="btn" id="scanReviewConfirmBtn" style="flex:2;">Add to Route</button>' +
+    '</div>' +
+    '</div>';
+
+  document.getElementById('loadingMsg').hidden = true;
+  document.getElementById('emptyMsg').hidden = true;
+  document.getElementById('content').hidden = false;
+  document.getElementById('stopsList').insertAdjacentHTML('afterbegin', reviewHtml);
+  document.getElementById('scanReviewConfirmBtn').addEventListener('click', confirmScanReview);
+  document.getElementById('scanReviewDiscardBtn').addEventListener('click', function() {
+    document.getElementById('scanReviewCard').remove();
+  });
+  document.getElementById('scanReviewCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function confirmScanReview() {
+  var btn = document.getElementById('scanReviewConfirmBtn');
+  var statusEl = document.getElementById('scanStatus');
+  var name = document.getElementById('reviewName').value.trim();
+  var address = document.getElementById('reviewAddress').value.trim();
+  var orderId = document.getElementById('reviewOrderId').value.trim();
+  var shopCode = document.getElementById('reviewShopCode').value;
+
+  if (!address) { alert('Address is required.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  try {
     var stopRes = await fetch('/api/stops', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         driver: driverCode,
-        shop_code: data.shop_code || null,
-        address: data.address,
-        name: data.name || null,
-        order_id: data.order_id || null,
+        shop_code: shopCode || null,
+        address: address,
+        name: name || null,
+        order_id: orderId || null,
         delivery_type: document.getElementById('scanDeliveryType').value,
         local_date: (function() { var n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); })()
       })
@@ -222,8 +286,10 @@ async function scanTagForRoute(file) {
     var stop = await stopRes.json();
     if (!stopRes.ok) throw new Error(stop.error || 'Could not add to route.');
 
+    document.getElementById('scanReviewCard').remove();
+    statusEl.hidden = false;
     statusEl.style.color = 'var(--green)';
-    statusEl.textContent = 'Added: ' + (data.name || 'delivery') + (data.order_id ? ' (Order #' + data.order_id + ')' : '') + '. Scan the next one, or view your route below.';
+    statusEl.textContent = 'Added: ' + (name || 'delivery') + (orderId ? ' (Order #' + orderId + ')' : '') + '. Scan the next one, or view your route below.';
 
     // Show the new stop immediately using the data we already have, rather
     // than re-fetching /api/stops right away - a fetch that quick can race
@@ -236,16 +302,11 @@ async function scanTagForRoute(file) {
     } else {
       lastActiveStops = lastActiveStops.map(function(s) { return s.id === stop.id ? stop : s; });
     }
-    document.getElementById('loadingMsg').hidden = true;
-    document.getElementById('emptyMsg').hidden = true;
-    document.getElementById('content').hidden = false;
     renderStops(lastActiveStops, lastSkippedStops);
   } catch (e) {
-    statusEl.style.color = 'var(--warm)';
-    statusEl.textContent = 'Could not add tag: ' + e.message;
-  } finally {
+    alert('Could not add to route: ' + e.message);
     btn.disabled = false;
-    btn.innerHTML = originalBtnText;
+    btn.textContent = 'Add to Route';
   }
 }
 
