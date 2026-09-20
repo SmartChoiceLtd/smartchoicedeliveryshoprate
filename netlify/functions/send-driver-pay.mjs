@@ -62,9 +62,7 @@ async function getYtdTotalsForDriver(driverCode, weekEnd) {
   };
 }
 
-async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
+async function buildPayStatementHtml(driver, orders, weekEnd, rates) {
   const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
   const weekDel = orders.length;
   const weekAvg = weekDel > 0 ? weekPay / weekDel : 0;
@@ -105,7 +103,7 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   const firstName = (driver.name || '').split(' ')[0];
   const driverLink = `https://smartchoicedeliveryshoprate.netlify.app/api/reports?type=driver&week_end=${weekEnd}&code=${(driver.code || '').toLowerCase()}`;
 
-  const html = `
+  return `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100% !important;min-width:280px;">
   <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;width:100% !important;box-sizing:border-box;">
     <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:20px;">Smart Choice Delivery</h1>
@@ -193,6 +191,11 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
     <p style="color:#D6EEF7;font-size:11px;margin:0;">Smart Choice Delivery &mdash; Calgary, AB &mdash; Your Delivery Service Partner</p>
   </div>
 </div>`;
+}
+
+async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
 
   const result = await resend.emails.send({
     from: 'pay@smartchoicedelivery.ca',
@@ -210,19 +213,7 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   return result;
 }
 
-export default async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } });
-  }
-
-  if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
-
-  let body;
-  try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
-
-  const { week_end } = body;
-  if (!week_end) return json({ error: 'week_end required (YYYY-MM-DD)' }, 400);
-
+async function getWeekOrdersByDriver(week_end) {
   const bounds = getWeekBounds(week_end);
   const timings = {};
   const t0 = Date.now();
@@ -271,6 +262,58 @@ export default async (req) => {
     if (!byDriver[code]) byDriver[code] = [];
     byDriver[code].push(o);
   });
+
+  return { byDriver, timings };
+}
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } });
+  }
+
+  const url = new URL(req.url);
+
+  // View-only page: lets a driver (or dispatcher, on their behalf) see the
+  // exact same statement even if the email was never received, or serves
+  // as a printable/shareable page to send another way. No email/Resend
+  // involved at all - pure lookup and render.
+  if (req.method === 'GET') {
+    const weekEnd = url.searchParams.get('week_end');
+    const driverCode = (url.searchParams.get('driver_code') || url.searchParams.get('code') || '').toUpperCase();
+    if (!weekEnd || !driverCode) {
+      return new Response('Both week_end (YYYY-MM-DD) and driver_code are required.', { status: 400, headers: { 'content-type': 'text/plain' } });
+    }
+
+    const driversStore = getStore('flower-drivers');
+    const { blobs: driverBlobs } = await driversStore.list();
+    const driverList = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
+    const driver = driverList.find(d => d && (d.code || '').toUpperCase() === driverCode);
+    if (!driver) {
+      return new Response('No driver found with code "' + driverCode + '".', { status: 404, headers: { 'content-type': 'text/plain' } });
+    }
+
+    const { byDriver } = await getWeekOrdersByDriver(weekEnd);
+    const orders = byDriver[driverCode] || [];
+
+    const ratesStore = getStore('flower-rates');
+    let rates = {};
+    try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+
+    const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
+    const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pay Statement - ${driver.name || driverCode}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
+    return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
+  }
+
+  if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
+
+  let body;
+  try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
+
+  const { week_end } = body;
+  if (!week_end) return json({ error: 'week_end required (YYYY-MM-DD)' }, 400);
+
+  const t0 = Date.now();
+  const { byDriver, timings } = await getWeekOrdersByDriver(week_end);
 
   const tDrivers = Date.now();
   const driversStore = getStore('flower-drivers');
