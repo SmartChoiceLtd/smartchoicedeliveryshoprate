@@ -37,6 +37,21 @@ function isEventZoneCode(zoneCode) {
   return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
 }
 
+// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
+// the given date. Embedded directly in each order's storage key so a
+// specific week's orders can be found via a fast, server-side prefix
+// filter on .list() instead of fetching and filtering every order ever
+// created - which became a real bottleneck once the store grew into the
+// thousands of records.
+function weekEndingSunday(dateStr) {
+  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 async function suggestZone(address, shopLat, shopLng, key) {
   try {
     const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
@@ -213,7 +228,8 @@ export default async (req) => {
       zoneSuggestion.suggested !== enteredZoneCode &&
       zoneSuggestion.confidence === 'high';
 
-    const orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const weekEnd = weekEndingSunday(raw.date);
+    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const order = {
       id: orderId,
       received_at: new Date().toISOString(),
