@@ -308,6 +308,7 @@ function sendDriverPay() {
       msg += '\n\n--- Timing diagnostics ---';
       msg += '\nOrders in store: ' + d._timings.orders_list_count;
       msg += '\nOrders in relevant window: ' + d._timings.orders_relevant_count;
+      msg += ' (' + d._timings.new_format_count + ' new-format, ' + d._timings.old_format_count + ' old-format)';
       msg += '\nOrders fetch: ' + d._timings.orders_fetch_ms + 'ms';
       msg += '\nDrivers fetch: ' + d._timings.drivers_fetch_ms + 'ms';
       msg += '\nRates fetch: ' + d._timings.rates_fetch_ms + 'ms';
