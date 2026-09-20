@@ -583,9 +583,6 @@ document.getElementById('applyAllGdpiBtn').addEventListener('click', function() 
     var km = kmForZone(zone);
     if (!rates[zone]) rates[zone] = {};
     rates[zone].gdpi = Math.round(perKm * km * 100) / 100;
-    // Persist the resolved km onto the rate record itself if it wasn't
-    // already set, so future calculations use the Rate Table as the
-    // source of truth instead of falling back to the seed table again.
     if (!rates[zone].km && km) rates[zone].km = km;
   });
   fetch('/api/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(rates) })
@@ -601,7 +598,7 @@ function loadApplications() {
   fetch('/api/onboard').then(function(res) { return res.json(); }).then(function(apps) {
     if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
     el.innerHTML = '<table><thead><tr>' +
-      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Action</th>' +
+      '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Link</th><th>Action</th>' +
       '</tr></thead><tbody>' +
       apps.map(function(a, i) {
         return '<tr>' +
@@ -614,6 +611,7 @@ function loadApplications() {
           '<td>' + esc(a.vehicle || '') + '</td>' +
           '<td>' + esc(a.referred_by || '') + '</td>' +
           '<td>' + esc(a.comments || '') + '</td>' +
+          '<td><button class="copy-link" onclick="copyApplicationLink(\'' + esc(a.id) + '\')">Copy link</button></td>' +
           '<td><button class="btn-danger btn-green" data-idx="' + i + '">Hire</button></td>' +
           '</tr>';
       }).join('') + '</tbody></table>';
@@ -627,6 +625,12 @@ function loadApplications() {
     var el2 = document.getElementById('applicationsList');
     if (el2) el2.innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>';
   });
+}
+
+function copyApplicationLink(id) {
+  var url = location.origin + '/api/onboard?view=html&id=' + encodeURIComponent(id);
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(function() { alert('Copied: ' + url); });
+  else window.prompt('Copy link:', url);
 }
 
 async function hireApplicant(name, email, phone, vehicle) {
