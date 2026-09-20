@@ -191,26 +191,31 @@ export default async (req) => {
   const t0 = Date.now();
 
   const ordersStore = getStore('flower-orders');
-  const { blobs } = await ordersStore.list();
-  timings.orders_list_count = blobs.length;
 
-  // Order keys are `order_<timestamp>_<random>` - the creation timestamp
-  // is embedded directly in the key, letting us narrow down to a relevant
-  // window using just the key list (fast - no data fetch needed) before
-  // ever fetching each blob's actual content. Fetching every single order
-  // ever created, regardless of age, was the real cause of the 14+ second
-  // fetch time that exhausted the function's execution budget before the
-  // email send could even begin - not anything about Resend or email
-  // configuration. 35 days back from week_end comfortably covers one
-  // week plus a generous buffer for clock/timezone edge cases.
-  const weekEndMs = new Date(week_end + 'T23:59:59').getTime();
-  const lookbackMs = 35 * 24 * 60 * 60 * 1000;
-  const relevantBlobs = blobs.filter(b => {
-    const match = b.key.match(/^order_(\d+)_/);
-    if (!match) return true; // unexpected key shape - keep it rather than risk silently dropping a real order
+  // New-format orders (created after the week-embedded key change) are
+  // found directly via a fast, server-side prefix filter - the week is
+  // right there in the key, so this never needs to look at anything
+  // outside the target week at all, regardless of how large the store
+  // grows overall.
+  const { blobs: newFormatBlobs } = await ordersStore.list({ prefix: `order_${week_end}_` });
+  timings.new_format_count = newFormatBlobs.length;
+
+  // Fallback for orders created before this key format existed - only
+  // matters until historical orders age out of any realistic pay-run
+  // window. Bounds are the exact Monday-Sunday week, no buffer needed
+  // since week boundaries are unambiguous.
+  const { blobs: allBlobs } = await ordersStore.list();
+  timings.orders_list_count = allBlobs.length;
+  const oldFormatCandidates = allBlobs.filter(b => {
+    if (b.key.startsWith(`order_${week_end}_`)) return false; // already captured above
+    const match = b.key.match(/^order_(\d+)_/); // old format: order_<timestamp>_<random>
+    if (!match) return false;
     const ts = parseInt(match[1]);
-    return ts >= (weekEndMs - lookbackMs) && ts <= (weekEndMs + 24 * 60 * 60 * 1000);
+    return ts >= bounds.start.getTime() && ts <= bounds.end.getTime();
   });
+  timings.old_format_count = oldFormatCandidates.length;
+
+  const relevantBlobs = newFormatBlobs.concat(oldFormatCandidates);
   timings.orders_relevant_count = relevantBlobs.length;
 
   const allOrders = await Promise.all(relevantBlobs.map(b => ordersStore.get(b.key, { type: 'json' })));
