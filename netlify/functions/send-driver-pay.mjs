@@ -32,6 +32,36 @@ function fmtWeekEnd(weekEnd) {
   return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
 }
 
+const YTD_START_DATE = '2025-12-29';
+
+// Sums this driver's actual orders across the full YTD range (Dec 29
+// through the current week), rather than relying on a single static
+// "starting point" that only ever got one week added to it. Most of this
+// history predates the week-embedded key format, so this scans the full
+// key list (fast - metadata only) and filters candidates by the
+// timestamp already embedded in every key (old or new format) before
+// fetching each one's content, avoiding a full-content fetch of anything
+// outside the YTD range.
+async function getYtdTotalsForDriver(driverCode, weekEnd) {
+  const store = getStore('flower-orders');
+  const { blobs } = await store.list();
+  const startMs = new Date(YTD_START_DATE + 'T00:00:00').getTime();
+  const endMs = new Date(weekEnd + 'T23:59:59').getTime();
+  const candidates = blobs.filter(b => {
+    const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+    if (!m) return false;
+    const ts = parseInt(m[1]);
+    return ts >= startMs && ts <= endMs;
+  });
+  const orders = (await Promise.all(candidates.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+  const driverOrders = orders.filter(o => (o.driver || '').toUpperCase() === driverCode.toUpperCase());
+  return {
+    pay: driverOrders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0),
+    deliveries: driverOrders.length,
+    candidates_scanned: candidates.length
+  };
+}
+
 async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -46,8 +76,11 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
 
   const ytdStartPay = parseFloat(driver.ytd_start_pay) || 0;
   const ytdStartDel = parseInt(driver.ytd_start_deliveries) || 0;
-  const ytdPay = ytdStartPay + weekPay;
-  const ytdDel = ytdStartDel + weekDel;
+  const tYtd = Date.now();
+  const ytdTotals = await getYtdTotalsForDriver(driver.code, weekEnd);
+  console.log('YTD fetch for', driver.code, ':', Date.now() - tYtd, 'ms,', ytdTotals.candidates_scanned, 'candidates scanned');
+  const ytdPay = ytdStartPay + ytdTotals.pay;
+  const ytdDel = ytdStartDel + ytdTotals.deliveries;
   const ytdAvg = ytdDel > 0 ? ytdPay / ytdDel : 0;
 
   const zoneBreak = {};
@@ -85,20 +118,22 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
       <div style="font-size:11px;font-weight:700;color:#0C769E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">This Week</div>
       <table style="width:100%;border-collapse:collapse;">
         <tr>
-          <td style="text-align:center;padding:4px 8px;border-right:1px solid #B0D4E8;">
-            <div style="font-size:26px;font-weight:700;color:#0C769E;">${fmt(weekPay)}</div>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #B0D4E8;border-bottom:1px solid #B0D4E8;width:50%;">
+            <div style="font-size:24px;font-weight:700;color:#0C769E;">${fmt(weekPay)}</div>
             <div style="font-size:11px;color:#6B6256;">Total Pay</div>
           </td>
-          <td style="text-align:center;padding:4px 8px;border-right:1px solid #B0D4E8;">
-            <div style="font-size:20px;font-weight:700;color:#2B2620;">${fmt(weekGdpi)}</div>
+          <td style="text-align:center;padding:6px 4px;border-bottom:1px solid #B0D4E8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${fmt(weekGdpi)}</div>
             <div style="font-size:11px;color:#6B6256;">GDPI</div>
           </td>
-          <td style="text-align:center;padding:4px 8px;border-right:1px solid #B0D4E8;">
-            <div style="font-size:20px;font-weight:700;color:#2B2620;">${weekDel}</div>
+        </tr>
+        <tr>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #B0D4E8;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${weekDel}</div>
             <div style="font-size:11px;color:#6B6256;">Deliveries</div>
           </td>
-          <td style="text-align:center;padding:4px 8px;">
-            <div style="font-size:20px;font-weight:700;color:#2B2620;">${fmt(weekAvg)}</div>
+          <td style="text-align:center;padding:6px 4px;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${fmt(weekAvg)}</div>
             <div style="font-size:11px;color:#6B6256;">Avg/Del</div>
           </td>
         </tr>
@@ -108,16 +143,18 @@ async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
       <div style="font-size:11px;font-weight:700;color:#2C6B2C;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Year to Date — Dec 29, 2025</div>
       <table style="width:100%;border-collapse:collapse;">
         <tr>
-          <td style="text-align:center;padding:4px 8px;border-right:1px solid #A8CFA8;">
-            <div style="font-size:20px;font-weight:700;color:#2C6B2C;">${fmt(ytdPay)}</div>
+          <td style="text-align:center;padding:6px 4px;" colspan="2">
+            <div style="font-size:22px;font-weight:700;color:#2C6B2C;">${fmt(ytdPay)}</div>
             <div style="font-size:11px;color:#6B6256;">Total Pay</div>
           </td>
-          <td style="text-align:center;padding:4px 8px;border-right:1px solid #A8CFA8;">
-            <div style="font-size:20px;font-weight:700;color:#2C6B2C;">${ytdDel}</div>
+        </tr>
+        <tr>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #A8CFA8;border-top:1px solid #A8CFA8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2C6B2C;">${ytdDel}</div>
             <div style="font-size:11px;color:#6B6256;">Deliveries</div>
           </td>
-          <td style="text-align:center;padding:4px 8px;">
-            <div style="font-size:20px;font-weight:700;color:#2C6B2C;">${fmt(ytdAvg)}</div>
+          <td style="text-align:center;padding:6px 4px;border-top:1px solid #A8CFA8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2C6B2C;">${fmt(ytdAvg)}</div>
             <div style="font-size:11px;color:#6B6256;">Avg/Del</div>
           </td>
         </tr>
