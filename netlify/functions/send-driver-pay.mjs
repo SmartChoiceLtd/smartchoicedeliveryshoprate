@@ -187,10 +187,14 @@ export default async (req) => {
   if (!week_end) return json({ error: 'week_end required (YYYY-MM-DD)' }, 400);
 
   const bounds = getWeekBounds(week_end);
+  const timings = {};
+  const t0 = Date.now();
 
   const ordersStore = getStore('flower-orders');
   const { blobs } = await ordersStore.list();
+  timings.orders_list_count = blobs.length;
   const allOrders = await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })));
+  timings.orders_fetch_ms = Date.now() - t0;
 
   const weekOrders = allOrders.filter(o => {
     if (!o) return false;
@@ -206,14 +210,19 @@ export default async (req) => {
     byDriver[code].push(o);
   });
 
+  const tDrivers = Date.now();
   const driversStore = getStore('flower-drivers');
   const { blobs: driverBlobs } = await driversStore.list();
   const driverList = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
   const activeDrivers = driverList.filter(d => d && d.active && d.email);
+  timings.drivers_fetch_ms = Date.now() - tDrivers;
 
+  const tRates = Date.now();
   const ratesStore = getStore('flower-rates');
   let rates = {};
   try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+  timings.rates_fetch_ms = Date.now() - tRates;
+  timings.total_before_send_ms = Date.now() - t0;
 
   const filterCode = (body.driver_code || '').toUpperCase();
   const driversToSend = (filterCode === 'ALL' || !filterCode)
@@ -224,7 +233,7 @@ export default async (req) => {
     // The requested driver code doesn't match any active driver with an
     // email on file at all - surface this clearly rather than silently
     // returning an empty, easy-to-miss result.
-    return json({ success: true, week_end, emails_sent: [], warning: `No active driver found with code "${filterCode}" and an email on file.` });
+    return json({ success: true, week_end, emails_sent: [], warning: `No active driver found with code "${filterCode}" and an email on file.`, _timings: timings });
   }
 
   const results = [];
@@ -239,17 +248,19 @@ export default async (req) => {
       results.push({ driver: code, status: 'skipped_no_deliveries', deliveries: 0 });
       continue;
     }
+    const tSend = Date.now();
     try {
       await sendDriverPayEmail(driver, orders, week_end, rates);
-      results.push({ driver: code, status: 'sent', deliveries: orders.length });
+      results.push({ driver: code, status: 'sent', deliveries: orders.length, send_ms: Date.now() - tSend });
       console.log('Pay email sent:', driver.name, driver.email);
     } catch(e) {
-      results.push({ driver: code, status: 'failed', error: e.message });
+      results.push({ driver: code, status: 'failed', error: e.message, send_ms: Date.now() - tSend });
       console.error('Pay email failed:', driver.name, e.message);
     }
   }
 
-  return json({ success: true, week_end, emails_sent: results });
+  timings.total_ms = Date.now() - t0;
+  return json({ success: true, week_end, emails_sent: results, _timings: timings });
 };
 
 export const config = { path: '/api/send-driver-pay' };
