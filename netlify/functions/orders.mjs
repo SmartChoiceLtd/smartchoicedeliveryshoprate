@@ -55,7 +55,7 @@ function weekEndingSunday(dateStr) {
 async function suggestZone(address, shopLat, shopLng, key) {
   try {
     const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
-    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone?${params}`);
+    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone-v2?${params}`);
     if (!res.ok) return null;
     return res.json();
   } catch (e) {
