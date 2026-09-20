@@ -97,6 +97,17 @@ function getExifOrientation(arrayBuffer) {
 
 var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
+// Android's scanning was already reliable with fast, direct-camera access
+// via capture=environment. Removing that attribute site-wide (to fix
+// iOS's gallery-access problem) had the opposite effect on Android -
+// instead of showing a combined chooser, it skipped straight to
+// gallery-only with no easy way to reach the camera at all. Keep the
+// attribute for Android (preserves the working fast-capture flow); leave
+// it off for iOS (where removing it was the actual fix).
+if (!isIOS) {
+  document.getElementById('fTagPhoto').setAttribute('capture', 'environment');
+}
+
 function compressPhotoToBase64(file) {
   // EXIF orientation correction is iOS-only: Android photos were working
   // correctly before this existed, and applying the same correction logic
@@ -227,7 +238,7 @@ async function scanTagForRoute(file) {
 // discovering the error later at Complete time or after submission.
 function showScanReview(data) {
   var shopOptions = '<option value="">No shop match</option>' + pendingShopList.map(function(s) {
-    var selected = s.code === data.shop_code ? ' selected' : '';
+    var selected = (s.code || '').toUpperCase() === (data.shop_code || '').toUpperCase() ? ' selected' : '';
     return '<option value="' + escapeHtml(s.code) + '"' + selected + '>' + escapeHtml(s.name) + '</option>';
   }).join('');
 
