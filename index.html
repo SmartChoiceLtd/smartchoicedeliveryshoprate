@@ -117,17 +117,10 @@
     </section>
     <section class="panel" id="pricingPanel" hidden>
       <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
-      <div style="margin-bottom:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
-        <label style="display:block;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Copy zone setup from another shop</label>
-        <div style="display:flex;gap:6px;">
-          <select id="copyFromShopSelect" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;"></select>
-          <button class="btn btn-sm" id="copyFromShopBtn" style="flex-shrink:0;">Copy</button>
-        </div>
-        <p class="hint" style="margin-top:6px;">Copies zone prices, community overrides, and town rates. Overwrites this shop's current setup.</p>
-      </div>
       <div class="pricing-section" id="pricingBody"></div>
-      <div style="margin-top:10px;">
-        <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="width:100%;">View / print pricing sheet</button>
+      <div style="margin-top:10px;display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="flex:1;">View / print pricing sheet</button>
+        <button class="btn btn-sm btn-ghost" id="communityDistancesBtn" style="flex:1;">Community distances</button>
       </div>
       <p class="hint">Click any Calgary community on the map to override its zone.</p>
     </section>
@@ -153,6 +146,9 @@
 </div>
 <div class="modal-bg" id="priceSheetModal" hidden>
   <div class="modal" id="priceSheetContent"></div>
+</div>
+<div class="modal-bg" id="communityDistancesModal" hidden>
+  <div class="modal" id="communityDistancesContent" style="max-width:720px;"></div>
 </div>
 <script>
 function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
@@ -260,34 +256,6 @@ function copyShopLink(shopId,btn){
   else window.prompt('Copy this link:',url);
 }
 
-/* copy zone setup between shops */
-function renderCopyFromShopSelect(currentShop){
-  const sel=document.getElementById('copyFromShopSelect');
-  const others=state.shops.filter(s=>s.id!==currentShop.id).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!others.length){sel.innerHTML='<option value="">No other shops yet</option>';sel.disabled=true;return;}
-  sel.disabled=false;
-  sel.innerHTML='<option value="">Select a shop&hellip;</option>'+others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-}
-
-async function copyZoneSetupFromShop(){
-  const target=getSelectedShop();
-  const sourceId=document.getElementById('copyFromShopSelect').value;
-  if(!target||!sourceId)return;
-  const source=state.shops.find(s=>s.id===sourceId);
-  if(!source)return;
-  if(!window.confirm(`Copy zone prices, community overrides, and town rates from ${source.name} to ${target.name}? This overwrites ${target.name}'s current setup.`))return;
-  const btn=document.getElementById('copyFromShopBtn');
-  const orig=btn.textContent;btn.disabled=true;btn.textContent='Copying...';
-  target.zonePrices={...source.zonePrices};
-  target.communityZones={...source.communityZones};
-  target.townPrices={...source.townPrices};
-  try{
-    await apiSaveShop(target);
-    styleCommunities();renderPricingTable();renderLegend();if(state.map)drawTownPins();
-  }catch(e){alert('Could not copy setup: '+e.message);}
-  finally{btn.disabled=false;btn.textContent=orig;}
-}
-
 /* pricing table */
 function renderPricingTable(){
   const shop=getSelectedShop();
@@ -295,7 +263,6 @@ function renderPricingTable(){
   if(!shop){panel.hidden=true;return;}
   panel.hidden=false;
   document.getElementById('pricingShopName').textContent=shop.name;
-  renderCopyFromShopSelect(shop);
   const body=document.getElementById('pricingBody');
 
   // Border zones = everything in ZONE_COLORS that isn't a core Calgary zone
@@ -469,8 +436,13 @@ function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<
 async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
   function renderShopList(){
   const el=document.getElementById('shopList');
-  const search=(document.getElementById('shopSearch').value||'').toLowerCase();
-  const filtered=state.shops.filter(s=>!search||s.name.toLowerCase().includes(search)||(s.address||'').toLowerCase().includes(search));
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase().trim();
+  const words=search?search.split(/\s+/):[];
+  const filtered=state.shops.filter(s=>{
+    if(!words.length)return true;
+    const haystack=(s.name+' '+(s.address||'')).toLowerCase();
+    return words.every(w=>haystack.includes(w));
+  });
   if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
   el.innerHTML=filtered.map(s=>`
     <div class="shop-item-wrap">
@@ -603,6 +575,53 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
 }
 
 /* pricing sheet */
+function showCommunityDistances(){
+  const shop=getSelectedShop();if(!shop)return;
+  const modal=document.getElementById('communityDistancesModal');
+  const content=document.getElementById('communityDistancesContent');
+
+  const rows=state.communities
+    .filter(c=>c.centroid)
+    .map(c=>{
+      const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);
+      const currentZone=shop.communityZones[c.name]||'C4';
+      return {name:c.name,km,currentZone};
+    })
+    .sort((a,b)=>a.km-b.km);
+
+  const zoneRowHtml=r=>{
+    const opts=COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===r.currentZone?'selected':''}>${z}</option>`).join('');
+    return `<tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td style="text-align:right;">${r.km.toFixed(1)} km</td>
+      <td><select data-community="${escapeHtml(r.name)}" onchange="quickSetCommunityZone(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;">${opts}</select></td>
+    </tr>`;
+  };
+
+  content.innerHTML=`
+    <h2>Community distances &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">Straight-line distance from the shop, nearest first. Change a zone directly here &mdash; saves immediately, same as clicking the community on the map.</p>
+    <div style="max-height:60vh;overflow-y:auto;">
+      <table><thead><tr><th>Community</th><th style="text-align:right;">Distance</th><th>Zone</th></tr></thead>
+      <tbody>${rows.map(zoneRowHtml).join('')}</tbody></table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('communityDistancesModal').hidden=true">Close</button>
+    </div>`;
+  modal.hidden=false;
+}
+
+async function quickSetCommunityZone(selectEl){
+  const shop=getSelectedShop();if(!shop)return;
+  const community=selectEl.dataset.community;
+  const newZone=selectEl.value;
+  shop.communityZones[community]=newZone;
+  try{
+    await apiSaveShop(shop);
+    styleCommunities();renderLegend();if(state.map)drawTownPins();
+  }catch(e){alert('Could not save zone: '+e.message);}
+}
+
 function showPricingSheet(){
   const shop=getSelectedShop();if(!shop)return;
   const modal=document.getElementById('priceSheetModal');
@@ -654,6 +673,7 @@ function showPricingSheet(){
 }
 
 document.getElementById('priceSheetModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
+document.getElementById('communityDistancesModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
 
 /* boot */
 async function boot(){
@@ -688,7 +708,7 @@ if(state.shops.length)selectShop(state.shops[0].id);
 
 document.getElementById('quoteBtn').addEventListener('click',generateQuote);
 document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
-document.getElementById('copyFromShopBtn').addEventListener('click',copyZoneSetupFromShop);
+document.getElementById('communityDistancesBtn').addEventListener('click',showCommunityDistances);
 
 boot();
 </script>
