@@ -271,6 +271,10 @@
       <div class="field">
         <label id="photoLabel">Photo (optional)</label>
       <input type="file" id="fPhoto" accept="image/*">
+      <div id="photoButtonsAndroid" hidden style="display:flex;gap:8px;margin-top:4px;">
+        <button type="button" class="btn btn-ghost" id="photoTakeBtn" style="flex:1;">Take Photo</button>
+        <button type="button" class="btn btn-ghost" id="photoGalleryBtn" style="flex:1;">Choose from Gallery</button>
+      </div>
       <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
       </div>
     </div>
@@ -937,6 +941,26 @@ function getExifOrientation(arrayBuffer) {
 
 var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
+// Android's file input can't offer both camera and gallery access at once
+// the way iOS's single picker can - capture=environment forces
+// camera-only, its absence forces gallery-only, with no combined
+// chooser. Two explicit buttons give Android drivers real choice; iOS
+// keeps its native input visible as-is since it already handles both.
+if (!isIOS) {
+  document.getElementById('fPhoto').style.display = 'none';
+  document.getElementById('photoButtonsAndroid').hidden = false;
+  document.getElementById('photoTakeBtn').addEventListener('click', function() {
+    var input = document.getElementById('fPhoto');
+    input.setAttribute('capture', 'environment');
+    input.click();
+  });
+  document.getElementById('photoGalleryBtn').addEventListener('click', function() {
+    var input = document.getElementById('fPhoto');
+    input.removeAttribute('capture');
+    input.click();
+  });
+}
+
 function compressPhotoToBase64(file) {
   // EXIF orientation correction is iOS-only: Android photos were working
   // correctly before this existed, and applying the same correction logic
@@ -1252,8 +1276,10 @@ async function init() {
         document.getElementById('photoLabel').textContent = doorstepSelected ? 'Photo (required)' : 'Photo (optional)';
         document.getElementById('photoRequired').hidden = !doorstepSelected;
         if (doorstepSelected) {
-          document.getElementById('fPhoto').setAttribute('required', 'required');
-          document.getElementById('fPhoto').click();
+          var photoInput = document.getElementById('fPhoto');
+          photoInput.setAttribute('required', 'required');
+          if (!isIOS) photoInput.setAttribute('capture', 'environment');
+          photoInput.click();
         } else {
           document.getElementById('fPhoto').removeAttribute('required');
         }
