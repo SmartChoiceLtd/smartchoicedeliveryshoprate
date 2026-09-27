@@ -66,8 +66,8 @@
         <div class="stat-label">Deliveries</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="statPieces">0</div>
-        <div class="stat-label">Pieces</div>
+        <div class="stat-value" id="statAvg">$0</div>
+        <div class="stat-label">Avg/Delivery</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" id="statPay">$0</div>
@@ -153,11 +153,11 @@ function filterOrders() {
 function render() {
   var orders = filterOrders();
   var totalDeliveries = orders.length;
-  var totalPieces = orders.reduce(function(s,o) { return s + (parseInt(o.total_pieces)||1); }, 0);
   var totalPay = orders.reduce(function(s,o) { return s + (parseFloat(o.driver_pay)||0); }, 0);
+  var avgPerDelivery = totalDeliveries > 0 ? totalPay / totalDeliveries : 0;
 
   document.getElementById('statDeliveries').textContent = totalDeliveries;
-  document.getElementById('statPieces').textContent = totalPieces;
+  document.getElementById('statAvg').textContent = '$' + avgPerDelivery.toFixed(2);
   document.getElementById('statPay').textContent = '$' + totalPay.toFixed(2);
   document.getElementById('totalPay').textContent = '$' + totalPay.toFixed(2);
   document.getElementById('totalLabel').textContent = currentPeriod === 'today' ? "Today's total pay" : currentPeriod === 'day' ? (selectedDay ? selectedDay + "'s total pay" : "Total pay") : "This week's total pay";
