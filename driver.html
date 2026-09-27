@@ -270,7 +270,7 @@
       </div>
       <div class="field">
         <label id="photoLabel">Photo (optional)</label>
-      <input type="file" id="fPhoto" accept="image/*" capture="environment">
+      <input type="file" id="fPhoto" accept="image/*">
       <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
       </div>
     </div>
@@ -877,6 +877,8 @@ function resetForm() {
   document.getElementById('fShopSearch').value = '';
   document.getElementById('fShop').value = '';
   document.getElementById('fShopDropdown').style.display = 'none';
+  document.getElementById('fWholesaler').value = '';
+  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.remove('active'); });
   document.getElementById('contactMethodField').hidden = true;
   document.getElementById('billingQueryField').hidden = true;
   document.getElementById('directSubField').hidden = true;
