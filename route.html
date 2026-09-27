@@ -19,6 +19,10 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
 .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
 .btn:hover{opacity:0.9;}
 .stop-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+.shop-dd{position:absolute;z-index:200;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);display:none;}
+.shop-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+.shop-dd-item:last-child{border-bottom:none;}
+.shop-dd-item:hover{background:var(--accent-soft);}
 .stop-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:13px;margin-right:8px;}
 .stop-name{font-size:15px;font-weight:700;}
 .stop-addr{font-size:13px;color:var(--ink-soft);margin:4px 0 10px;}
@@ -236,11 +240,23 @@ async function scanTagForRoute(file) {
 // queued - lets a driver catch and fix a misread name, address, or order
 // number right away, while the tag is still in hand, rather than
 // discovering the error later at Complete time or after submission.
+var reviewSelectedShopCode = '';
+
 function showScanReview(data) {
-  var shopOptions = '<option value="">No shop match</option>' + pendingShopList.map(function(s) {
-    var selected = (s.code || '').toUpperCase() === (data.shop_code || '').toUpperCase() ? ' selected' : '';
-    return '<option value="' + escapeHtml(s.code) + '"' + selected + '>' + escapeHtml(s.name) + '</option>';
-  }).join('');
+  // Only one review card can ever exist at a time - if a driver scans a
+  // second tag before confirming the first, this removes the earlier one
+  // rather than letting two copies of the same element IDs (reviewName,
+  // reviewShopCode, etc.) coexist in the DOM. That collision was the
+  // likely real cause of shop content appearing to carry over or not
+  // clear correctly between scans - getElementById only ever finds the
+  // first matching id, which could easily be the wrong card's.
+  var existing = document.getElementById('scanReviewCard');
+  if (existing) existing.remove();
+
+  var matchedShop = pendingShopList.find(function(s) {
+    return (s.code || '').toUpperCase() === (data.shop_code || '').toUpperCase();
+  });
+  reviewSelectedShopCode = matchedShop ? matchedShop.code : '';
 
   var reviewHtml = '<div id="scanReviewCard" class="stop-card" style="border-color:var(--accent);">' +
     '<div style="font-weight:700;margin-bottom:8px;color:var(--accent);">Check details before adding</div>' +
@@ -251,7 +267,10 @@ function showScanReview(data) {
     '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Order ID</label>' +
     '<input type="text" id="reviewOrderId" value="' + escapeHtml(data.order_id || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
     '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Shop</label>' +
-    '<select id="reviewShopCode" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;font-size:14px;">' + shopOptions + '</select>' +
+    '<div style="position:relative;margin-bottom:12px;">' +
+    '<input type="text" id="reviewShopSearch" autocomplete="off" placeholder="Search shop..." value="' + escapeHtml(matchedShop ? matchedShop.name : '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;">' +
+    '<div class="shop-dd" id="reviewShopDropdown"></div>' +
+    '</div>' +
     '<div style="display:flex;gap:8px;">' +
     '<button class="btn btn-ghost" id="scanReviewDiscardBtn" style="flex:1;">Discard</button>' +
     '<button class="btn" id="scanReviewConfirmBtn" style="flex:2;">Add to Route</button>' +
@@ -262,6 +281,16 @@ function showScanReview(data) {
   document.getElementById('emptyMsg').hidden = true;
   document.getElementById('content').hidden = false;
   document.getElementById('stopsList').insertAdjacentHTML('afterbegin', reviewHtml);
+
+  document.getElementById('reviewShopSearch').addEventListener('input', function() {
+    reviewSelectedShopCode = ''; // typing invalidates whatever was previously selected until a new item is clicked
+    document.getElementById('reviewShopDropdown').style.display = 'block';
+    renderReviewShopDropdown(this.value);
+  });
+  document.getElementById('reviewShopSearch').addEventListener('focus', function() {
+    document.getElementById('reviewShopDropdown').style.display = 'block';
+    renderReviewShopDropdown(this.value);
+  });
   document.getElementById('scanReviewConfirmBtn').addEventListener('click', confirmScanReview);
   document.getElementById('scanReviewDiscardBtn').addEventListener('click', function() {
     document.getElementById('scanReviewCard').remove();
@@ -269,13 +298,46 @@ function showScanReview(data) {
   document.getElementById('scanReviewCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+// Mirrors driver.html's renderShopDropdown() exactly for visual/behavioral
+// consistency, adapted to this review card's own shop list shape
+// ({code, name, aliases}, no "featured" concept) and its own element ids.
+function renderReviewShopDropdown(search) {
+  var dd = document.getElementById('reviewShopDropdown');
+  if (!dd) return;
+  var s = (search || '').toLowerCase();
+  var matches = pendingShopList.filter(function(sh) { return !s || sh.name.toLowerCase().includes(s); });
+  matches.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  var html = matches.length
+    ? matches.map(function(sh) { return '<div class="shop-dd-item" data-code="' + escapeHtml(sh.code) + '">' + escapeHtml(sh.name) + '</div>'; }).join('')
+    : '<div style="padding:10px 14px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
+  dd.innerHTML = html;
+  dd.querySelectorAll('.shop-dd-item').forEach(function(item) {
+    item.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var code = this.dataset.code;
+      var shop = pendingShopList.find(function(sh) { return sh.code === code; });
+      if (!shop) return;
+      reviewSelectedShopCode = shop.code;
+      document.getElementById('reviewShopSearch').value = shop.name;
+      dd.style.display = 'none';
+    });
+  });
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#reviewShopSearch') && !e.target.closest('#reviewShopDropdown')) {
+    var dd = document.getElementById('reviewShopDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
 async function confirmScanReview() {
   var btn = document.getElementById('scanReviewConfirmBtn');
   var statusEl = document.getElementById('scanStatus');
   var name = document.getElementById('reviewName').value.trim();
   var address = document.getElementById('reviewAddress').value.trim();
   var orderId = document.getElementById('reviewOrderId').value.trim();
-  var shopCode = document.getElementById('reviewShopCode').value;
+  var shopCode = reviewSelectedShopCode;
 
   if (!address) { alert('Address is required.'); return; }
 
@@ -298,6 +360,7 @@ async function confirmScanReview() {
     if (!stopRes.ok) throw new Error(stop.error || 'Could not add to route.');
 
     document.getElementById('scanReviewCard').remove();
+    reviewSelectedShopCode = '';
     statusEl.hidden = false;
     statusEl.style.color = 'var(--green)';
     statusEl.textContent = 'Added: ' + (name || 'delivery') + (orderId ? ' (Order #' + orderId + ')' : '') + '. Scan the next one, or view your route below.';
