@@ -16,27 +16,11 @@ function getWeekBounds(weekEnd) {
   return { start, end };
 }
 
-// Handles the date formats an order can carry: ISO from the driver form,
-// DD-Mon-YYYY / D/M/YYYY from the Zoho webhook (same formats reports.mjs
-// parses). Date-only values are pinned to noon so they can't slip across a
-// day boundary; full timestamps (received_at) parse as-is.
+// Date-only values are pinned to noon so they can't slip across a day
+// boundary; see orderIsoDate for the formats handled.
 function parseOrderDate(o) {
-  const raw = o.date || o.received_at;
-  if (!raw) return new Date(0);
-  const s = String(raw).trim();
-  let iso = null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) iso = s;
-  else {
-    const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
-    let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
-    if (m && months[m[2].toLowerCase()]) iso = m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
-    else {
-      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-      if (m) iso = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-    }
-  }
-  if (iso) return new Date(iso + 'T12:00:00');
-  return new Date(raw);
+  const iso = orderIsoDate(o);
+  return iso ? new Date(iso + 'T12:00:00') : new Date(0);
 }
 
 function fmt(n) {
@@ -51,31 +35,78 @@ function fmtWeekEnd(weekEnd) {
 
 const YTD_START_DATE = '2025-12-29';
 
-// Sums this driver's actual orders across the full YTD range (Dec 29
-// through the current week), rather than relying on a single static
-// "starting point" that only ever got one week added to it. Most of this
-// history predates the week-embedded key format, so this scans the full
-// key list (fast - metadata only) and filters candidates by the
-// timestamp already embedded in every key (old or new format) before
-// fetching each one's content, avoiding a full-content fetch of anything
-// outside the YTD range.
-async function getYtdTotalsForDriver(driverCode, weekEnd) {
+// The calendar day (YYYY-MM-DD) an order belongs to, whatever format its
+// date arrived in: ISO from the driver form, DD-Mon-YYYY / D/M/YYYY from
+// the Zoho webhook, or a full timestamp. Null if there's no usable date.
+function orderIsoDate(o) {
+  const raw = o && (o.date || o.received_at);
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return null;
+}
+
+// Year-to-date, as plainly as it can be defined: total pay = the sum of
+// every one of this driver's deliveries from YTD_START_DATE through the
+// end of the pay week, deliveries = how many there are, average = pay /
+// deliveries. An order counts if its DELIVERY DATE is in range - not when
+// the record happened to be created - and this week's orders are always
+// included exactly once, so YTD can never come out smaller than "This Week".
+// The key timestamp is used only as a cheap pre-filter to avoid fetching
+// the whole store; its upper bound is padded 14 days so late-entered
+// orders aren't cut off before the exact date check.
+async function computeYtd(driver, weekOrders, weekEnd) {
   const store = getStore('flower-orders');
   const { blobs } = await store.list();
-  const startMs = new Date(YTD_START_DATE + 'T00:00:00').getTime();
-  const endMs = new Date(weekEnd + 'T23:59:59').getTime();
+  const DAY = 86400000;
+  const startMs = new Date(YTD_START_DATE + 'T00:00:00').getTime() - 2 * DAY;
+  const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 14 * DAY;
   const candidates = blobs.filter(b => {
     const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
     if (!m) return false;
     const ts = parseInt(m[1]);
     return ts >= startMs && ts <= endMs;
   });
-  const orders = (await Promise.all(candidates.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
-  const driverOrders = orders.filter(o => (o.driver || '').toUpperCase() === driverCode.toUpperCase());
+  const fetched = (await Promise.all(candidates.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+
+  const code = (driver.code || '').toUpperCase();
+  const counted = new Map();
+  const consider = o => {
+    if ((o.driver || '').toUpperCase() !== code) return;
+    const day = orderIsoDate(o);
+    if (!day || day < YTD_START_DATE || day > weekEnd) return;
+    counted.set(o.id || (o.order_id + '|' + day + '|' + o.name), o);
+  };
+  fetched.forEach(consider);
+  weekOrders.forEach(consider);
+
+  const list = Array.from(counted.values());
+  const days = list.map(orderIsoDate).sort();
+  const ordersPay = list.reduce((sum, o) => sum + (parseFloat(o.driver_pay) || 0), 0);
+
+  const baselinePay = parseFloat(driver.ytd_start_pay) || 0;
+  const baselineDel = parseInt(driver.ytd_start_deliveries) || 0;
+  const totalPay = baselinePay + ordersPay;
+  const totalDel = baselineDel + list.length;
   return {
-    pay: driverOrders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0),
-    deliveries: driverOrders.length,
-    candidates_scanned: candidates.length
+    baseline: { pay: baselinePay, deliveries: baselineDel },
+    orders: {
+      pay: ordersPay,
+      deliveries: list.length,
+      first_date: days[0] || null,
+      last_date: days[days.length - 1] || null,
+      zero_pay_orders: list.filter(o => !(parseFloat(o.driver_pay) > 0)).length,
+      premium_records: list.filter(o => o.order_id === 'PREMIUM').length,
+      candidates_scanned: candidates.length
+    },
+    total: { pay: totalPay, deliveries: totalDel, avg: totalDel > 0 ? totalPay / totalDel : 0 }
   };
 }
 
@@ -89,14 +120,12 @@ async function buildPayStatementHtml(driver, orders, weekEnd, rates) {
     return s + (parseFloat(r.gdpi) || 0);
   }, 0);
 
-  const ytdStartPay = parseFloat(driver.ytd_start_pay) || 0;
-  const ytdStartDel = parseInt(driver.ytd_start_deliveries) || 0;
   const tYtd = Date.now();
-  const ytdTotals = await getYtdTotalsForDriver(driver.code, weekEnd);
-  console.log('YTD fetch for', driver.code, ':', Date.now() - tYtd, 'ms,', ytdTotals.candidates_scanned, 'candidates scanned');
-  const ytdPay = ytdStartPay + ytdTotals.pay;
-  const ytdDel = ytdStartDel + ytdTotals.deliveries;
-  const ytdAvg = ytdDel > 0 ? ytdPay / ytdDel : 0;
+  const ytd = await computeYtd(driver, orders, weekEnd);
+  console.log('YTD for', driver.code, ':', Date.now() - tYtd, 'ms,', ytd.orders.candidates_scanned, 'candidates scanned');
+  const ytdPay = ytd.total.pay;
+  const ytdDel = ytd.total.deliveries;
+  const ytdAvg = ytd.total.avg;
 
   const zoneBreak = {};
   orders.forEach(o => {
@@ -319,6 +348,22 @@ export default async (req) => {
     const ratesStore = getStore('flower-rates');
     let rates = {};
     try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+
+    // ?debug=1 shows exactly what the YTD figures are made of, instead of
+    // the statement itself - baseline vs. counted orders, the date range
+    // covered, and how many zero-pay / premium records are in the count.
+    if (url.searchParams.get('debug') === '1') {
+      const ytd = await computeYtd(driver, orders, weekEnd);
+      const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
+      return json({
+        driver: driverCode,
+        week_end: weekEnd,
+        week: { pay: weekPay, deliveries: orders.length, avg: orders.length ? weekPay / orders.length : 0 },
+        ytd_start_date: YTD_START_DATE,
+        ytd,
+        note: 'ytd.total = ytd.baseline + ytd.orders. avg = total.pay / total.deliveries.'
+      });
+    }
 
     const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
     const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pay Statement - ${driver.name || driverCode}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
