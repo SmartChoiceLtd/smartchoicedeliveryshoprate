@@ -60,6 +60,25 @@ function getToday() {
   return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
 }
 
+// Returns an order's calendar day as a local YYYY-MM-DD string, whatever
+// format it arrived in: ISO from the driver form, DD-Mon-YYYY or D/M/YYYY
+// from the Zoho webhook (the same formats orders.html and reports.mjs
+// already parse), or a full timestamp. A plain slice(0,10) only worked for
+// the first of those, which silently excluded every webhook order.
+function orderDay(o) {
+  var raw = String((o && (o.date || o.received_at)) || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  var months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  var m = raw.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  var d = new Date(raw);
+  if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return raw.slice(0, 10);
+}
+
 function esc(s) {
   if (!s) return '';
   var d = document.createElement('div');
@@ -76,7 +95,7 @@ async function loadCounts() {
     var today = getToday();
 
     var todayOrders = allOrders.filter(function(o) {
-      return (o.date || o.received_at || '').slice(0, 10) === today;
+      return orderDay(o) === today;
     });
 
     document.getElementById('totalCount').textContent = todayOrders.length;
