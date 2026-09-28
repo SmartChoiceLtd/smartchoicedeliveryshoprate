@@ -11,16 +11,85 @@ function toCSVRow(fields) {
   return fields.map(csvEscape).join(',');
 }
 
+// The calendar day (YYYY-MM-DD) an order belongs to, whatever format its
+// date arrived in: ISO from the driver form, DD-Mon-YYYY / D/M/YYYY from
+// the Zoho webhook, or a full timestamp.
+function orderIsoDate(o) {
+  const raw = o && (o.date || o.received_at);
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return null;
+}
+
+// The Monday-to-Sunday week ending on weekEnd: returns its Monday.
+function weekStartIso(weekEnd) {
+  const d = new Date(weekEnd + 'T12:00:00');
+  d.setDate(d.getDate() - 6);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Fetches just one week's orders instead of every order ever created.
+// Orders are stored under keys that embed their week-ending Sunday
+// (order_<sunday>_<timestamp>_<random>), so the bulk of them come back from
+// a fast prefix lookup. Older orders (no week in the key) and any that were
+// filed under a different week are recovered by their key timestamp, padded
+// a little either side for late entries. The exact date check at the end is
+// what decides what's in the export - the key lookups only narrow the fetch.
+async function getOrdersForWeek(store, weekEnd) {
+  const startIso = weekStartIso(weekEnd);
+  const DAY = 86400000;
+  const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+  const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
+
+  const { blobs: prefixed } = await store.list({ prefix: `order_${weekEnd}_` });
+  const { blobs: all } = await store.list();
+  const fallback = all.filter(b => {
+    if (b.key.startsWith(`order_${weekEnd}_`)) return false;
+    const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+    if (!m) return false;
+    const ts = parseInt(m[1]);
+    return ts >= startMs && ts <= endMs;
+  });
+  const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+  return fetched.filter(o => {
+    const d = orderIsoDate(o);
+    return d && d >= startIso && d <= weekEnd;
+  });
+}
+
 export default async (req) => {
   try {
     const store = getStore('flower-orders');
-    const { blobs } = await store.list();
-    const orders = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }))))
-      .filter(Boolean)
-      .sort((a, b) => new Date(a.date || a.received_at) - new Date(b.date || b.received_at));
-
     const url = new URL(req.url);
     const format = url.searchParams.get('format') || 'detail';
+
+    // Optional: limit the export to one Monday-to-Sunday week, identified by
+    // the Sunday it ends on. Without it, every order is exported, as before.
+    const weekEnd = url.searchParams.get('week_end');
+    if (weekEnd && !/^\d{4}-\d{2}-\d{2}$/.test(weekEnd)) {
+      return new Response(JSON.stringify({ error: 'week_end must be YYYY-MM-DD' }), { status: 400, headers: { 'content-type': 'application/json' } });
+    }
+
+    let orders;
+    if (weekEnd) {
+      orders = await getOrdersForWeek(store, weekEnd);
+    } else {
+      const { blobs } = await store.list();
+      orders = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+    }
+    orders.sort((a, b) => (orderIsoDate(a) || '').localeCompare(orderIsoDate(b) || ''));
+
+    // File names carry the week ending so exports from different weeks
+    // don't collide or get mixed up in a downloads folder.
+    const fileTag = weekEnd ? 'week-ending-' + weekEnd : new Date().toISOString().slice(0, 10);
 
     if (format === 'detail') {
       const headers = ['Date','Order ID','Name','Address','Shop Code','Shop','Driver','Pieces','Zone','Zone Source','Delivery Status','Delivery Time','Accepted By','Contact Method','Neighboured To','Comments','Driver Pay','Delivery Type','Wholesaler','Billing Party','Received At'];
@@ -38,7 +107,7 @@ export default async (req) => {
         status: 200,
         headers: {
           'content-type': 'text/csv',
-          'content-disposition': `attachment; filename="orders-detail-${new Date().toISOString().slice(0,10)}.csv"`
+          'content-disposition': `attachment; filename="orders-detail-${fileTag}.csv"`
         }
       });
     }
@@ -62,7 +131,7 @@ export default async (req) => {
         status: 200,
         headers: {
           'content-type': 'text/csv',
-          'content-disposition': `attachment; filename="orders-pivot-${new Date().toISOString().slice(0,10)}.csv"`
+          'content-disposition': `attachment; filename="orders-pivot-${fileTag}.csv"`
         }
       });
     }
@@ -87,7 +156,7 @@ export default async (req) => {
         status: 200,
         headers: {
           'content-type': 'text/csv',
-          'content-disposition': `attachment; filename="orders-driver-${new Date().toISOString().slice(0,10)}.csv"`
+          'content-disposition': `attachment; filename="orders-driver-${fileTag}.csv"`
         }
       });
     }
