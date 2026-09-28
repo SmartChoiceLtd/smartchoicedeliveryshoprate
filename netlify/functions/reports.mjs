@@ -22,9 +22,13 @@ function getWeekRange(weekEnd) {
 // so order keys can be found via prefix filtering regardless of which
 // function created them.
 function weekEndingSunday(dateStr) {
-  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
-  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
-  const day = d.getDay();
+  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
+  // An unparseable date must still land on a real Sunday - previously this
+  // returned today's date as-is, which is almost never a Sunday, so the
+  // order got filed under a week key that no weekly report or pay run
+  // would ever look up.
+  if (!d || isNaN(d.getTime())) d = new Date();
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
   const daysToSunday = day === 0 ? 0 : 7 - day;
   d.setDate(d.getDate() + daysToSunday);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -117,7 +121,7 @@ export default async (req) => {
   const { blobs: allBlobs } = await store.list();
   const oldFormatCandidates = allBlobs.filter(b => {
     if (b.key.startsWith(`order_${targetWeekEnd}_`)) return false;
-    const match = b.key.match(/^order_(\d+)_/);
+    const match = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/); // also recovers new-format keys filed under a bogus week prefix
     if (!match) return false;
     const ts = parseInt(match[1]);
     return ts >= fetchStartMs && ts <= fetchEndMs;
