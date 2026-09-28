@@ -218,7 +218,7 @@
       </div>
       <div id="directSubField" hidden style="margin-top:8px;">
         <div class="status-grid" id="directSubGrid">
-          <button class="status-btn" data-sub="Concierge/Reception">Concierge/Reception</button>
+          <button class="status-btn" data-sub="Concierge/Reception">Concierge</button>
           <button class="status-btn" data-sub="Mailroom">Mailroom</button>
           <button class="status-btn" data-sub="Loading Dock">Loading Dock</button>
           <button class="status-btn" data-sub="Doorstep">Doorstep</button>
@@ -769,7 +769,7 @@ function lookupZone(address, placeLat, placeLng) {
 }
 
 /* Shop search dropdown */
-function populateShopDropdown() {
+function populateShopDropdown(preserveShop) {
   if (deliveryType === 'wholesale') {
     document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop) — optional';
     document.getElementById('wholesalerField').hidden = false;
@@ -789,8 +789,10 @@ function populateShopDropdown() {
     document.getElementById('wholesaleStatusCard').hidden = true;
     document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
   }
-  document.getElementById('fShopSearch').value = '';
-  document.getElementById('fShop').value = '';
+  if (!preserveShop) {
+    document.getElementById('fShopSearch').value = '';
+    document.getElementById('fShop').value = '';
+  }
   document.getElementById('fShopDropdown').style.display = 'none';
 }
 
@@ -1229,9 +1231,18 @@ async function init() {
     document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
       var btn = e.target.closest('.toggle-btn');
       if (!btn) return;
+      var prevType = deliveryType;
       deliveryType = btn.dataset.type;
       document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
-      populateShopDropdown();
+      // Store to Door and Events use the shop identically (the sending
+      // shop), so switching between them must not wipe it - special
+      // events always originate from a registered shop, and a tag scanned
+      // as Store to Door and then switched to Events was losing its shop
+      // every time. Wholesale is different: the field there means the
+      // RECEIVING shop, so crossing that boundary in either direction
+      // still clears it.
+      var crossesWholesale = (prevType === 'wholesale') !== (deliveryType === 'wholesale');
+      populateShopDropdown(!crossesWholesale);
       selectedZone = '';
       if (deliveryType !== 'events') {
         eventType = '';
@@ -1394,18 +1405,23 @@ async function init() {
           }
           if (urlParams.get('order_id')) document.getElementById('fOrderId').value = urlParams.get('order_id');
           if (urlParams.get('name')) document.getElementById('fName').value = urlParams.get('name');
-          if (urlParams.get('address')) {
-            var addr = urlParams.get('address');
-            document.getElementById('fAddress').value = addr;
-            formattedAddress = addr;
-            lookupZone(addr);
-          }
+          // Shop first, THEN the zone lookup: lookupZone reads the selected
+          // shop to pass its coordinates, and the C1-C5 bands are driving
+          // distance from the shop. With the order reversed, the lookup
+          // fired with no shop selected and measured from a fallback
+          // downtown point instead of the actual pickup location.
           if (urlParams.get('shop_code')) {
             var linkedShop = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === urlParams.get('shop_code').toUpperCase(); });
             if (linkedShop) {
               document.getElementById('fShop').value = linkedShop.id;
               document.getElementById('fShopSearch').value = linkedShop.name;
             }
+          }
+          if (urlParams.get('address')) {
+            var addr = urlParams.get('address');
+            document.getElementById('fAddress').value = addr;
+            formattedAddress = addr;
+            lookupZone(addr);
           }
         } else {
           restoreDraftIfPresent();
