@@ -43,9 +43,30 @@ function isEventZoneCode(zoneCode) {
 // filter on .list() instead of fetching and filtering every order ever
 // created - which became a real bottleneck once the store grew into the
 // thousands of records.
+// Normalizes the date formats an order can arrive with to YYYY-MM-DD.
+// Driver-form orders send ISO dates, but the Zoho webhook sends
+// DD-Mon-YYYY (or D/M/YYYY) - the same formats reports.mjs and orders.html
+// already parse. Without this, those orders' week key came out wrong.
+// Returns null if the format isn't recognized.
+function normalizeOrderDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return null;
+}
+
 function weekEndingSunday(dateStr) {
-  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
-  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
+  // An unparseable date must still land on a real Sunday - previously this
+  // returned today's date as-is, which is almost never a Sunday, so the
+  // order got filed under a week key that no weekly report or pay run
+  // would ever look up.
+  if (!d || isNaN(d.getTime())) d = new Date();
   const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
   const daysToSunday = day === 0 ? 0 : 7 - day;
   d.setDate(d.getDate() + daysToSunday);
@@ -228,7 +249,7 @@ export default async (req) => {
       zoneSuggestion.suggested !== enteredZoneCode &&
       zoneSuggestion.confidence === 'high';
 
-    const weekEnd = weekEndingSunday(raw.date);
+    const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
     const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const order = {
       id: orderId,
