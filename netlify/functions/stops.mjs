@@ -4,6 +4,23 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
 
+// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
+// the given date - same helper as orders.mjs, kept consistent so order
+// keys can be found via prefix filtering regardless of which function
+// created them.
+function weekEndingSunday(dateStr) {
+  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
+  // An unparseable date must still land on a real Sunday - previously this
+  // returned today's date as-is, which is almost never a Sunday, so the
+  // order got filed under a week key that no weekly report or pay run
+  // would ever look up.
+  if (!d || isNaN(d.getTime())) d = new Date();
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 // Driver NV gets an automatic daily premium (zone SC2) the first time they
 // scan a tag each day - hardcoded to this one driver for now rather than a
 // general per-driver config field, since generalizing this safely needs
@@ -23,7 +40,8 @@ async function maybeApplyDailyPremium(driver, localDate) {
     const rates = await ratesStore.get('rates', { type: 'json' }) || {};
     const r = rates['SC2'] || {};
 
-    const orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const weekEnd = weekEndingSunday(localDate);
+    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const order = {
       id: orderId,
       received_at: new Date().toISOString(),
