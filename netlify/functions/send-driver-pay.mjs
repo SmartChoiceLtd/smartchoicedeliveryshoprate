@@ -16,9 +16,26 @@ function getWeekBounds(weekEnd) {
   return { start, end };
 }
 
+// Handles the date formats an order can carry: ISO from the driver form,
+// DD-Mon-YYYY / D/M/YYYY from the Zoho webhook (same formats reports.mjs
+// parses). Date-only values are pinned to noon so they can't slip across a
+// day boundary; full timestamps (received_at) parse as-is.
 function parseOrderDate(o) {
   const raw = o.date || o.received_at;
   if (!raw) return new Date(0);
+  const s = String(raw).trim();
+  let iso = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) iso = s;
+  else {
+    const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+    let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+    if (m && months[m[2].toLowerCase()]) iso = m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+    else {
+      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) iso = m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    }
+  }
+  if (iso) return new Date(iso + 'T12:00:00');
   return new Date(raw);
 }
 
@@ -236,7 +253,11 @@ async function getWeekOrdersByDriver(week_end) {
   timings.orders_list_count = allBlobs.length;
   const oldFormatCandidates = allBlobs.filter(b => {
     if (b.key.startsWith(`order_${week_end}_`)) return false; // already captured above
-    const match = b.key.match(/^order_(\d+)_/); // old format: order_<timestamp>_<random>
+    // Matches the old format (order_<timestamp>_<random>) AND new-format keys
+    // filed under a different week prefix - webhook orders with non-ISO dates
+    // were briefly filed under a bogus week key, so they're recovered here by
+    // their embedded timestamp. The exact-date filter below keeps results correct.
+    const match = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
     if (!match) return false;
     const ts = parseInt(match[1]);
     return ts >= bounds.start.getTime() && ts <= bounds.end.getTime();
