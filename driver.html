@@ -144,7 +144,7 @@
       </div>
       <div class="field" id="billingQueryField" hidden>
         <label>Invoice To</label>
-        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT &amp; FS default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
+        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT, FS &amp; SV default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
         <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
           <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
           <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
@@ -522,7 +522,7 @@ function isWholesaleZone(code) {
 
 var WHOLESALER_BILLING = {
   AT: 'wholesaler', FS: 'wholesaler',
-  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'shop', QF: 'shop'
+  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'wholesaler', QF: 'shop'
 };
 
 function setBillingDefault(code) {
