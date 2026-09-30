@@ -45,6 +45,11 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
   <input type="file" id="fTagPhoto" accept="image/*" hidden>
   <div id="scanStatus" hidden style="font-size:13px;color:var(--ink-soft);margin-top:8px;"></div>
   <a class="btn btn-ghost" id="manualEntryLink" style="margin-top:8px;width:100%;">Manual Entry (no tag to scan)</a>
+  <button class="btn btn-ghost" id="findShopBtn" style="margin-top:8px;width:100%;">&#128269; Find a Shop</button>
+  <div id="shopListPanel" hidden style="margin-top:8px;">
+    <input type="text" id="shopListSearch" placeholder="Search code, name, or address..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px;margin-bottom:8px;">
+    <div id="shopListResults" style="max-height:320px;overflow-y:auto;"></div>
+  </div>
 </div>
 <div class="main">
   <div class="loading" id="loadingMsg">Loading your route&hellip;</div>
@@ -322,6 +327,58 @@ function renderReviewShopDropdown(search) {
       dd.style.display = 'none';
     });
   });
+}
+
+// Standalone shop reference list, independent of scanning - lets a driver
+// look up any shop's code, name, and address at any time, with a direct
+// link to Google Maps for directions. Loaded once, on first open, rather
+// than on every page load, since most visits to this page won't need it.
+var allShopsForList = null;
+
+document.getElementById('findShopBtn').addEventListener('click', async function() {
+  var panel = document.getElementById('shopListPanel');
+  var opening = panel.hidden;
+  panel.hidden = !opening;
+  if (!opening) return;
+  document.getElementById('shopListSearch').value = '';
+  if (!allShopsForList) {
+    document.getElementById('shopListResults').innerHTML = '<div style="padding:12px;color:var(--ink-soft);font-size:13px;">Loading shops&hellip;</div>';
+    try {
+      var res = await fetch('/api/shops');
+      allShopsForList = res.ok ? await res.json() : [];
+    } catch (e) {
+      allShopsForList = [];
+    }
+  }
+  renderShopList('');
+});
+
+document.getElementById('shopListSearch').addEventListener('input', function() {
+  renderShopList(this.value);
+});
+
+function renderShopList(search) {
+  var container = document.getElementById('shopListResults');
+  if (!allShopsForList) return;
+  var s = (search || '').toLowerCase();
+  var matches = allShopsForList.filter(function(sh) {
+    var code = sh.name ? sh.name.split(' ')[0] : '';
+    return !s || sh.name.toLowerCase().includes(s) || (sh.address || '').toLowerCase().includes(s) || code.toLowerCase().includes(s);
+  });
+  matches.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  if (!matches.length) {
+    container.innerHTML = '<div style="padding:12px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
+    return;
+  }
+  container.innerHTML = matches.map(function(sh) {
+    var code = sh.name ? sh.name.split(' ')[0] : '';
+    var rest = sh.name ? sh.name.slice(code.length).trim() : '';
+    return '<div class="stop-card" style="padding:10px;margin-bottom:6px;">' +
+      '<div style="font-weight:700;">' + escapeHtml(code) + (rest ? ' <span style="font-weight:400;">' + escapeHtml(rest) + '</span>' : '') + '</div>' +
+      '<div style="font-size:13px;color:var(--ink-soft);margin:2px 0 6px;">' + escapeHtml(sh.address || '') + '</div>' +
+      '<a class="btn btn-ghost" href="' + navigateUrl(sh.address) + '" target="_blank" rel="noopener" style="font-size:12px;padding:6px 10px;">Navigate</a>' +
+      '</div>';
+  }).join('');
 }
 
 document.addEventListener('click', function(e) {
