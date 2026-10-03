@@ -550,7 +550,15 @@ function toggleSkip(stopId, skip) {
     method: 'PUT', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ skipped: skip })
   }).then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
-    .then(function() { loadRoute(); })
+    .then(function(updatedStop) {
+      // Move the stop between the two local lists directly, using the
+      // server's own confirmed response, rather than trusting an
+      // immediate re-fetch to reflect this write.
+      lastActiveStops = lastActiveStops.filter(function(s) { return s.id !== stopId; });
+      lastSkippedStops = lastSkippedStops.filter(function(s) { return s.id !== stopId; });
+      if (skip) lastSkippedStops.push(updatedStop); else lastActiveStops.push(updatedStop);
+      renderStops(lastActiveStops, lastSkippedStops);
+    })
     .catch(function(e) { alert('Could not update: ' + e.message); });
 }
 
@@ -605,7 +613,18 @@ function removeStop(stopId, btn) {
     method: 'PUT', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ status: 'abandoned' })
   }).then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
-    .then(function() { loadRoute(); })
+    .then(function() {
+      // Drop it from local state directly, using the server's own
+      // confirmation that the write succeeded, rather than trusting an
+      // immediate re-fetch to reflect it.
+      lastActiveStops = lastActiveStops.filter(function(s) { return s.id !== stopId; });
+      lastSkippedStops = lastSkippedStops.filter(function(s) { return s.id !== stopId; });
+      renderStops(lastActiveStops, lastSkippedStops);
+      if (!lastActiveStops.length && !lastSkippedStops.length) {
+        document.getElementById('content').hidden = true;
+        document.getElementById('emptyMsg').hidden = false;
+      }
+    })
     .catch(function(e) { alert('Could not remove: ' + e.message); btn.disabled = false; });
 }
 
@@ -620,7 +639,10 @@ function loadRoute() {
   ]).then(function(results) {
     var allStops = results[0];
     var mapsKey = results[1] && results[1].key;
-    var mine = allStops.filter(function(s) { return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode; });
+    var justCompletedId = new URLSearchParams(location.search).get('just_completed');
+    var mine = allStops.filter(function(s) {
+      return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode && s.id !== justCompletedId;
+    });
 
     if (!mine.length) {
       document.getElementById('loadingMsg').hidden = true;
