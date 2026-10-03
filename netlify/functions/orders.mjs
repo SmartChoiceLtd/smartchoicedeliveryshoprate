@@ -151,10 +151,10 @@ export default async (req) => {
       zone:             body['Zone']                     || body['zone']              || null,
       zone_full:        body['Zone (with Group Name)']   || null,
       delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
-      delivery_time:    body['Delivery Time']            || null,
-      contact_method:   body['Recipient Contact Method'] || null,
-      neighboured_to:   body['Neighboured To']           || null,
-      accepted_by:      body['Delivery Accepted By']       || null,
+      delivery_time:    body['Delivery Time']            || body.delivery_time    || null,
+      contact_method:   body['Recipient Contact Method'] || body.contact_method   || null,
+      neighboured_to:   body['Neighboured To']           || body.neighboured_to   || null,
+      accepted_by:      body['Delivery Accepted By']     || body.accepted_by      || null,
       comments:         body['Comments']                 || null,
     };
 
