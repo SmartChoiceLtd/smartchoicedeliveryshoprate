@@ -133,7 +133,7 @@
         <select id="fWholesaler">
           <option value="">Select wholesaler...</option>
           <option value="AM">AM AMAZING FLORAL WHOLESALE</option>
-          <option value="AT">AT ATLANTIC</option>
+          <option value="WFW">WFW WEAVER FLORAL WHOLESALE</option>
           <option value="BA">BA BERNARD ANDERSON</option>
           <option value="FC">FC FLOWER CENTER</option>
           <option value="FS">FS FLORISTS SUPPLY</option>
@@ -144,7 +144,7 @@
       </div>
       <div class="field" id="billingQueryField" hidden>
         <label>Invoice To</label>
-        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">AT, FS &amp; SV default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
+        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">WFW, FS &amp; SV default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
         <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
           <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
           <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
@@ -257,6 +257,12 @@
     <div class="card" id="wholesaleStatusCard" hidden>
       <h2>Delivery Confirmation</h2>
       <div class="field">
+        <div class="status-grid">
+          <button type="button" class="status-btn" id="wsDoorstepBtn">Doorstep</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Select if left at the door. A photo is required.</div>
+      </div>
+      <div class="field">
         <label>Accepted By</label>
         <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
       </div>
@@ -275,6 +281,14 @@
         <button type="button" class="btn btn-ghost" id="photoTakeBtn" style="flex:1;">Take Photo</button>
         <button type="button" class="btn btn-ghost" id="photoGalleryBtn" style="flex:1;">Choose from Gallery</button>
       </div>
+      <div id="photoStatus" hidden style="display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:var(--green-soft);">
+        <img id="photoThumb" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:var(--green);font-size:14px;">&#10003; Photo attached</div>
+          <div id="photoStatusSub" style="font-size:12px;color:var(--ink-soft);">Uploads when you tap Submit</div>
+        </div>
+        <button type="button" id="photoRemoveBtn" style="background:transparent;border:1px solid var(--border);color:var(--ink-soft);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Remove</button>
+      </div>
       <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
       </div>
     </div>
@@ -289,6 +303,7 @@
     <div class="success">
       <h3>Delivery Submitted</h3>
       <p id="successDetail"></p>
+      <p id="successPhoto" hidden style="margin-top:8px;font-weight:600;"></p>
     </div>
     <button class="btn" style="margin-top:16px;" id="myRouteBtn2">&larr; My Route</button>
     <button class="btn btn-secondary" id="nextBtn">Next Delivery (Manual Entry)</button>
@@ -344,6 +359,7 @@ function saveDraft() {
       if (el) draft.fields[id] = el.value;
     });
     draft.directSub = Array.from(document.querySelectorAll('#directSubGrid .status-btn.selected')).map(function(b){ return b.dataset.sub; });
+    draft.wsDoorstep = !!document.querySelector('#wsDoorstepBtn.selected');
     draft.undeliverableSub = Array.from(document.querySelectorAll('#undeliverableSubGrid .status-btn.selected')).map(function(b){ return b.dataset.unsub; });
     var contactSel = document.querySelector('#contactMethodGrid .status-btn.selected');
     draft.contactMethod = contactSel ? contactSel.dataset.contact : '';
@@ -419,7 +435,9 @@ function restoreDraftIfPresent() {
 
   if (selectedZone) { refreshZoneDisplay(); updatePay(); }
 
-  var doorstepSelected = !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+  if (draft.wsDoorstep) document.getElementById('wsDoorstepBtn').classList.add('selected');
+  refreshPhotoUI();
+  var doorstepSelected = isDoorstepSelected();
   var noteEl = document.getElementById('draftRestoredMsg');
   noteEl.textContent = 'Restored your in-progress entry.' + (doorstepSelected ? ' Photo will need to be retaken.' : '');
   noteEl.hidden = false;
@@ -521,7 +539,7 @@ function isWholesaleZone(code) {
 }
 
 var WHOLESALER_BILLING = {
-  AT: 'wholesaler', FS: 'wholesaler',
+  WFW: 'wholesaler', FS: 'wholesaler',
   AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'wholesaler', QF: 'shop'
 };
 
@@ -906,7 +924,9 @@ function resetForm() {
   var now = new Date();
   document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
   document.getElementById('successScreen').hidden = true;
+  document.getElementById('successPhoto').hidden = true;
   document.getElementById('app').hidden = false;
+  refreshPhotoUI();
 }
 
 // Resizes and re-compresses a photo file via canvas before upload - a raw
@@ -965,6 +985,117 @@ if (!isIOS) {
     input.click();
   });
 }
+
+// ---- Photo area: one function decides everything it shows -----------------------------
+var photoPreviewUrl = null;
+var photoPreviewFile = null;
+
+// Doorstep counts only where it is actually in effect. On the Wholesale tab that is
+// its own Doorstep button. On Store/Events it is the Doorstep sub-choice, and only
+// while "Direct to Address" is still selected: un-choosing Direct to Address hides the
+// sub-choices, and a hidden Doorstep must not keep demanding a photo (or get saved).
+function isDoorstepSelected() {
+  if (deliveryType === 'wholesale') {
+    var wb = document.getElementById('wsDoorstepBtn');
+    return !!(wb && wb.classList.contains('selected'));
+  }
+  return selectedStatuses.indexOf('Direct to Address') >= 0 &&
+    !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+}
+
+// The statuses that actually apply to this delivery. Only choices belonging to the
+// current tab and to a still-selected parent status are included, so selections left
+// over on another tab (or under a status that was un-chosen) can't leak into the order.
+function collectDeliveryStatuses() {
+  if (deliveryType === 'wholesale') {
+    return isDoorstepSelected() ? ['Direct to Address', 'Doorstep'] : [];
+  }
+  var statuses = selectedStatuses.slice();
+  if (statuses.indexOf('Direct to Address') >= 0) {
+    document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
+  }
+  if (statuses.indexOf('Undeliverable') >= 0) {
+    document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
+  }
+  var rd = document.getElementById('fRedirectDetail').value.trim();
+  if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
+  return statuses;
+}
+
+function refreshPhotoUI() {
+  var input = document.getElementById('fPhoto');
+  var file = (input.files && input.files.length) ? input.files[0] : null;
+  var doorstep = isDoorstepSelected();
+  document.getElementById('photoLabel').textContent = doorstep ? 'Photo (required)' : 'Photo (optional)';
+  if (doorstep) input.setAttribute('required', 'required'); else input.removeAttribute('required');
+  // The red warning shows only while a photo is still missing.
+  document.getElementById('photoRequired').hidden = !(doorstep && !file);
+
+  var box = document.getElementById('photoStatus');
+  var thumb = document.getElementById('photoThumb');
+  if (!file) {
+    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
+    photoPreviewUrl = null; photoPreviewFile = null;
+    thumb.removeAttribute('src');
+    box.hidden = true;
+    return;
+  }
+  if (file !== photoPreviewFile) {
+    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
+    photoPreviewFile = file;
+    photoPreviewUrl = null;
+    thumb.style.display = '';
+    try {
+      photoPreviewUrl = URL.createObjectURL(file);
+      thumb.onerror = function() { thumb.style.display = 'none'; }; // keep the text confirmation even if a preview can't render
+      thumb.src = photoPreviewUrl;
+    } catch (e) { thumb.style.display = 'none'; }
+  }
+  document.getElementById('photoStatusSub').textContent = doorstep
+    ? 'Doorstep photo ready. Uploads when you tap Submit'
+    : 'Uploads when you tap Submit';
+  box.hidden = false;
+}
+
+// Called after any Doorstep-related tap. Opens the camera/picker straight away only
+// when Doorstep itself was just turned ON and no photo is attached yet - tapping some
+// other sub-choice (Mailroom etc.) or re-toggling with a photo already attached must
+// not re-prompt.
+function onDoorstepToggled(turnedOn) {
+  var input = document.getElementById('fPhoto');
+  var hadPhoto = !!(input.files && input.files.length);
+  refreshPhotoUI();
+  if (turnedOn && isDoorstepSelected() && !hadPhoto) {
+    if (!isIOS) input.setAttribute('capture', 'environment');
+    input.click();
+  }
+}
+
+// After a successful submit: say what actually happened to the photo. "Saved" is only
+// claimed when the server confirmed it stored the photo.
+function showSuccessPhotoStatus(sentPhoto, resData) {
+  var el = document.getElementById('successPhoto');
+  if (!sentPhoto || !resData) { el.hidden = true; return; }
+  if (resData.has_photo === false) {
+    el.textContent = '\u26A0 Delivery saved, but the photo did not upload. Please let dispatch know.';
+    el.style.color = 'var(--warm)';
+  } else if (resData.has_photo === true) {
+    el.textContent = '\uD83D\uDCF7 Photo saved';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '\uD83D\uDCF7 Photo sent with this delivery';
+    el.style.color = 'var(--ink-soft)';
+  }
+  el.hidden = false;
+}
+
+// One listener covers every way a photo can arrive: the Doorstep auto-prompt, Take Photo,
+// Choose from Gallery, and the iPhone picker all end in a change event on this input.
+document.getElementById('fPhoto').addEventListener('change', refreshPhotoUI);
+document.getElementById('photoRemoveBtn').addEventListener('click', function() {
+  document.getElementById('fPhoto').value = '';
+  refreshPhotoUI();
+});
 
 function compressPhotoToBase64(file) {
   // EXIF orientation correction is iOS-only: Android photos were working
@@ -1069,7 +1200,7 @@ async function submitDelivery() {
   if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; return; }
   if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; return; }
   var photoFile = document.getElementById('fPhoto').files[0];
-  var doorstepSelected = !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+  var doorstepSelected = isDoorstepSelected();
   if (doorstepSelected && !photoFile) {
     errEl.textContent = 'Photo required for Doorstep delivery. Please take a photo.';
     errEl.hidden = false;
@@ -1145,14 +1276,7 @@ async function submitDelivery() {
     event_type: eventType || '',
     underlying_zone: pay.isEventOverride ? pay.baseZone : '',
     delivery_type: deliveryType,
-    delivery_status: (function() {
-      var statuses = selectedStatuses.slice();
-      document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
-      document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
-      var rd = document.getElementById('fRedirectDetail').value.trim();
-      if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
-      return statuses;
-    })(),
+    delivery_status: collectDeliveryStatuses(),
     delivery_time: document.getElementById('fTime').value,
     accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
     neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
@@ -1175,6 +1299,7 @@ async function submitDelivery() {
     if (resData.queued) {
       clearDraft();
       await fulfillStop(null);
+      showSuccessPhotoStatus(null, null); // can't confirm what an offline queue does with a photo, so say nothing
       document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
       document.getElementById('app').hidden = true;
       document.getElementById('successScreen').hidden = false;
@@ -1183,6 +1308,7 @@ async function submitDelivery() {
     if (!res.ok) throw new Error('Status ' + res.status);
     clearDraft();
     await fulfillStop(resData.order_id);
+    showSuccessPhotoStatus(photoBase64, resData);
     document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
     document.getElementById('app').hidden = true;
     document.getElementById('successScreen').hidden = false;
@@ -1255,6 +1381,7 @@ async function init() {
       document.getElementById('zoneResult').hidden = true;
       document.getElementById('zoneManual').hidden = true;
       document.getElementById('payPreview').hidden = true;
+      refreshPhotoUI(); // the red "photo required" note must follow the tab you are now on
     });
 
     document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
@@ -1280,24 +1407,20 @@ async function init() {
         document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
         document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
         document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+        refreshPhotoUI();
       });
     });
 
     document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         this.classList.toggle('selected');
-       var doorstepSelected = document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
-        document.getElementById('photoLabel').textContent = doorstepSelected ? 'Photo (required)' : 'Photo (optional)';
-        document.getElementById('photoRequired').hidden = !doorstepSelected;
-        if (doorstepSelected) {
-          var photoInput = document.getElementById('fPhoto');
-          photoInput.setAttribute('required', 'required');
-          if (!isIOS) photoInput.setAttribute('capture', 'environment');
-          photoInput.click();
-        } else {
-          document.getElementById('fPhoto').removeAttribute('required');
-        }
+        onDoorstepToggled(this.dataset.sub === 'Doorstep' && this.classList.contains('selected'));
       });
+    });
+
+    document.getElementById('wsDoorstepBtn').addEventListener('click', function() {
+      this.classList.toggle('selected');
+      onDoorstepToggled(this.classList.contains('selected'));
     });
 
     document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
