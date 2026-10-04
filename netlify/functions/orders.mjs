@@ -325,7 +325,10 @@ export default async (req) => {
           await store.setJSON(orderId, order);
         }
       }
-      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
+      // has_photo reports whether the photo was actually stored (it is downgraded to
+      // false above if the photo write failed), so the driver form can tell the driver
+      // the truth instead of assuming the photo made it.
+      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
    }
