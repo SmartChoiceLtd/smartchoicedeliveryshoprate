@@ -233,7 +233,10 @@ async function geocode(address, key, biasLat, biasLng) {
     formatted: r.formatted_address,
     types: r.types || [],
     neighborhood: neighborhoodComponent ? neighborhoodComponent.long_name : null,
-    locality: localityComponent ? localityComponent.long_name : null
+    locality: localityComponent ? localityComponent.long_name : null,
+    components: components.map(c => ({ types: c.types || [], name: c.long_name })),
+    locationType: r.geometry.location_type || null,
+    partialMatch: !!r.partial_match
   };
 }
 
@@ -246,25 +249,49 @@ async function getDrivingKm(originLat, originLng, destLat, destLng, key) {
   return el.distance.value / 1000;
 }
 
-// This file is a renamed duplicate of suggest-zone.mjs, created 2026-09-20
-// as a workaround for an unresolved Netlify infrastructure issue: the
-// original file's deployed/served output stopped reflecting genuine,
-// verified-correct source changes, confirmed via direct GitHub raw-file
-// checks, deploy-specific dedicated URLs, full cache-cleared rebuilds,
-// and testing from multiple networks. Escalated to Netlify support,
-// awaiting response. This new path/filename has no stale build state to
-// inherit, sidestepping the issue rather than waiting on it. Once
-// Netlify confirms/resolves the original issue, this can be renamed back
-// or the old file retired - whichever is cleaner at that point.
+// History: this is a copy of suggest-zone.mjs under a new route, created
+// 2026-09-20 when /api/suggest-zone kept returning an old build. The real cause
+// turned out to be a different file in the repo (manifest.mjs) that had an old copy
+// of this code pasted into it and claimed the same route - not a Netlify fault.
+// Every route must be claimed by exactly ONE function file. Nothing calls the
+// original /api/suggest-zone any more, so suggest-zone.mjs can be retired.
+
+// The business defines each out-of-town zone as a centre point and a radius
+// (OUT_OF_TOWN_ZONES). These helpers find which of a chosen group of those zones
+// contain a point, nearest centre winning.
+function nearestZoneContaining(lat, lng, codes) {
+  let best = null, bestDist = Infinity;
+  for (const zone of OUT_OF_TOWN_ZONES) {
+    if (!codes.includes(zone.code)) continue;
+    const d = haversineKm({ lat, lng }, { lat: zone.lat, lng: zone.lng });
+    if (d <= zone.radiusKm && d < bestDist) { best = zone; bestDist = d; }
+  }
+  return best ? { zone: best, dist: bestDist } : null;
+}
+
+// Towns that sit in the east corridor that the RVS/RVN rule below covers. They have
+// their own codes and rates, so they must be checked BEFORE that rule - otherwise the
+// rule claims every one of their addresses as Rocky View County.
+const EAST_TOWNS = ['CHE', 'LAN'];
+const EAST_TOWN_BY_LOCALITY = { 'CHESTERMERE': 'CHE', 'LANGDON': 'LAN' };
+
+// West / rural-residential zones. Google labels many acreage addresses out here with
+// "Calgary" as the city (it's their mailing city) even though they are outside the
+// city limits. For these zones only STRONG evidence of being in the city counts
+// (inside the real boundary, or inside an official community); Google's locality
+// alone does not. Deliberately limited to the west and far zones: on the other edges
+// of the city, genuinely-Calgary new communities missing from the 2016 map rely on
+// that locality signal and must keep it.
+const WEST_RURAL = ['EVA', 'SBK', 'BPW', 'PRI', 'BRG', 'COC'];
 
 function json(data, status = 200) {
-  return new Response(JSON.stringify({ ...data, _build: 'rvs-rvn-radius-removed-2026-09-12' }), {
+  return new Response(JSON.stringify({ ...data, _build: 'towns-before-corridor-rural-strong-city-2026-10-04' }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
 }
 
-export default async (req) => {
+async function handle(req) {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
   }
@@ -366,6 +393,28 @@ export default async (req) => {
       community });
   }
 
+  // Chestermere and Langdon: their own zones, checked before the RVS/RVN corridor
+  // rule below (which previously claimed all of their addresses).
+  if (!isLikelyInCalgary(lat, lng) && !resolvedCommunity) {
+    let eastTown = nearestZoneContaining(lat, lng, EAST_TOWNS);
+    const byLocality = locality && EAST_TOWN_BY_LOCALITY[locality.toUpperCase()];
+    if (!eastTown && byLocality) {
+      const z = OUT_OF_TOWN_ZONES.find(zz => zz.code === byLocality);
+      eastTown = { zone: z, dist: haversineKm({ lat, lng }, { lat: z.lat, lng: z.lng }) };
+    }
+    if (eastTown) {
+      return json({
+        suggested: eastTown.zone.code,
+        confidence: eastTown.dist < eastTown.zone.radiusKm * 0.6 ? 'high' : 'medium',
+        message: `Matched to ${eastTown.zone.name} (${eastTown.zone.code})`,
+        formatted_address: formatted,
+        distance_to_zone_km: Math.round(eastTown.dist * 10) / 10,
+        community: eastTown.zone.name,
+        _debug_neighborhood: neighborhood, _debug_locality: locality, _debug_resolved_community: resolvedCommunity
+      });
+    }
+  }
+
   // RVS/RVN geographic corridor — east of Stoney Trail, outside Calgary.
   // Trans-Canada (lat ~51.055) divides RVN (north) from RVS (south).
   // isLikelyInCalgary() is the primary gate here (a point must be
@@ -401,6 +450,24 @@ export default async (req) => {
   // says this address is in Calgary specifically - this catches
   // communities not in any named list at all (e.g. Copperfield) and isn't
   // dependent on any static dataset being complete for newer streets.
+  // West / rural-residential zones: Google's "Calgary" locality is not enough on its
+  // own out here (see WEST_RURAL above). Outside the real boundary and outside every
+  // official community, the zone the business defined for the area wins.
+  if (!isLikelyInCalgary(lat, lng) && !resolvedCommunity) {
+    const westRural = nearestZoneContaining(lat, lng, WEST_RURAL);
+    if (westRural) {
+      return json({
+        suggested: westRural.zone.code,
+        confidence: westRural.dist < westRural.zone.radiusKm * 0.6 ? 'high' : 'medium',
+        message: `Matched to ${westRural.zone.name} (${westRural.zone.code})`,
+        formatted_address: formatted,
+        distance_to_zone_km: Math.round(westRural.dist * 10) / 10,
+        community: westRural.zone.name,
+        _debug_neighborhood: neighborhood, _debug_locality: locality, _debug_resolved_community: resolvedCommunity
+      });
+    }
+  }
+
   const isInCalgaryPerGoogle = locality && locality.toUpperCase() === 'CALGARY';
   if (isLikelyInCalgary(lat, lng) || resolvedCommunity || isInCalgaryPerGoogle) {
     const community = resolvedCommunity || neighborhood;
@@ -479,6 +546,39 @@ export default async (req) => {
     formatted_address: formatted,
     straight_line_km: Math.round(straightKm)
   });
+};
+
+// Adding &debug=1 to a request returns the normal answer plus the raw signals the
+// decision was based on (where Google put the point, what it called the area, which
+// zone circles contain it), so a surprising result can be explained instead of guessed at.
+export default async (req) => {
+  const res = await handle(req);
+  const url = new URL(req.url);
+  if (url.searchParams.get('debug') !== '1') return res;
+  try {
+    const key = process.env.GOOGLE_MAPS_KEY;
+    const address = url.searchParams.get('address');
+    const shopLat = parseFloat(url.searchParams.get('shop_lat') || SHOP_FALLBACK_LAT);
+    const shopLng = parseFloat(url.searchParams.get('shop_lng') || SHOP_FALLBACK_LNG);
+    const answer = await res.clone().json();
+    const g = key && address ? await geocode(address, key, shopLat, shopLng) : null;
+    if (!g) return res;
+    const resolved = await findCommunityName(g.lat, g.lng);
+    const circles = OUT_OF_TOWN_ZONES
+      .map(z => ({ code: z.code, km_from_centre: Math.round(haversineKm({ lat: g.lat, lng: g.lng }, { lat: z.lat, lng: z.lng }) * 10) / 10, radius_km: z.radiusKm }))
+      .filter(c => c.km_from_centre <= c.radius_km);
+    return new Response(JSON.stringify({ ...answer, _signals: {
+      lat: g.lat, lng: g.lng, location_type: g.locationType, partial_match: g.partialMatch,
+      google_locality: g.locality, google_neighborhood: g.neighborhood,
+      google_components: g.components,
+      inside_city_boundary: isLikelyInCalgary(g.lat, g.lng),
+      inside_community_polygon: resolved,
+      in_east_corridor_longitude: g.lng > -113.90 && g.lng < -113.600,
+      zone_circles_containing_point: circles
+    } }, null, 2), { status: 200, headers: { 'content-type': 'application/json' } });
+  } catch (e) {
+    return res;
+  }
 };
 
 export const config = { path: '/api/suggest-zone-v2' };
