@@ -396,13 +396,24 @@ method: 'PUT',
 headers: { 'content-type': 'application/json' },
 body: JSON.stringify({ zone_code: newZone, zone_source: 'override', zone_override_note: note, zone_conflict: false, total_pieces: pieces, shop_code: shopCode, name: name, address: address, formatted_address: address })
 }).then(function(res) {
-if (!res.ok) throw new Error('Status ' + res.status);
+if (!res.ok) {
+  // Show the server's own explanation (e.g. "could not look up the shop name") rather than a bare status code.
+  return res.json().catch(function() { return {}; }).then(function(b) { throw new Error(b.error || ('Status ' + res.status)); });
+}
 return res.json();
 }).then(function(updated) {
 var idx = allOrders.findIndex(function(o){ return o.id === currentOverrideId; });
+var before = idx >= 0 ? allOrders[idx] : null;
 if (idx >= 0) allOrders[idx] = updated;
 document.getElementById('overrideModal').hidden = true;
 applyFilters();
+// The server fills in the shop name from the code. If the code matches no shop or
+// wholesaler it blanks the name (rather than keep the old shop's) - say so, so a typo
+// doesn't pass unnoticed.
+var codeChanged = before && String(before.shop_code || '').toUpperCase() !== String(updated.shop_code || '').toUpperCase();
+if (codeChanged && updated.shop_code && updated.shop_full === '') {
+  alert('Saved. No shop or wholesaler uses the code "' + updated.shop_code + '", so the shop name was left blank. If that is a typo, open Override again to fix it.');
+}
 }).catch(function(e) { alert('Could not save: ' + e.message); })
 .finally(function() { btn.disabled = false; btn.textContent = 'Save'; });
 });
