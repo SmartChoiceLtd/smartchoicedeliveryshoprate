@@ -30,6 +30,38 @@ Respond with ONLY a raw JSON object, no markdown formatting, no code fences, no 
 If a field is not legible or not present on the tag, use an empty string "" for that field rather than guessing or making up a value. Never fabricate information that isn't actually visible on the tag.`;
 }
 
+// Which model reads the tag. PRIMARY is the accuracy upgrade over the smaller model that
+// was running before. FALLBACK is that proven smaller model, used ONLY if the API rejects
+// the primary model's name/access (a configuration problem) so a wrong model name can never
+// stop scanning outright. Temporary errors (busy, rate limited) are NOT fallen back on -
+// silently switching to the weaker model would hide a drop in accuracy; the driver just retries.
+const PRIMARY_MODEL = 'claude-sonnet-5-5';
+const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
+
+function callVision(model, apiKey, mediaType, base64Data, prompt) {
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
+            { type: 'text', text: prompt }
+          ]
+        }
+      ]
+    })
+  });
+}
+
 export default async (req) => {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
@@ -63,27 +95,17 @@ export default async (req) => {
   const base64Data = match[2];
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
-              { type: 'text', text: buildExtractionPrompt(body.shops) }
-            ]
-          }
-        ]
-      })
-    });
+    const prompt = buildExtractionPrompt(body.shops);
+    let modelUsed = PRIMARY_MODEL;
+    let res = await callVision(PRIMARY_MODEL, apiKey, mediaType, base64Data, prompt);
+    if (!res.ok && (res.status === 404 || res.status === 400)) {
+      const rejection = await res.clone().text().catch(() => '');
+      if (/model/i.test(rejection)) {
+        console.error('scan-tag: ' + PRIMARY_MODEL + ' was rejected (' + res.status + '), using ' + FALLBACK_MODEL + ' instead:', rejection.slice(0, 300));
+        modelUsed = FALLBACK_MODEL;
+        res = await callVision(FALLBACK_MODEL, apiKey, mediaType, base64Data, prompt);
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
@@ -111,7 +133,8 @@ export default async (req) => {
       name: extracted.name || '',
       address: extracted.address || '',
       shop_name: extracted.shop_name || '',
-      shop_code: (extracted.shop_code || '').toUpperCase()
+      shop_code: (extracted.shop_code || '').toUpperCase(),
+      model_used: modelUsed
     });
   } catch (e) {
     return json({ error: 'Could not process tag: ' + e.message }, 500);
