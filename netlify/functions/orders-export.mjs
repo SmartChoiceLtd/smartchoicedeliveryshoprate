@@ -65,8 +65,25 @@ async function getOrdersForWeek(store, weekEnd) {
   });
 }
 
+// Same session check the reports and order-detail endpoints use: a valid,
+// unexpired login cookie is required. This export contains every customer
+// name, address and pay figure, so it must not be reachable by URL alone.
+async function requireAuth(req) {
+  const cookieHeader = req.headers.get('cookie') || '';
+  const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+  if (!match) return null;
+  const sessionsStore = getStore('flower-sessions');
+  const session = await sessionsStore.get(match[1], { type: 'json' });
+  if (!session || new Date(session.expires_at) < new Date()) return null;
+  return session.username;
+}
+
 export default async (req) => {
   try {
+    const username = await requireAuth(req);
+    if (!username) {
+      return new Response('Not authenticated. Please sign in at /login.html and try again.', { status: 401, headers: { 'content-type': 'text/plain' } });
+    }
     const store = getStore('flower-orders');
     const url = new URL(req.url);
     const format = url.searchParams.get('format') || 'detail';
