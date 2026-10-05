@@ -1,336 +1,315 @@
 import { getStore } from '@netlify/blobs';
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json' }
-  });
+function csvEscape(val) {
+  if (val === null || val === undefined) return '';
+  var str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) return `"${str.replace(/"/g, '""')}"`;
+  return str;
+}
+function toCSVRow(fields) { return fields.map(csvEscape).join(','); }
+
+var QB_ZONE_MAP = {
+  AIR:  { product:'OUT OF TOWN:AIR',          desc:'AIRDRIE $25 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  BAK1: { product:'BAKERY:BAK1',              desc:'BAK1 CITY BASIC $15  1 PKG  OR AS QUOTED' },
+  BAK2: { product:'BAKERY:BAK2',              desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' },
+  BAKP: { product:'BAKERY:BAKP',              desc:'BAKERY $15 OR AS QUOTED FOR MULTIPLE PKGS AND EVENTS' },
+  BAL:  { product:'OUT OF TOWN:BAL',          desc:'BALZAC $22 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  BAS:  { product:'GIFT BASKETS:BAS',         desc:'GIFT BASKETS IN CITY $13/1 PIECE + $2.50 EACH EXTRA PIECE OR AS QUOTED' },
+  BEI:  { product:'OUT OF TOWN:BEI',          desc:'BEISEKER $50' },
+  BLK:  { product:'OUT OF TOWN:BLK',          desc:'BLACK DIAMOND $35 BASE RATE' },
+  BNF:  { product:'OUT OF TOWN:BNF',          desc:'BANFF BASE RATE' },
+  BPW:  { product:'OUT OF TOWN:BPW',          desc:'BEARSPAW COUNTRY ESTATES $25' },
+  BRG:  { product:'OUT OF TOWN:BRG',          desc:'BRAGG CREEK $35' },
+  BTY:  { product:'BEAUTY PRODUCTS:BTY',      desc:'BEAUTY PRODUCTS $15/1 PIECE +$1 PER EXTRA PIECE' },
+  C1:   { product:'CITY WIDE:C1',             desc:'CITY WIDE SHOP SPECIFIC $11 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C2:   { product:'CITY WIDE:C2',             desc:'CITY WIDE $12 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C3:   { product:'CITY WIDE:C3',             desc:'CITY WIDE $13 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C4:   { product:'CITY WIDE:C4',             desc:'CITY WIDE SHOP SPECIFIC $14 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  C5:   { product:'CITY WIDE:C5',             desc:'CITY WIDE SHOP SPECIFIC $15 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  CAN:  { product:'OUT OF TOWN:CAN',          desc:'CANMORE $80' },
+  CAR:  { product:'OUT OF TOWN:CAR',          desc:'OUT OF TOWN CARSLAND BASE $60' },
+  CHE:  { product:'OUT OF TOWN:CHE',          desc:'CHESTERMERE $25/1 PCE + $3 PER EXTRA PIECE' },
+  COC:  { product:'OUT OF TOWN:COC',          desc:'COCHRANE $30' },
+  COR:  { product:'CORPORATE:COR',            desc:'PICK UP DELIVERY AND RETURN OF CORPORATE' },
+  CRO:  { product:'OUT OF TOWN:CRO',          desc:'CROSSFIELD $45' },
+  DEW:  { product:'OUT OF TOWN:DEW',          desc:'DEWINTON $22' },
+  DOC:  { product:'DOCUMENTS:DOC',            desc:'DOCUMENT SERVICE PICK UP & DELIVERY $18 OR AS QUOTED' },
+  DVA:  { product:'OUT OF TOWN:DVA',          desc:'DIAMOND VALLEY $50 BASE RATE' },
+  ERV:  { product:'OUT OF TOWN:ERV',          desc:'ELBOW RIVER ESTATES $22' },
+  EVA:  { product:'OUT OF TOWN:EVA',          desc:'ELBOW VALLEY $22' },
+  FUN:  { product:'SPECIAL EVENTS:FUN',       desc:'FUNERAL $15/1 PIECE + $3/EACH EXTRA PIECE' },
+  FUNO: { product:'SPECIAL EVENTS:FUNO',      desc:'FUNERAL OUT OF TOWN $25 +$3 EACH ADDITIONAL PIECE' },
+  HOT:  { product:'CITY WIDE:HOT',            desc:'HOT SHOT RATE $25 IN ADDITION TO BASE RATE / OR AS QUOTED' },
+  HPT:  { product:'OUT OF TOWN:HPT',          desc:'HERITAGE POINT $20' },
+  HRV:  { product:'OUT OF TOWN:HRV',          desc:'HIGH RIVER $40' },
+  KAN:  { product:'OUT OF TOWN:KAN',          desc:'KANANASKIS $50' },
+  LAN:  { product:'OUT OF TOWN:LAN',          desc:'LANGDON $30' },
+  LYA:  { product:'OUT OF TOWN:LYA',          desc:'LYALTA $38' },
+  MDF:  { product:'OUT OF TOWN:MDF',          desc:'MD FOOTHILLS DEWINTON' },
+  MIL:  { product:'OUT OF TOWN:MIL',          desc:'MILLARVILLE $45 BASE RATE' },
+  NAN:  { product:'OUT OF TOWN:NAN',          desc:'NANTON $65' },
+  NCH:  { product:'NCH',                      desc:'NO CHARGE' },
+  OKO:  { product:'OUT OF TOWN:OKO',          desc:'OKOTOKS $25' },
+  PRI:  { product:'OUT OF TOWN:PRI',          desc:'PRIDDIS $30' },
+  RVS:  { product:'OUT OF TOWN:RVS',          desc:'ROCKY VIEW COUNTY SW SE $23' },
+  RVN: { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NORTH $25' },          
+  SBK:  { product:'OUT OF TOWN:SBK',          desc:'SPRINGBANK $25' },
+  SC2:  { product:'SMARTCHOICE DELIVERY:SC2', desc:'SMART CHOICE DELIVERY SC2' },
+  SC3:  { product:'SMARTCHOICE DELIVERY:SC3', desc:'SMART CHOICE DELIVERY SC3' },
+  SET:  { product:'SPECIAL EVENTS:SET',       desc:'EVENT SET UP $35/HR/PERSON or any part thereof' },
+  SPEC: { product:'SPECIAL EVENTS:SPEC',      desc:'SPECIAL EVENTS $25 +$5 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  SPL:  { product:'SEASONAL PLANTERS:SPL',    desc:'SEASONAL PLANTERS $20 PLUS $5 EACH ADDITIONAL' },
+  SPO:  { product:'SEASONAL PLANTERS:SPO',    desc:'SEASONAL PLANTERS OUT OF TOWN: $25 OR AS QUOTED' },
+  STR:  { product:'OUT OF TOWN:STR',          desc:'STRATHMORE $35' },
+  TSA: { product:'OUT OF TOWN:TSA', desc:'TSUU TINA ADJACENT - ALPINE PARK DISTRICT $23' },
+  TSU:  { product:'OUT OF TOWN:TSU',          desc:'TSUU TSIINA' },
+  TVA:  { product:'OUT OF TOWN:TVA',          desc:'TURNER VALLEY $50' },
+  WAI:  { product:'WHOLESALE:WAI',            desc:'WHOLESALE PICK UP AIRDRIE $25 + $1.5 PER EXTRA CASE' },
+  WCH:  { product:'WHOLESALE:WCH',            desc:'WHOLESALE PICK UP CHESTERMERE $25 + $1.5 PER EXTRA CASE' },
+  WCO:  { product:'WHOLESALE:WCO',            desc:'WHOLESALE PICK UP COCHRANE $30 +$1.5 PER EXTRA CASE' },
+  WED:  { product:'SPECIAL EVENTS:WED',       desc:'WEDDING IN CITY $25 BASE + $5/EACH ADDITIONAL PIECE' },
+  WEDO: { product:'SPECIAL EVENTS:WEDO',      desc:'WEDDING OUT OF TOWN BASE RATE PLUS $5 PER EXTRA PCE / OR AS QUOTED' },
+  WHR:  { product:'WHOLESALE:WHR',            desc:'WHOLESALE PICK UP HIGH RIVER $40 BASE+ $1.5 PER EXTRA CASE' },
+  WLO:  { product:'WHOLESALE:WLO',            desc:'WHOLESALE PICK UP LONGVIEW $60 + $1.5 PER EXTRA CASE' },
+  WLY:  { product:'WHOLESALE:WLY',            desc:'OUT OF TOWN WHOLESALE - LYALTA BASE RATE $38 PLUS $1.5 FOR EACH ADDITIONAL CASE' },
+  WPH:  { product:'WHOLESALE:WPH',            desc:'WHOLESALE PICK UP AIRPORT $15 + $1 PER EXTRA CASE' },
+  WPO:  { product:'WHOLESALE:WPO',            desc:'WHOLESALE PICK UP OKOTOKS $25 + $1.5 EXTRA CASE' },
+  WPU:  { product:'WHOLESALE:WPU',            desc:'WHOLESALE PICK UP $15 + $1.5 EXTRA CASE +SEASONAL GREENS $1.5 PER EXTRA CASE' },
+  WST:  { product:'WHOLESALE:WST',            desc:'WHOLESALE PICK UP STRATHMORE $38 + $1.5 PER EXTRA CASE' },
+  WTV:  { product:'WHOLESALE:WTV',            desc:'WHOLESALE PICK UP TURNER VALLEY $50 + $1.5 PER EXTRA CASE' },
+  WBR:  { product:'WHOLESALE:WBR',            desc:'WHOLESALE PICK UP BRAGG CREEK $40 + $1.5 PER EXTRA CASE' },
+};
+
+var QB_CUSTOMERS = {
+  AC:'GROWER DIRECT ACADIA', AF:'AL FRACHE FLOWERS LTD', AL:"ALLAN'S FLOWERS",
+  ALP:'ALPINE BLOOMS', AM:'AMAZING FLORAL WHOLESALE LTD', AMB:'Amborella Floral Studio Inc',
+  AV:'AVENIDA FLOWERS', B9:'BLOOMS ON 9TH',
+  BA:'BERNARD ANDERSON', BAD:'BLOOMS & DESIGN', BBB:'BLOOM BY BUNCHES',
+  BB:'BB BASKETS  INC',BE:'BLACK EARTH', BEN:'BENJI BLOOMS', BK:'BASKETS & BEYOND',
+  BOP:'BIRD OF PARADISE FLORAL STUDIO', BQ:'BRIE & BANQUET', BV:'BONAVISTA FLOWERS',
+  BY:'BLOSSOMS YYC', CE:'CREATIVE EDGE', CF:'CLAEREN FLOWERS',
+  CH:'CASHYN HOMES', CK:'CHICKWEED FLORALS', CLF:'CALGARY LOCAL FLORIST',
+  CLW:'CUSTOM LASER WORKS', CN:'CREATIONS BY NAZIA', CW:"CHARLOTTE'S WEB",
+  DA:'DAHLIA', DB:'Durand Bridal and Formal Wear', DC:'DIVINE FLORAL YYC',
+  DE:'DEEVINE', DF:'DAHLIA FLOWERS', DO:'DESIGNING ON THE EDGE', DV:'DEER VALLEY FLORIST',
+  FN:'FLOWER AURA BY NATASHA', FA:'FLOWER ARTISTRY', FB:'FLOWERS & BEYOND',
+  FCU:'FLOWER CULTURE', FC:'FLOWER CENTER', FHY:'FLORAL HAVEN YYC',
+  FI:'Finesse Flowers Inc.', FJ:'flowers by JANIE', FLO:'DEYAR FLOART STUDIO',
+  FL:'FLEURISH', FM:'FLOWER MAGIC', FO:'FORGET ME NOT FLOWERS',
+  FPA:'FUNKY PETALS AIRDRIE', FPK:'FUNKY PETALS KENSINGTON', FS:'FLORISTS SUPPLY',
+  FV:'FOXGLOVE STUDIO', FW:'FLOWER WHISPERS', FX:'FLOWER CHIX',
+  GF:'GARDENIA FLOWERS', GR:'GYPSY ROSE', HB:'HOUSE OF BLOOMS',
+  HC:'LAURIE DAVIDGE', HH:'HOLLAND HOUSE FLOWERS', HP:'Hawthorn Plains',
+  IF:'INCREDIBLE FLORIST GROUP', IT:'ITINERANTE FLOWERS', KF:'KENSINGTON FLORIST MK',
+  LB:'LAUREN BELL', LM:'LA MAISON FLOWER STUDIO', MA:'MANDALA FLORAL INC',
+  MB:'MBS CANADA', MFM:'MARLOW FLORAL WORKS MISSION', MFS:'MARLOW FLORAL WORKS SOUTH CENTRE',
+  MM:'MICHELE MASTERSON BOTANICAL DESIGN', MR:'MAY ROSE FLORIST', MY:'MY FLORIST',
+  MZ:'MENZIES', NB:'NUTRITION & BEYOND', NR:'NECTARE & ROOT',
+  NW:'Northwest Florist Ltd.', OA:'OASIS FLOWER SHOP', OF:'OKOTOKS FLOWERS',
+  OR:'OLIVER REAL ESTATE INC', OT:'Orso Trades Inc', PA:'PANDA 130',
+  PCA:'PANDA CANADA', PCO:'PANDA COCHRANE', PCR:'TOUCH OF PETALS/PANDA CROWFOOT',
+  PD:'POSH DESIGNS', PO:'PURPLE ORCHID', PS:'PRETTY SWEET',
+  PSU:'PANDA SUNRIDGE', QF:'QFRESH LOGISTICS', SB:'SBe Wholesale Flowers',
+  SCV:'SWEET CAKES BY VERNZ', SF:'SMALL FLOWER BOUTIQUE', SK:'SK FLORIST',
+  SR:'SWEET ROOTS STUDIO', SRS:'SWEET ROOTS STUDIO', SV:'Savannah Flowers Corp',
+  SW:'SWEET WILLIAMS CO', SZ:'STEMZ FLORIST & TREASURES', TD:'TRIMS & DREAMS',
+  TF:'THALEA FLOWERS', TH:'TREEHOUSE', TNX:'TNX TROPICAL',
+  TP:'TOUCH OF PETALS', TW:'TWIGS & COMPANY', UR:'Urban Roots Home',
+  VA:'VAVA BLOOM', VC:'VIOvar & CO', VCW:'VILLAGE CRAFT WINEMAKER',
+  VT:'VINTAGE THISTLE STETTLER', WA:'WILD ABOUT FLOWERS',
+  WF:'WILDFLOWERS AT KENSINGTON', WFW:'WEAVER FLORAL WHOLESALE', WO:'WILD ORCHID',
+  YA:'YARA FLOWERS LTD', YR:'YRENE RAMIREZ',
+};
+
+function formatDateQB(d) {
+  var dd = String(d.getDate()).padStart(2,'0');
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
 }
 
-// Map Zoho's "Shop (with Group Name)" to shop code
-// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
-function extractShopCode(shopWithGroup) {
-  if (!shopWithGroup) return null;
-  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+function getWeekDates(weekEndStr) {
+  var end = new Date(weekEndStr + 'T23:59:59');
+  var start = new Date(weekEndStr + 'T00:00:00');
+  start.setDate(end.getDate() - 6);
+  return { start, end };
 }
 
-// Map Zoho's "Zone (with Group Name)" to zone code
-// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
-function extractZoneCode(zoneWithGroup) {
-  if (!zoneWithGroup) return null;
-  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
-}
-
-// Determine if zone needs auto-calculation
-function needsZoneCalculation(zoneCode) {
-  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
-  return false;
-}
-
-// Event-type pricing codes from driver.html's Event Type overlay (Special
-// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
-// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
-// are tracked under their own code. None of them should ever be
-// re-suggested or overwritten by the address-based zone matcher below.
-const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
-function isEventZoneCode(zoneCode) {
-  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
-}
-
-// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
-// the given date. Embedded directly in each order's storage key so a
-// specific week's orders can be found via a fast, server-side prefix
-// filter on .list() instead of fetching and filtering every order ever
-// created - which became a real bottleneck once the store grew into the
-// thousands of records.
-// Normalizes the date formats an order can arrive with to YYYY-MM-DD.
-// Driver-form orders send ISO dates, but the Zoho webhook sends
-// DD-Mon-YYYY (or D/M/YYYY) - the same formats reports.mjs and orders.html
-// already parse. Without this, those orders' week key came out wrong.
-// Returns null if the format isn't recognized.
-function normalizeOrderDate(raw) {
-  if (!raw) return null;
-  const s = String(raw).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
-  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
-  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-  return null;
-}
-
-function weekEndingSunday(dateStr) {
-  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
-  // An unparseable date must still land on a real Sunday - previously this
-  // returned today's date as-is, which is almost never a Sunday, so the
-  // order got filed under a week key that no weekly report or pay run
-  // would ever look up.
-  if (!d || isNaN(d.getTime())) d = new Date();
-  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const daysToSunday = day === 0 ? 0 : 7 - day;
-  d.setDate(d.getDate() + daysToSunday);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-async function suggestZone(address, shopLat, shopLng, key) {
-  try {
-    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
-    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone-v2?${params}`);
-    if (!res.ok) return null;
-    return res.json();
-  } catch (e) {
-    return null;
-  }
-}
-
-async function getShopLocation(shopCode) {
-  try {
-    const store = getStore('flower-shops');
-    const { blobs } = await store.list();
-    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
-    const match = shops.filter(Boolean).find(s =>
-      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
-    );
-    return match ? { lat: match.lat, lng: match.lng } : null;
-  } catch (e) {
-    return null;
-  }
+// Same session check the reports, order-detail and export endpoints use.
+// This file builds the QuickBooks invoice CSV - billing amounts for every
+// shop - so it must not be reachable by URL alone.
+async function requireAuth(req) {
+  var cookieHeader = req.headers.get('cookie') || '';
+  var match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+  if (!match) return null;
+  var sessionsStore = getStore('flower-sessions');
+  var session = await sessionsStore.get(match[1], { type: 'json' });
+  if (!session || new Date(session.expires_at) < new Date()) return null;
+  return session.username;
 }
 
 export default async (req) => {
-  // Handle GET — list all orders. NOT auth-gated: this is shared with
-  // driver-summary.html (driver-facing, no login system at all) in
-  // addition to orders.html's dashboard - same category as shops.mjs/
-  // rates.mjs/stops.mjs, which were deliberately left open for the same
-  // reason. Protecting the dashboard relies on its page-level login
-  // redirect instead of blocking this endpoint outright.
-  if (req.method === 'GET') {
-    try {
-      const store = getStore('flower-orders');
-      const url = new URL(req.url);
-      const limitParam = parseInt(url.searchParams.get('limit') || '500');
-      const { blobs } = await store.list();
-      const orders = await Promise.all(
-        blobs.slice(-Math.min(limitParam, 1000)).map(b => store.get(b.key, { type: 'json' }))
-      );
-      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
-    } catch (e) {
-      return json({ error: 'Could not load orders: ' + e.message }, 500);
+  try {
+    var username = await requireAuth(req);
+    if (!username) {
+      return new Response('Not authenticated. Please sign in at /login.html and try again.', { status: 401, headers: { 'content-type': 'text/plain' } });
     }
-  }  
-  // Handle POST — receive Zoho webhook
-  if
-   (req.method === 'POST') {
-    const key = process.env.GOOGLE_MAPS_KEY;
-    const ratesStore = getStore('flower-rates');
-    let ratesData = {};
-    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
-   let body;
-    try {
-      body = await req.json();
-    } catch (e) {
-      return json({ error: 'Invalid JSON payload' }, 400);
+    var url = new URL(req.url);
+    var weekEnd = url.searchParams.get('week_end');
+    var startInvoice = parseInt(url.searchParams.get('start_invoice') || '1');
+
+    if (!weekEnd) {
+      return new Response(JSON.stringify({ error: 'week_end parameter required (YYYY-MM-DD)' }), { status: 400 });
     }
+    // Load orders and rates
+    var ordersStore = getStore('flower-orders');
+    var ratesStore = getStore('flower-rates');
 
-      // Map Zoho field names to our internal structure
-    const raw = {
-      date:             body['Date']                     || body['date']              || null,
-      order_id:         body['Order ID']                 || body['order_id']          || null,
-      name:             body['Name']                     || body['name']              || null,
-      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
-      unit: body.unit || body['Unit'] || null,
-      time_request: body.time_request || body['Time Request'] || null,
-      rush: !!body.rush,
-      shop:             body['Shop']                     || body['shop']              || null,
-     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
-      driver:           body['Driver']                   || body['driver']            || null,
-      driver_pay: body.driver_pay || body['driver_pay'] || 0,
-     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
-      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
-      zone:             body['Zone']                     || body['zone']              || null,
-      zone_full:        body['Zone (with Group Name)']   || null,
-      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
-      delivery_time:    body['Delivery Time']            || body.delivery_time    || null,
-      contact_method:   body['Recipient Contact Method'] || body.contact_method   || null,
-      neighboured_to:   body['Neighboured To']           || body.neighboured_to   || null,
-      accepted_by:      body['Delivery Accepted By']     || body.accepted_by      || null,
-      comments:         body['Comments']                 || null,
-    };
+    var { blobs } = await ordersStore.list();
+    var allOrders = (await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })))).filter(Boolean);
 
-    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
-    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
+    // Load rate table
+    var rates = {};
+    try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
-    // Wholesale deliveries use their own separate zone system (WPU, WAI,
-    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
-    // entered directly from Zoho). Checked BEFORE zone determination below:
-    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
-    // etc, and re-running a wholesale order's address through it could
-    // silently overwrite a correct wholesale code with an unrelated retail
-    // one - the same category of bug we already fixed for event-type codes.
-    const isWholesale = (raw.delivery_type === 'wholesale') ||
-      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
+    // Default rates fallback
+    var DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:20,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
+    var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
-    // Auto-calculate zone if not entered or flagged as needing calculation
-    let zoneCode = enteredZoneCode;
-    let zoneSource = 'manual';
-    let zoneSuggestion = null;
+    // Filter by week
+ function parseOrderDate(o) {
+  var raw = o.date || o.received_at || '';
+  // Handle YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
+  // Handle DD-Mon-YYYY (e.g. 24-Jul-2026)
+  var months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  var monMatch = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
+  if (monMatch) return monMatch[3] + '-' + (months[monMatch[2]] || '01') + '-' + monMatch[1].padStart(2,'0');
+  // Handle D/M/YYYY
+  var dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) return dmyMatch[3] + '-' + dmyMatch[2].padStart(2,'0') + '-' + dmyMatch[1].padStart(2,'0');
+  return raw.slice(0,10);
+}
+var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1000).toISOString().slice(0,10);
+    var weekOrders = allOrders.filter(o => {
+  var dateStr = parseOrderDate(o);
+  return dateStr >= startStr && dateStr <= weekEnd;
+});
 
-    if (isWholesale) {
-      // Wholesale zone codes are authoritative as entered - never
-      // re-suggested against the retail address matcher. If no zone was
-      // entered at all, this needs a human to fill in rather than guessing
-      // a retail zone that doesn't apply to wholesale pricing.
-      if (enteredZoneCode) {
-        zoneCode = enteredZoneCode.toUpperCase();
-        zoneSource = 'manual';
-      } else {
-        zoneSource = 'needs_review';
-      }
-    } else if (isEventZoneCode(enteredZoneCode)) {
-      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
-      // never re-suggested/overwritten. Still look up the address for its
-      // community name (for tracking/reports), but ignore any suggested
-      // zone code that comes back with it.
-      zoneCode = enteredZoneCode.toUpperCase();
-      zoneSource = 'manual';
-      if (raw.address && key) {
-        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-        zoneSuggestion = await suggestZone(
-          raw.address,
-          shopLoc?.lat || 51.0447,
-          shopLoc?.lng || -114.0719,
-          key
-        );
-      }
-    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
-      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-      zoneSuggestion = await suggestZone(
-        raw.address,
-        shopLoc?.lat || 51.0447,
-        shopLoc?.lng || -114.0719,
-        key
-      );
-      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
-        zoneCode = zoneSuggestion.suggested;
-        zoneSource = 'auto';
-      } else {
-        zoneSource = 'needs_review';
-      }
-  } else if (enteredZoneCode) {
-      if (raw.address && key) {
-        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-        zoneSuggestion = await suggestZone(
-          raw.address,
-          shopLoc?.lat || 51.0447,
-          shopLoc?.lng || -114.0719,
-          key
-        );
-        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
-          zoneCode = zoneSuggestion.suggested;
-          zoneSource = 'auto';
-        } else {
-          zoneCode = enteredZoneCode;
-          zoneSource = 'manual';
-        }
-      } else {
-        zoneCode = enteredZoneCode;
-        zoneSource = 'manual';
-      }
-    }
-  
+    // Group by billing shop, then zone — sum shop amounts
+    var shopGroups = {};
+
+  weekOrders.forEach(o => {
+      var zone = (o.zone_code || '').toUpperCase();
+      if (!zone || zone === 'NCH' || zone === 'SC2' || zone === 'SC3') return;
+      var shopCode = (o.shop_code || '').toUpperCase().split(' ')[0];
+      if (!shopCode || shopCode === 'SCD') return;
     
-
-    // Flag if manual zone differs from suggestion
-    const zoneConflict = !isWholesale &&
-      !isEventZoneCode(enteredZoneCode) &&
-      zoneSuggestion?.suggested &&
-      enteredZoneCode &&
-      zoneSuggestion.suggested !== enteredZoneCode &&
-      zoneSuggestion.confidence === 'high';
-
-    const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
-    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const order = {
-      id: orderId,
-      received_at: new Date().toISOString(),
-      date: raw.date,
-      order_id: raw.order_id,
-      name: raw.name,
-      address: raw.address,
-      unit: raw.unit || null,
-      time_request: raw.time_request || null,
-      formatted_address: zoneSuggestion?.formatted_address || raw.address,
-      community: zoneSuggestion?.community || null,
-      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
-      shop_code: shopCode,
-      shop_full: raw.shop_full || raw.shop || null,
-      driver: raw.driver,
-      driver_pay: (function() {
-        if (raw.driver_pay) return parseFloat(raw.driver_pay);
-        const r = ratesData ? ratesData[zoneCode] : null;
-        if (!r) return 0;
-        const pieces = parseInt(raw.total_pieces || 1);
-        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
-        const base = ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && dist != null)
-          ? (r.drate || 0) + (r.perkm || 0) * dist
-          : (r.drate || 0);
-        const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
-        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium;
-      })(),
-      total_pieces: raw.total_pieces,
-      zone_entered: enteredZoneCode,
-      zone_code: zoneCode,
-      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
-      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
-      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
-      rush: !!raw.rush,
-      // Snapshot of the rate table entry actually in effect for this zone
-      // at the moment this order was created. Reports should prefer this
-      // over a live rate-table lookup - otherwise, changing a rate later
-      // would silently rewrite what an already-invoiced order says every
-      // time a shop report gets re-run, which is a real billing-integrity
-      // problem, not just a cosmetic one.
-      rate_snapshot: (ratesData && ratesData[zoneCode]) ? ratesData[zoneCode] : null,
-      // Same historical-accuracy reasoning applies to the rush premium -
-      // if HOT's rate changes later, old rush orders shouldn't silently
-      // reflect the new amount.
-      hot_rate_snapshot: (raw.rush && ratesData && ratesData['HOT']) ? ratesData['HOT'] : null,
-      delivery_status: raw.delivery_status,
-      delivery_time: raw.delivery_time,
-      contact_method: raw.contact_method,
-      neighboured_to: raw.neighboured_to,
-      accepted_by: raw.accepted_by,
-      comments: raw.comments,
-      has_photo: !!body.photo_base64,
-    };
-
-    try {
-      const store = getStore('flower-orders');
-      await store.setJSON(orderId, order);
-      // Photo is stored in a separate blob store, not embedded in the order
-      // record itself - GET /api/orders loads every order's full JSON on
-      // every page view, so embedding potentially-large photo data there
-      // would slow that down for every order, viewed or not. The photo is
-      // only fetched on-demand when someone actually wants to view it.
-      if (body.photo_base64) {
-        try {
-          const photoStore = getStore('flower-order-photos');
-          await photoStore.set(orderId, body.photo_base64);
-        } catch (e) {
-          // Order itself already saved successfully - don't fail the whole
-          // submission just because the photo couldn't be stored, but the
-          // has_photo flag above would then be misleading. Downgrade it.
-          order.has_photo = false;
-          await store.setJSON(orderId, order);
+      // For wholesale, billing_party determines who pays
+      if (o.delivery_type === 'wholesale' && o.billing_party) {
+        var bp = String(o.billing_party);
+        // If billing_party is a known shop code, use it
+        if (QB_CUSTOMERS[bp.toUpperCase()]) {
+          shopCode = bp.toUpperCase();
+        } else {
+          // Try to extract code from billing_party text
+          var firstWord = bp.split(' ')[0].toUpperCase();
+          if (QB_CUSTOMERS[firstWord]) shopCode = firstWord;
         }
       }
-      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource }, 201);
-    } catch (e) {
-      return json({ error: 'Could not store order: ' + e.message }, 500);
-   }
+
+      if (!shopCode) return;
+      if (!shopGroups[shopCode]) shopGroups[shopCode] = {};
+
+      // Calculate shop amount for this order
+      var pieces = parseInt(o.total_pieces || 1);
+      var amount = 0;
+
+      if (o.shop_pay) {
+        // Use stored shop_pay if available
+        amount = parseFloat(o.shop_pay) || 0;
+      } else {
+        // Calculate from rate table
+        var r = rates[zone] || {};
+        var srate = r.srate || DEFAULT_SRATE[zone] || 0;
+        var sratex = r.sratex || DEFAULT_SRATEX[zone] || 0;
+        amount = srate + (pieces - 1) * sratex;
+      }
+
+      if (!shopGroups[shopCode][zone]) shopGroups[shopCode][zone] = 0;
+      shopGroups[shopCode][zone] += amount;
+    });
+
+    // Build QB invoice date info
+    var weekEndDate = new Date(weekEnd + 'T12:00:00');
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var weekEndFormatted = `${months[weekEndDate.getMonth()]} ${weekEndDate.getDate()} ${weekEndDate.getFullYear()}`;
+    var invoiceDate = formatDateQB(weekEndDate);
+    var memo = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`;
+
+    var headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo',
+      'Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','*ItemAmount','*ItemTaxCode','ItemTaxAmount'];
+
+    var rows = [];
+    var invoiceNo = startInvoice;
+
+    // Sort shops alphabetically by customer name
+    var sortedShops = Object.keys(shopGroups).sort((a,b) => {
+      var ca = QB_CUSTOMERS[a] || a;
+      var cb = QB_CUSTOMERS[b] || b;
+      return ca.localeCompare(cb);
+    });
+
+   sortedShops.forEach(shopKey => {
+      var code = shopKey.split(' ')[0].toUpperCase();
+      var customer = QB_CUSTOMERS[code] || QB_CUSTOMERS[shopKey] || shopKey;
+      var zones = shopGroups[shopKey];
+      var firstLine = true;
+      // Sort zones alphabetically
+      Object.keys(zones).sort().forEach(zone => {
+
+      // Sort zones alphabetically
+
+        var amount = parseFloat(zones[zone].toFixed(2));
+        if (amount <= 0) return;
+        var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
+
+       rows.push(toCSVRow([
+          invoiceNo,
+          firstLine ? customer : '',
+          firstLine ? invoiceDate : '',
+          firstLine ? invoiceDate : '',
+          firstLine ? 'Due on receipt' : '',
+          '',
+          firstLine ? memo : '',
+          qb.product,
+          qb.desc,
+          1,
+          amount,
+          amount,
+          'GST',
+          ''
+        ]));
+        firstLine = false;
+      });
+
+      invoiceNo++;
+    });
+
+    var csv = [toCSVRow(headers), ...rows].join('\n');
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv',
+        'content-disposition': `attachment; filename="qb-invoices-${weekEnd}.csv"`
+      }
+    });
+
+  } catch(e) {
+    console.error('QB export failed:', e.stack || e.message);
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
-  return json({ error: 'Method not allowed' }, 405);
 };
 
-export const config = { path: '/api/orders' };
+export var config = { path: '/api/qb-export' };
+
