@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scan Quality — Smart Choice Delivery</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#DDEBDD;--radius:12px;}
+*{box-sizing:border-box;}html,body{margin:0;}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+h1{font-family:Georgia,serif;font-weight:600;font-size:20px;margin:0;}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin:22px 0 8px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:14px;}
+.topbar a{color:var(--accent);text-decoration:none;font-size:14px;}
+.main{padding:16px;max-width:980px;margin:0 auto;}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+.controls input[type=date]{padding:7px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+.chip,.go{padding:8px 12px;border:1px solid var(--border);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;color:var(--ink);}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.go{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+.stat .v{font-size:26px;font-weight:700;}
+.stat .l{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.stat.good .v{color:var(--green);} .stat.warn .v{color:var(--warm);}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px;}
+th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;white-space:normal;min-width:150px;}
+th{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);background:var(--bg);}
+tr:last-child td{border-bottom:none;}
+td.low{color:var(--ink-soft);}
+.note{font-size:12px;color:var(--ink-soft);margin:6px 2px 0;line-height:1.45;}
+.empty,.error{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-align:center;color:var(--ink-soft);}
+.error{border-color:var(--warm);color:var(--warm);}
+.edit{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;font-size:13px;}
+.edit .meta{color:var(--ink-soft);font-size:12px;margin-bottom:4px;}
+.edit .chg{margin-top:3px;} .edit .from{color:var(--warm);text-decoration:line-through;} .edit .to{color:var(--green);font-weight:600;}
+details{margin-top:14px;font-size:13px;color:var(--ink-soft);} summary{cursor:pointer;color:var(--accent);}
+details p{margin:6px 0;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Scan Quality</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+
+  <div class="controls">
+    <button class="chip" data-days="1">Today</button>
+    <button class="chip on" data-days="7">Last 7 days</button>
+    <button class="chip" data-days="30">Last 30 days</button>
+    <span style="flex:1;"></span>
+    <input type="date" id="fromDate"> <span style="color:var(--ink-soft);">to</span> <input type="date" id="toDate">
+    <button class="go" id="goBtn">Show</button>
+  </div>
+
+  <div id="out"><div class="empty">Loading&hellip;</div></div>
+
+  <details>
+    <summary>How to read this</summary>
+    <p><b>Clean rate</b> &mdash; of the scans a driver added to their route, the share that needed <i>no</i> corrections at the review step. This is the headline accuracy number. Capital letters and spacing don't count as corrections; a different word or number does.</p>
+    <p><b>Discarded</b> &mdash; the driver threw the reading away. <b>Couldn't read</b> &mdash; no address could be found on the photo. <b>Errors</b> &mdash; the reading service failed. <b>Waiting</b> &mdash; read, but the driver hasn't answered yet (or left the page).</p>
+    <p><b>Tokens</b> &mdash; the amount of text/image the AI processed for each scan: this is what you are charged for. Multiply by your model's price on Anthropic's pricing page to compare the cost of models. <b>Avg time</b> is the average, so one slow scan can pull it up.</p>
+    <p>Groups with fewer than 20 confirmed scans are shown in grey: too few to draw conclusions from.</p>
+  </details>
+</div>
+
+<script>
+function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function pct(a, b) { return b > 0 ? Math.round(1000 * a / b) / 10 : null; }
+function fmtPct(a, b) { var p = pct(a, b); return p === null ? '&ndash;' : p + '%'; }
+function avg(sum, n, digits) { return n > 0 ? (sum / n).toFixed(digits || 0) : null; }
+var LOW = 20;
+
+var gate = fetch('/api/auth?action=check').then(function(r) { return r.json(); }).then(function(d) {
+  if (!d.authenticated) window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
+  return !!d.authenticated;
+}).catch(function() { window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname); return false; });
+
+function isoDay(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function setRange(days) {
+  var to = new Date(), from = new Date(); from.setDate(from.getDate() - (days - 1));
+  document.getElementById('fromDate').value = isoDay(from); document.getElementById('toDate').value = isoDay(to);
+}
+
+function table(title, rows, firstCol) {
+  var keys = Object.keys(rows).sort(function(a, b) { return rows[b].scans - rows[a].scans; });
+  if (!keys.length) return '';
+  var h = '<h2>' + esc(title) + '</h2><div class="tablewrap"><table><thead><tr><th>' + esc(firstCol) + '</th><th>Scans</th><th>Added</th><th>Clean rate</th><th>Discarded</th><th>Couldn\u2019t read</th><th>Errors</th><th>Avg time</th><th>Tokens in / out</th></tr></thead><tbody>';
+  keys.forEach(function(k) {
+    var c = rows[k], low = c.confirmed < LOW;
+    var t = avg(c.lat_sum, c.lat_n, 1), ti = avg(c.in_tok, c.tok_n), to = avg(c.out_tok, c.tok_n);
+    h += '<tr' + (low ? ' class="low"' : '') + '><td>' + esc(k) + '</td><td>' + c.scans + '</td><td>' + c.confirmed + '</td>' +
+      '<td' + (low ? ' class="low"' : '') + '><b>' + fmtPct(c.clean, c.confirmed) + '</b></td>' +
+      '<td>' + fmtPct(c.discarded, c.read) + '</td><td>' + fmtPct(c.no_address, c.scans) + '</td><td>' + fmtPct(c.errors, c.scans) + '</td>' +
+      '<td>' + (t === null ? '&ndash;' : (t / 1000).toFixed(1) + ' s') + '</td><td>' + (ti === null ? '&ndash;' : ti + ' / ' + to) + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function render(d) {
+  var t = d.total, out = document.getElementById('out');
+  if (!t.scans) { out.innerHTML = '<div class="empty">No scans logged between ' + esc(d.range.from) + ' and ' + esc(d.range.to) + '.</div>'; return; }
+  var clean = pct(t.clean, t.confirmed), time = avg(t.lat_sum, t.lat_n, 1);
+  var h = '<div class="cards">' +
+    '<div class="stat"><div class="v">' + t.scans + '</div><div class="l">scans, ' + esc(d.range.from) + ' to ' + esc(d.range.to) + '</div></div>' +
+    '<div class="stat ' + (clean !== null && clean >= 90 ? 'good' : clean !== null && clean < 70 ? 'warn' : '') + '"><div class="v">' + (clean === null ? '&ndash;' : clean + '%') + '</div><div class="l">clean rate (no corrections needed)</div></div>' +
+    '<div class="stat"><div class="v">' + t.confirmed + '</div><div class="l">added to a route</div></div>' +
+    '<div class="stat ' + (pct(t.discarded, t.read) > 15 ? 'warn' : '') + '"><div class="v">' + fmtPct(t.discarded, t.read) + '</div><div class="l">discarded by the driver</div></div>' +
+    '<div class="stat ' + (pct(t.no_address, t.scans) > 10 ? 'warn' : '') + '"><div class="v">' + fmtPct(t.no_address, t.scans) + '</div><div class="l">couldn\u2019t read an address</div></div>' +
+    '<div class="stat"><div class="v">' + (time === null ? '&ndash;' : (time / 1000).toFixed(1) + ' s') + '</div><div class="l">average time to read</div></div>' +
+    '</div>';
+  if (t.pending) h += '<p class="note">' + t.pending + ' scan' + (t.pending === 1 ? '' : 's') + ' still waiting for the driver to add or discard' + (t.replaced ? ', and ' + t.replaced + ' replaced by a newer scan' : '') + '.</p>';
+  if (d.capped) h += '<p class="note" style="color:var(--warm);">One or more days had more scans than can be shown; the figures cover the most recent part of those days.</p>';
+
+  h += table('By AI model', d.by.model, 'Model');
+  h += table('By model and phone', d.by.model_phone, 'Phone \u00b7 model');
+  h += '<p class="note">This is the table for comparing models fairly: it compares each model on the same kind of phone.</p>';
+  h += table('By phone', d.by.os, 'Phone / system version');
+  var ex = d.by.exif; var exKeys = Object.keys(ex).filter(function(k) { return k.indexOf('phone') === 0; });
+  if (exKeys.length) { var only = {}; exKeys.forEach(function(k) { only[k] = ex[k]; }); h += table('iPhones: how the photo was prepared', only, 'iPhone type'); h += '<p class="note">\u201cPhone rotates photos itself\u201d is any recent iPhone; \u201cneeds manual rotation\u201d is an old iPhone (iOS before 13.4).</p>'; }
+  h += table('By driver', d.by.driver, 'Driver');
+
+  var f = [['Order number', 'e_order_id'], ['Recipient name', 'e_name'], ['Address', 'e_address'], ['Shop', 'e_shop_code']];
+  h += '<h2>Which fields get corrected</h2><div class="tablewrap"><table><thead><tr><th>Field</th><th>Corrected</th><th>Share of scans added</th></tr></thead><tbody>';
+  f.forEach(function(x) { h += '<tr><td>' + x[0] + '</td><td>' + t[x[1]] + '</td><td>' + fmtPct(t[x[1]], t.confirmed) + '</td></tr>'; });
+  h += '</tbody></table></div>';
+
+  if (d.edits && d.edits.length) {
+    var labels = { order_id: 'Order #', name: 'Name', address: 'Address', shop_code: 'Shop' };
+    h += '<h2>Recent corrections</h2>';
+    d.edits.forEach(function(e) {
+      var when = e.at ? new Date(e.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+      h += '<div class="edit"><div class="meta">' + esc(when) + ' &middot; ' + esc(e.driver || '?') + ' &middot; ' + esc(e.platform) + ' &middot; ' + esc(e.model) + '</div>';
+      Object.keys(e.edits || {}).forEach(function(k) {
+        var c = e.edits[k]; h += '<div class="chg"><b>' + esc(labels[k] || k) + ':</b> <span class="from">' + esc(c.from || '(blank)') + '</span> &rarr; <span class="to">' + esc(c.to || '(blank)') + '</span></div>';
+      });
+      h += '</div>';
+    });
+  }
+  out.innerHTML = h;
+}
+
+function load() {
+  var from = document.getElementById('fromDate').value, to = document.getElementById('toDate').value;
+  var out = document.getElementById('out'); out.innerHTML = '<div class="empty">Loading&hellip;</div>';
+  gate.then(function(ok) { if (!ok) return; return fetch('/api/scan-log?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to)); })
+    .then(function(r) { if (!r) return; if (r.status === 401) { window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname); return; } if (!r.ok) throw new Error('Status ' + r.status); return r.json(); })
+    .then(function(d) { if (d) render(d); })
+    .catch(function(e) { out.innerHTML = '<div class="error">Could not load scan figures: ' + esc(e.message) + '</div>'; });
+}
+
+document.querySelectorAll('.chip').forEach(function(b) {
+  b.addEventListener('click', function() {
+    document.querySelectorAll('.chip').forEach(function(x) { x.classList.toggle('on', x === b); });
+    setRange(parseInt(b.dataset.days, 10)); load();
+  });
+});
+document.getElementById('goBtn').addEventListener('click', function() { document.querySelectorAll('.chip').forEach(function(x) { x.classList.remove('on'); }); load(); });
+setRange(7); load();
+</script>
+</body>
+</html>
