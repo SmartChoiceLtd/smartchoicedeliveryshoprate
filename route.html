@@ -259,9 +259,13 @@ async function scanTagForRoute(file) {
     pendingShopList = shopList;
 
     statusEl.textContent = 'Extracting delivery details\u2026';
+    // Two extras for the scan-quality log (see scan-log.mjs): who is scanning, and - on iPhones -
+    // whether this phone rotates photos itself. Neither changes how the tag is read.
+    var exifAuto = null;
+    try { if (isIOS) exifAuto = await browserAppliesExifOrientation(); } catch (e) { exifAuto = null; }
     var res = await fetch('/api/scan-tag', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList })
+      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList, driver: driverCode, exif_auto: exifAuto })
     });
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not read tag.');
@@ -288,6 +292,20 @@ async function scanTagForRoute(file) {
 // number right away, while the tag is still in hand, rather than
 // discovering the error later at Complete time or after submission.
 var reviewSelectedShopCode = '';
+var reviewScanId = null;
+
+// Tells the server what the driver did with a scan (kept it / threw it away / replaced it),
+// so scan accuracy can be measured. Strictly best-effort and silent: this must never get in
+// the way of adding a stop, so nothing here is awaited and every failure is swallowed.
+function reportScanOutcome(scanId, outcome, finalValues) {
+  if (!scanId) return;
+  try {
+    fetch('/api/scan-log', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ scan_id: scanId, outcome: outcome, final: finalValues })
+    }).catch(function() {});
+  } catch (e) { /* ignore */ }
+}
 
 function showScanReview(data) {
   // Only one review card can ever exist at a time - if a driver scans a
@@ -298,7 +316,8 @@ function showScanReview(data) {
   // clear correctly between scans - getElementById only ever finds the
   // first matching id, which could easily be the wrong card's.
   var existing = document.getElementById('scanReviewCard');
-  if (existing) existing.remove();
+  if (existing) { reportScanOutcome(reviewScanId, 'replaced'); existing.remove(); }
+  reviewScanId = data.scan_id || null;
 
   var matchedShop = pendingShopList.find(function(s) {
     return (s.code || '').toUpperCase() === (data.shop_code || '').toUpperCase();
@@ -340,6 +359,7 @@ function showScanReview(data) {
   });
   document.getElementById('scanReviewConfirmBtn').addEventListener('click', confirmScanReview);
   document.getElementById('scanReviewDiscardBtn').addEventListener('click', function() {
+    reportScanOutcome(reviewScanId, 'discarded'); reviewScanId = null;
     document.getElementById('scanReviewCard').remove();
   });
   document.getElementById('scanReviewCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -460,6 +480,8 @@ async function confirmScanReview() {
 
     document.getElementById('scanReviewCard').remove();
     reviewSelectedShopCode = '';
+    reportScanOutcome(reviewScanId, 'confirmed', { name: name, address: address, order_id: orderId, shop_code: shopCode });
+    reviewScanId = null;
     statusEl.hidden = false;
     statusEl.style.color = 'var(--green)';
     statusEl.textContent = 'Added: ' + (name || 'delivery') + (orderId ? ' (Order #' + orderId + ')' : '') + '. Scan the next one, or view your route below.';
