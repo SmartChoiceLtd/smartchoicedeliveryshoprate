@@ -52,6 +52,9 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
   </div>
 </div>
 <div class="main">
+  <!-- The scan review card lives here, outside the stop list: the list is redrawn by the route
+       loading and by the background location step, and anything inside it gets wiped. -->
+  <div id="scanReviewHost"></div>
   <div class="loading" id="loadingMsg">Loading your route&hellip;</div>
   <div class="notfound" id="notFoundMsg" hidden>Driver link not found. Check your link or contact your dispatcher.</div>
   <div class="empty" id="emptyMsg" hidden>No pending deliveries right now. Scan a tag on the delivery form to add one.</div>
@@ -239,6 +242,26 @@ function compressPhotoToBase64(file) {
 var lastActiveStops = [];
 var lastSkippedStops = [];
 
+// What the driver has done to their stops during THIS visit to the page. The route is fetched
+// once when the page opens (and again on Refresh), and the background location step later redraws
+// from that fetched snapshot - either can arrive AFTER the driver has already added, removed or
+// skipped something. These records are laid back over whatever arrives, so a late redraw can
+// never undo what the driver just did (a stop vanishing, or reappearing after being removed).
+var localAdds = {};   // stop id -> stop, added this visit
+var localGone = {};   // stop id -> true, removed this visit
+var localSkip = {};   // stop id -> true/false, skipped or un-skipped this visit
+
+function applyLocalChanges(list) {
+  var out = list.filter(function(s) { return !localGone[s.id]; }).map(function(s) {
+    return (s.id in localSkip) ? Object.assign({}, s, { skipped: localSkip[s.id] }) : s;
+  });
+  Object.keys(localAdds).forEach(function(id) {
+    if (localGone[id] || out.some(function(s) { return s.id === id; })) return;
+    out.push((id in localSkip) ? Object.assign({}, localAdds[id], { skipped: localSkip[id] }) : localAdds[id]);
+  });
+  return out;
+}
+
 var pendingShopList = [];
 
 async function scanTagForRoute(file) {
@@ -343,10 +366,7 @@ function showScanReview(data) {
     '</div>' +
     '</div>';
 
-  document.getElementById('loadingMsg').hidden = true;
-  document.getElementById('emptyMsg').hidden = true;
-  document.getElementById('content').hidden = false;
-  document.getElementById('stopsList').insertAdjacentHTML('afterbegin', reviewHtml);
+  document.getElementById('scanReviewHost').insertAdjacentHTML('afterbegin', reviewHtml);
 
   document.getElementById('reviewShopSearch').addEventListener('input', function() {
     reviewSelectedShopCode = ''; // typing invalidates whatever was previously selected until a new item is clicked
@@ -492,11 +512,17 @@ async function confirmScanReview() {
     // results, which is what caused scans to appear to "not show up" for
     // a couple minutes. Not re-optimized until the next full refresh, but
     // reliably visible right away.
+    localAdds[stop.id] = stop; delete localGone[stop.id];
     if (!lastActiveStops.some(function(s) { return s.id === stop.id; })) {
       lastActiveStops.push(stop);
     } else {
       lastActiveStops = lastActiveStops.map(function(s) { return s.id === stop.id ? stop : s; });
     }
+    // The review card no longer sits inside the list, so make sure the list itself is showing
+    // (it is hidden while the route is empty or still loading).
+    document.getElementById('loadingMsg').hidden = true;
+    document.getElementById('emptyMsg').hidden = true;
+    document.getElementById('content').hidden = false;
     renderStops(lastActiveStops, lastSkippedStops);
   } catch (e) {
     alert('Could not add to route: ' + e.message);
@@ -618,6 +644,7 @@ function toggleSkip(stopId, skip) {
       // Move the stop between the two local lists directly, using the
       // server's own confirmed response, rather than trusting an
       // immediate re-fetch to reflect this write.
+      localSkip[stopId] = !!skip; if (localAdds[stopId]) localAdds[stopId] = updatedStop;
       lastActiveStops = lastActiveStops.filter(function(s) { return s.id !== stopId; });
       lastSkippedStops = lastSkippedStops.filter(function(s) { return s.id !== stopId; });
       if (skip) lastSkippedStops.push(updatedStop); else lastActiveStops.push(updatedStop);
@@ -681,6 +708,7 @@ function removeStop(stopId, btn) {
       // Drop it from local state directly, using the server's own
       // confirmation that the write succeeded, rather than trusting an
       // immediate re-fetch to reflect it.
+      localGone[stopId] = true; delete localAdds[stopId];
       lastActiveStops = lastActiveStops.filter(function(s) { return s.id !== stopId; });
       lastSkippedStops = lastSkippedStops.filter(function(s) { return s.id !== stopId; });
       renderStops(lastActiveStops, lastSkippedStops);
@@ -704,9 +732,9 @@ function loadRoute() {
     var allStops = results[0];
     var mapsKey = results[1] && results[1].key;
     var justCompletedId = new URLSearchParams(location.search).get('just_completed');
-    var mine = allStops.filter(function(s) {
+    var mine = applyLocalChanges(allStops.filter(function(s) {
       return s.status === 'pending' && (s.driver || '').toUpperCase() === driverCode && s.id !== justCompletedId;
-    });
+    }));
 
     if (!mine.length) {
       document.getElementById('loadingMsg').hidden = true;
@@ -734,8 +762,15 @@ function loadRoute() {
     getCurrentLocation().then(function(currentLocation) {
       return optimizeOrder(active, mapsKey, currentLocation);
     }).then(function(ordered) {
-      lastActiveStops = ordered;
-      renderStops(ordered, skipped);
+      // This order was worked out from the list as it stood when the page opened. The driver may
+      // have added, removed or skipped stops since, so apply the new order only to the stops that
+      // are still active, and keep anything added in the meantime at the end.
+      var position = {}; ordered.forEach(function(s, i) { position[s.id] = i; });
+      var current = lastActiveStops.slice();
+      var known = current.filter(function(s) { return s.id in position; }).sort(function(a, b) { return position[a.id] - position[b.id]; });
+      var extra = current.filter(function(s) { return !(s.id in position); });
+      lastActiveStops = known.concat(extra);
+      renderStops(lastActiveStops, lastSkippedStops);
     }).catch(function() { /* best-effort - already showing a usable route */ });
   }).catch(function(e) {
     document.getElementById('loadingMsg').textContent = 'Could not load your route: ' + e.message;
