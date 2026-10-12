@@ -100,6 +100,8 @@ export default async (req) => {
   const type = url.searchParams.get('type') || 'driver';
   const code = url.searchParams.get('code') || 'all';
   const period = url.searchParams.get('period') || 'week'; // 'week' or 'day'
+  const wantJson = url.searchParams.get('format') === 'json';
+  const groups = []; // structured copy of each report page, used by format=json (PDF export)
 
   if (!weekEnd) {
     return new Response(JSON.stringify({error:'week_end required (YYYY-MM-DD)'}), {status:400,headers:{'content-type':'application/json'}});
@@ -218,6 +220,24 @@ export default async (req) => {
       const totalDue = sumDrate + sumGdpi;
       const allZones = [...new Set(Object.keys(zoneDrate))].sort();
 
+      groups.push({
+        code: dc, name: driverFullName !== dc ? driverFullName : '', title: `${driverTitle} \u2014 ${periodLabel}`,
+        subtitle: 'SMART CHOICE DELIVERY DRIVER DETAIL', kind: 'driver',
+        stats: [['DELIVERIES', String(orders.length)], ['BASE PAY', '$' + sumDrate.toFixed(2)], ['FUEL PREMIUM', '$' + sumGdpi.toFixed(2)], ['TOTAL DUE', '$' + totalDue.toFixed(2)]],
+        total: Math.round(totalDue * 100) / 100, count: orders.length,
+        zoneTables: [
+          { head: ['DZONE', 'drate'], rows: allZones.map(z => [z, '$' + (zoneDrate[z]||0).toFixed(2)]), total: ['Grand Total', '$' + sumDrate.toFixed(2)] },
+          { head: ['DZONE', 'GDPI'], rows: allZones.filter(z => zoneGdpi[z] > 0).map(z => [z, '$' + (zoneGdpi[z]||0).toFixed(2)]), total: ['Total GDPI', '$' + sumGdpi.toFixed(2)] }
+        ],
+        footer: 'Total $ Due: $' + totalDue.toFixed(2),
+        head: ['Date','Order ID','Name','Address','Community','DSHOP','DZONE','KM','Pcs','drate','GDPI','Total'],
+        rows: orderPay.map(({o,zone,pieces,drate,gdpi,total}) => [
+          fmt(parseDate(o.date||o.received_at||'')), String(o.order_id||1), (o.name||'').slice(0,18),
+          (o.formatted_address||o.address||'').slice(0,28), (o.community||'').slice(0,18), o.shop_code||'', zone,
+          ((zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null)?o.distance_km.toFixed(1):'', String(pieces),
+          '$'+drate.toFixed(2), '$'+gdpi.toFixed(2), '$'+total.toFixed(2)])
+      });
+
       html += `<div class="page">
         <div class="header">
           <div class="header-left">
@@ -318,6 +338,22 @@ export default async (req) => {
         grandTotal += amount;
       });
 
+      groups.push({
+        code: sc, name: shopFullName, title: `${shopTitle} \u2014 ${periodLabel}`,
+        subtitle: 'SMART CHOICE DELIVERY SHOP DETAIL \u2022 INVOICE PERIOD ' + weekEnd, kind: 'shop',
+        band: `${period === 'day' ? 'DATE' : 'WEEK ENDING'} ${weekEnd}  \u2022  DSHOP ${sc}  \u2022  Invoice Total: $${grandTotal.toFixed(2)}`,
+        total: Math.round(grandTotal * 100) / 100, count: orders.length,
+        zoneTables: [
+          { head: ['DZONE', 'Srate'], rows: Object.keys(zoneSums).sort().map(z => [z, '$' + zoneSums[z].toFixed(2)]), total: ['Grand Total', '$' + grandTotal.toFixed(2)] }
+        ],
+        footer: 'Invoice Total: $' + grandTotal.toFixed(2),
+        head: ['Date','Order ID','Name','Address','Community','Driver','DZONE','KM','Pcs','Srate'],
+        rows: orderAmts.map(({o,zone,pieces,amount}) => [
+          fmt(parseDate(o.date||o.received_at||'')), String(o.order_id||1), (o.name||'').slice(0,20),
+          (o.formatted_address||o.address||'').slice(0,30), (o.community||'').slice(0,20), o.driver||'', zone,
+          ((zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null)?o.distance_km.toFixed(1):'', String(pieces), '$'+amount.toFixed(2)])
+      });
+
       html += `<div class="page">
         <div class="header">
           <div class="header-left">
@@ -360,6 +396,12 @@ export default async (req) => {
           </div>
         </div>
       </div>`;
+    });
+  }
+
+  if (wantJson) {
+    return new Response(JSON.stringify({ week_end: weekEnd, period, type, period_label: periodLabel, groups }), {
+      status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
     });
   }
 
