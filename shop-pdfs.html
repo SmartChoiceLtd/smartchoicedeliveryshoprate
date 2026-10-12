@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop PDFs</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+[hidden]{display:none!important;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}
+.topbar h1{font-family:Georgia,serif;font-size:18px;margin:0;flex:1;}
+.topbar a{color:var(--accent);font-size:13px;text-decoration:none;}
+.wrap{max-width:900px;margin:0 auto;padding:20px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
+input[type=date]{padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+.seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.seg button{border:none;background:none;padding:9px 16px;font-size:14px;cursor:pointer;color:var(--ink-soft);}
+.seg button.on{background:var(--accent);color:#fff;font-weight:600;}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;}
+.btn:disabled{opacity:.5;cursor:default;}
+.btn-ghost{background:none;color:var(--accent);border:1px solid var(--accent);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th{text-align:left;font-size:12px;color:var(--ink-soft);padding:6px 8px;border-bottom:2px solid var(--border);}
+td{padding:7px 8px;border-bottom:1px solid var(--border);}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+.path{font-size:12px;color:var(--ink-soft);}
+.msg{padding:10px 12px;border-radius:8px;font-size:13px;margin-top:12px;white-space:pre-wrap;}
+.msg.ok{background:var(--green-soft);color:var(--green);border:1px solid #A8CFA8;}
+.msg.err{background:#FBEAEA;color:#7A2E22;border:1px solid #E3B3AE;}
+.msg.info{background:var(--accent-soft);color:#0a5a78;}
+.hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Shop &amp; Driver PDFs</h1><a href="/orders">&larr; Orders</a></div>
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <div><label>Report type</label><div class="seg" id="typeSeg"><button data-t="shop" class="on">Shops</button><button data-t="driver">Drivers</button></div></div>
+      <div><label>Week ending (Sunday)</label><input type="date" id="weekEnd"></div>
+      <button class="btn" id="loadBtn">Load</button>
+    </div>
+    <div class="hint" id="rootHint"></div>
+  </div>
+
+  <div class="card" id="listCard" hidden>
+    <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+      <div id="summary" style="font-weight:600;"></div>
+      <div class="row">
+        <button class="btn" id="saveBtn">Save to folder</button>
+        <button class="btn btn-ghost" id="zipBtn">Download zip</button>
+      </div>
+    </div>
+    <table><thead><tr><th><input type="checkbox" id="allChk" checked></th><th>Report</th><th class="num">Deliveries</th><th class="num">Total</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    <div class="path" id="pathEg" style="margin-top:10px;"></div>
+    <div id="msg" class="msg" hidden></div>
+  </div>
+  <div id="topMsg" class="msg err" hidden></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+var type = 'shop', data = null;
+var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+var HAS_FS = typeof window.showDirectoryPicker === 'function';
+
+function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
+function safe(s){return String(s||'').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim().toUpperCase();}
+function money(n){return '$'+Number(n).toFixed(2);}
+function pad(n){return String(n).padStart(2,'0');}
+
+function lastSunday(){
+  var d=new Date(); var back=d.getDay()===0?0:d.getDay(); // most recent Sunday on/before today
+  d.setDate(d.getDate()-back);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function monthFolder(weekEnd){var p=weekEnd.split('-');return MONTHS[parseInt(p[1],10)-1]+' '+p[0].slice(2);}
+function groupFolder(g){return safe(g.code+' '+(g.name||''));}
+function groupFile(g,weekEnd){return groupFolder(g)+' WE '+weekEnd+'.pdf';}
+function rootName(){return type==='shop'?'SC26 SHOP':'SC26 DRIVER';}
+
+function showTop(t){var m=document.getElementById('topMsg');m.textContent=t||'';m.hidden=!t;}
+function showMsg(t,cls){var m=document.getElementById('msg');m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;}
+
+/* ---------- PDF ---------- */
+function buildPdf(g){
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'landscape',unit:'mm',format:'letter'});
+  var W=doc.internal.pageSize.getWidth(), M=8, y=M+4;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0);
+  doc.text(g.title,M,y);
+  doc.setFontSize(10); doc.text('SMART CHOICE DELIVERY',W-M,y,{align:'right'});
+  doc.setFont('helvetica','normal'); doc.setTextColor(68);
+  doc.text(g.subtitle,M,y+5);
+  doc.setFont('helvetica','bold'); doc.setTextColor(0);
+  doc.text(g.kind==='shop'?'Shop Weekly Detail':'Driver Weekly Detail',W-M,y+5,{align:'right'});
+  y+=8; doc.setDrawColor(0); doc.setLineWidth(0.5); doc.line(M,y,W-M,y); y+=4;
+
+  if(g.band){
+    doc.setFillColor(244,220,201); doc.rect(M,y,W-2*M,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(184,71,43);
+    doc.text(g.band,M+2,y+4.6); y+=10;
+  }
+  if(g.stats){
+    var x=M;
+    g.stats.forEach(function(s){
+      doc.setDrawColor(210); doc.setLineWidth(0.2); doc.roundedRect(x,y,38,12,1.5,1.5);
+      doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(12,118,158);
+      doc.text(s[1],x+19,y+6,{align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100);
+      doc.text(s[0],x+19,y+10.2,{align:'center'});
+      x+=42;
+    });
+    y+=16;
+  }
+
+  // zone summary tables, side by side
+  var bottom=y, left=M;
+  g.zoneTables.forEach(function(t){
+    var body=t.rows.slice(); body.push(t.total);
+    doc.autoTable({
+      startY:y, margin:{left:left}, tableWidth:50, head:[t.head], body:body, theme:'plain',
+      styles:{fontSize:8,cellPadding:{top:0.9,bottom:0.9,left:1.5,right:1.5},textColor:0},
+      headStyles:{fillColor:[12,118,158],textColor:255,fontStyle:'bold'},
+      columnStyles:{1:{halign:'right'}},
+      didParseCell:function(h){
+        if(h.section==='body'&&h.row.index===body.length-1){h.cell.styles.fontStyle='bold';h.cell.styles.fillColor=[240,240,240];}
+        if(h.section==='body'&&h.row.index<body.length-1){h.cell.styles.lineWidth={bottom:0.1};h.cell.styles.lineColor=[225,225,225];}
+      }
+    });
+    bottom=Math.max(bottom,doc.lastAutoTable.finalY); left+=56;
+  });
+  // grand total box
+  doc.setFillColor(244,220,201); doc.setDrawColor(168,207,168); doc.setLineWidth(0.2);
+  doc.rect(left,y,70,9,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0);
+  doc.text(g.footer,left+3,y+6);
+  y=bottom+6;
+
+  var colStyles={}, head=g.head;
+  // right-align money / count columns
+  head.forEach(function(h,i){ if(/^(KM|Pcs|Srate|drate|GDPI|Total)$/.test(h)) colStyles[i]={halign:'right'}; });
+  doc.autoTable({
+    startY:y, margin:{left:M,right:M,top:M+2,bottom:10},
+    head:[head.concat([''])], body:g.rows.map(function(r){return r.concat(['']);}),
+    styles:{fontSize:7.5,cellPadding:{top:0.9,bottom:0.9,left:1.3,right:1.3},overflow:'ellipsize',textColor:0,lineColor:[235,235,235],lineWidth:{bottom:0.1}},
+    headStyles:{fillColor:[12,118,158],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[249,249,249]},
+    columnStyles:colStyles,
+    rowPageBreak:'avoid',
+    didDrawCell:function(h){
+      // tick box in the last column (the standard PDF fonts have no box glyph)
+      if(h.section==='body'&&h.column.index===head.length){
+        doc.setDrawColor(90); doc.setLineWidth(0.2);
+        doc.rect(h.cell.x+h.cell.width/2-1.3,h.cell.y+h.cell.height/2-1.3,2.6,2.6);
+      }
+    }
+  });
+  var pages=doc.getNumberOfPages();
+  for(var p=1;p<=pages;p++){
+    doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
+    doc.text(g.code+' \u2022 '+data.period_label+' \u2022 page '+p+' of '+pages,W-M,doc.internal.pageSize.getHeight()-4,{align:'right'});
+  }
+  return doc.output('blob');
+}
+
+/* ---------- load ---------- */
+function selected(){
+  var out=[]; document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){ if(c.checked) out.push(data.groups[parseInt(c.dataset.i,10)]); });
+  return out;
+}
+function render(){
+  var we=data.week_end, tb=document.getElementById('rows');
+  if(!data.groups.length){
+    document.getElementById('listCard').hidden=false;
+    tb.innerHTML='<tr><td colspan="5" style="color:#6B6256">No '+(type==='shop'?'shop':'driver')+' deliveries found for week ending '+esc(we)+'.</td></tr>';
+    document.getElementById('summary').textContent='Nothing to save'; document.getElementById('pathEg').textContent='';
+    document.getElementById('saveBtn').disabled=true; document.getElementById('zipBtn').disabled=true; return;
+  }
+  document.getElementById('saveBtn').disabled=false; document.getElementById('zipBtn').disabled=false;
+  var tot=0; data.groups.forEach(function(g){tot+=g.total;});
+  document.getElementById('summary').textContent=data.groups.length+(type==='shop'?' shops':' drivers')+' \u2022 week ending '+we+' \u2022 '+money(tot);
+  tb.innerHTML=data.groups.map(function(g,i){
+    return '<tr><td><input type="checkbox" data-i="'+i+'" checked></td><td><strong>'+esc(g.code)+'</strong> '+esc(g.name||'')+'</td><td class="num">'+g.count+'</td><td class="num">'+money(g.total)+'</td><td><button class="btn btn-ghost btn-sm" data-pdf="'+i+'">PDF</button></td></tr>';
+  }).join('');
+  var g0=data.groups[0];
+  document.getElementById('pathEg').textContent='Saves as: '+rootName()+'\\'+monthFolder(we)+'\\'+groupFolder(g0)+'\\'+groupFile(g0,we);
+  document.getElementById('listCard').hidden=false; showMsg('');
+  document.getElementById('allChk').checked=true;
+}
+async function load(){
+  var we=document.getElementById('weekEnd').value;
+  showTop(''); showMsg('');
+  if(!we){showTop('Pick a week-ending date.');return;}
+  var btn=document.getElementById('loadBtn'); btn.disabled=true; btn.textContent='Loading\u2026';
+  try{
+    var r=await fetch('/api/reports?format=json&type='+type+'&code=all&week_end='+we);
+    if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);return;}
+    if(!r.ok) throw new Error('Server said '+r.status);
+    data=await r.json(); render();
+  }catch(e){showTop('Could not load: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='Load';}
+}
+
+/* ---------- save ---------- */
+function download(blob,name){
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+}
+function idb(){return new Promise(function(res,rej){var q=indexedDB.open('scd-pdf',1);q.onupgradeneeded=function(){q.result.createObjectStore('h');};q.onsuccess=function(){res(q.result);};q.onerror=function(){rej(q.error);};});}
+async function getSavedHandle(key){try{var db=await idb();return await new Promise(function(res){var r=db.transaction('h').objectStore('h').get(key);r.onsuccess=function(){res(r.result||null);};r.onerror=function(){res(null);};});}catch(e){return null;}}
+async function putSavedHandle(key,h){try{var db=await idb();db.transaction('h','readwrite').objectStore('h').put(h,key);}catch(e){}}
+
+async function getRoot(){
+  var key='root-'+type, h=await getSavedHandle(key);
+  if(h){
+    try{
+      var perm=await h.queryPermission({mode:'readwrite'});
+      if(perm!=='granted') perm=await h.requestPermission({mode:'readwrite'});
+      if(perm==='granted') return h;
+    }catch(e){}
+  }
+  h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+  await putSavedHandle(key,h);
+  return h;
+}
+async function saveToFolder(){
+  var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
+  var btn=document.getElementById('saveBtn');
+  if(!HAS_FS){showMsg('This browser cannot write to a folder directly - use Download zip instead (Edge or Chrome can save straight to the folder).','err');return;}
+  var root;
+  try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError'){return;} showMsg('Could not open the folder: '+e.message,'err'); return; }
+  btn.disabled=true; var we=data.week_end, done=0, failed=[];
+  try{
+    var mDir=await root.getDirectoryHandle(monthFolder(we),{create:true});
+    for(var i=0;i<sel.length;i++){
+      var g=sel[i]; showMsg('Saving '+(i+1)+' of '+sel.length+': '+g.code+'\u2026','info');
+      try{
+        var blob=buildPdf(g);
+        var sDir=await mDir.getDirectoryHandle(groupFolder(g),{create:true});
+        var fh=await sDir.getFileHandle(groupFile(g,we),{create:true});
+        var w=await fh.createWritable(); await w.write(blob); await w.close(); done++;
+      }catch(e){failed.push(g.code+' ('+e.message+')');}
+    }
+    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+monthFolder(we)+'\\'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
+  }catch(e){showMsg('Could not save: '+e.message,'err');}
+  finally{btn.disabled=false;}
+}
+async function downloadZip(){
+  var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
+  var we=data.week_end, zip=new JSZip();
+  sel.forEach(function(g){ zip.file(monthFolder(we)+'/'+groupFolder(g)+'/'+groupFile(g,we), buildPdf(g)); });
+  var blob=await zip.generateAsync({type:'blob'});
+  download(blob,rootName()+' WE '+we+'.zip');
+  showMsg('Zip downloaded - unzip it into your '+rootName()+' folder; the month and shop folders merge with the existing ones.','ok');
+}
+
+/* ---------- wiring ---------- */
+document.getElementById('typeSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return; type=b.dataset.t;
+  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
+  document.getElementById('listCard').hidden=true; data=null; hint();
+});
+function hint(){
+  document.getElementById('rootHint').textContent=HAS_FS
+    ? 'Save to folder: choose your '+rootName()+' folder once; the app remembers it. PDFs go into MONTH YY \\ CODE NAME \\ CODE NAME WE date.pdf, filed by the invoice (week-ending) month.'
+    : 'This browser cannot save into a folder directly. Download zip gives the same folder layout; Edge or Chrome can save straight to the folder.';
+}
+document.getElementById('loadBtn').addEventListener('click',load);
+document.getElementById('saveBtn').addEventListener('click',saveToFolder);
+document.getElementById('zipBtn').addEventListener('click',downloadZip);
+document.getElementById('allChk').addEventListener('change',function(){var v=this.checked;document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){c.checked=v;});});
+document.getElementById('rows').addEventListener('click',function(e){
+  var b=e.target.closest('[data-pdf]'); if(!b) return;
+  var g=data.groups[parseInt(b.dataset.pdf,10)]; download(buildPdf(g),groupFile(g,data.week_end));
+});
+
+(function init(){
+  var q=new URLSearchParams(location.search);
+  document.getElementById('weekEnd').value=q.get('week_end')||lastSunday();
+  if(q.get('type')==='driver'){type='driver';document.querySelectorAll('#typeSeg button').forEach(function(x){x.classList.toggle('on',x.dataset.t==='driver');});}
+  hint();
+  fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
+    if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);return;}
+    load();
+  }).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);});
+})();
+</script>
+</body>
+</html>
