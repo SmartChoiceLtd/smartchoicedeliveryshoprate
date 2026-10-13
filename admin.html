@@ -69,6 +69,26 @@ tr.inactive td{color:var(--ink-soft);}
       <button class="btn" id="addDriverBtn">Add Driver</button>
       <div id="addDriverMsg" hidden></div>
     </div>
+    <div class="section" id="ytdModalWrap" hidden>
+      <h2>YTD starting figures &mdash; <span id="ytdWho"></span></h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Totals from the old program, up to and including the "legacy through" date. The app adds its own orders dated AFTER that day. Deliveries = number of deliveries (not pieces).</p>
+      <div class="field-row">
+        <div class="field"><label>Starting pay ($)</label><input type="number" step="0.01" id="ytdPay"></div>
+        <div class="field"><label>Starting deliveries</label><input type="number" step="1" id="ytdDel"></div>
+        <div class="field"><label>Legacy through (last day covered)</label><input type="date" id="ytdThru"></div>
+      </div>
+      <div id="ytdCalc" style="font-size:13px;margin-bottom:10px;"></div>
+      <button class="btn btn-sm" id="ytdSave">Save</button>
+      <button class="btn btn-sm btn-grey" id="ytdCancel">Cancel</button>
+      <div id="ytdMsg" hidden></div>
+    </div>
+    <div class="section">
+      <h2>Bulk load YTD starting figures</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;">One driver per line: <code>code,pay,deliveries,through-date</code> (YYYY-MM-DD). Codes that don't match a driver are skipped and listed.</p>
+      <textarea id="ytdBulk" rows="6" style="width:100%;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:8px;"></textarea>
+      <div style="margin-top:8px;"><button class="btn btn-sm" id="ytdBulkBtn">Load</button></div>
+      <div id="ytdBulkMsg" hidden></div>
+    </div>
     <div class="section">
       <h2>Drivers</h2>
       <div id="driversList" class="loading">Loading...</div>
@@ -256,6 +276,7 @@ function renderDrivers() {
         '<td><button class="copy-link" onclick="copyDriverLink(\'' + esc(d.code) + '\')">Copy link</button></td>' +
         '<td style="display:flex;gap:4px;">' +
         '<button class="btn-danger" onclick="editDriver(\'' + esc(d.code) + '\')">Edit</button>' +
+        '<button class="btn-danger btn-green" onclick="openYtd(\'' + esc(d.code) + '\')">YTD</button>' +
         '<button class="btn-danger" onclick="toggleDriver(\'' + esc(d.code) + '\',' + !d.active + ')">' + (d.active ? 'Deactivate' : 'Activate') + '</button>' +
         '<button class="btn-danger btn-grey" onclick="deleteDriver(\'' + esc(d.code) + '\')">Delete</button>' +
         '</td></tr>';
@@ -677,6 +698,82 @@ document.getElementById('saveTemplateBtn').addEventListener('click', function() 
     setTimeout(function() { document.getElementById('templateMsg').hidden = true; }, 3000);
   }).catch(function() { alert('Could not save template.'); })
   .finally(function() { btn.disabled = false; btn.textContent = 'Save Template'; });
+});
+
+
+/* ===== YTD STARTING FIGURES ===== */
+var ytdCode = null;
+var YTD_MIN_AVG = 8.25;
+function ytdFind(code) { return drivers.find(function(x) { return (x.code || '').toLowerCase() === String(code).toLowerCase(); }); }
+function ytdRecalc() {
+  var pay = parseFloat(document.getElementById('ytdPay').value) || 0;
+  var del = parseInt(document.getElementById('ytdDel').value) || 0;
+  var el = document.getElementById('ytdCalc');
+  if (!del) { el.textContent = ''; return; }
+  var avg = pay / del;
+  el.innerHTML = 'Average per delivery: <strong>$' + avg.toFixed(2) + '</strong>' +
+    (avg < YTD_MIN_AVG ? ' <span style="color:var(--warm);font-weight:600;">&#9888; below the $' + YTD_MIN_AVG.toFixed(2) + ' minimum - check these numbers (deliveries, not pieces)</span>' : '');
+}
+function openYtd(code) {
+  var d = ytdFind(code); if (!d) return;
+  ytdCode = d.code;
+  document.getElementById('ytdWho').textContent = d.code + ' ' + (d.name || '');
+  document.getElementById('ytdPay').value = d.ytd_start_pay != null ? d.ytd_start_pay : '';
+  document.getElementById('ytdDel').value = d.ytd_start_deliveries != null ? d.ytd_start_deliveries : '';
+  document.getElementById('ytdThru').value = d.ytd_through_date || '';
+  document.getElementById('ytdMsg').hidden = true;
+  document.getElementById('ytdModalWrap').hidden = false;
+  ytdRecalc();
+  document.getElementById('ytdModalWrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function ytdPut(code, fields) {
+  var r = await fetch('/api/drivers?code=' + encodeURIComponent(code), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fields) });
+  if (!r.ok) throw new Error('Save failed (' + r.status + ')');
+  return r.json();
+}
+document.getElementById('ytdPay').addEventListener('input', ytdRecalc);
+document.getElementById('ytdDel').addEventListener('input', ytdRecalc);
+document.getElementById('ytdCancel').addEventListener('click', function() { document.getElementById('ytdModalWrap').hidden = true; });
+document.getElementById('ytdSave').addEventListener('click', async function() {
+  var msg = document.getElementById('ytdMsg');
+  var thru = document.getElementById('ytdThru').value;
+  if (!thru) { msg.className = 'error-msg'; msg.textContent = 'Enter the legacy-through date (last day the old program covers).'; msg.hidden = false; return; }
+  try {
+    var updated = await ytdPut(ytdCode, {
+      ytd_start_pay: parseFloat(document.getElementById('ytdPay').value) || 0,
+      ytd_start_deliveries: parseInt(document.getElementById('ytdDel').value) || 0,
+      ytd_through_date: thru
+    });
+    var i = drivers.findIndex(function(x) { return x.code === updated.code; });
+    if (i >= 0) drivers[i] = updated;
+    msg.className = 'success-msg'; msg.textContent = 'Saved.'; msg.hidden = false;
+  } catch (e) { msg.className = 'error-msg'; msg.textContent = 'Error: ' + e.message; msg.hidden = false; }
+});
+document.getElementById('ytdBulkBtn').addEventListener('click', async function() {
+  var btn = this, msg = document.getElementById('ytdBulkMsg');
+  var lines = document.getElementById('ytdBulk').value.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
+  var ok = 0, skipped = [], low = [], failed = [];
+  btn.disabled = true;
+  for (var i = 0; i < lines.length; i++) {
+    var p = lines[i].split(',').map(function(x) { return x.trim(); });
+    var d = ytdFind(p[0]);
+    var pay = parseFloat(p[1]), del = parseInt(p[2]), thru = p[3];
+    if (!d) { skipped.push(p[0]); continue; }
+    if (isNaN(pay) || isNaN(del) || !/^\d{4}-\d{2}-\d{2}$/.test(thru || '')) { failed.push(p[0] + ' (bad line)'); continue; }
+    try {
+      var updated = await ytdPut(d.code, { ytd_start_pay: pay, ytd_start_deliveries: del, ytd_through_date: thru });
+      var k = drivers.findIndex(function(x) { return x.code === updated.code; }); if (k >= 0) drivers[k] = updated;
+      ok++;
+      if (del && pay / del < YTD_MIN_AVG) low.push(d.code + ' $' + (pay / del).toFixed(2));
+    } catch (e) { failed.push(p[0] + ' (' + e.message + ')'); }
+  }
+  btn.disabled = false;
+  msg.className = (skipped.length || failed.length) ? 'error-msg' : 'success-msg';
+  msg.textContent = 'Updated ' + ok + ' driver(s).' +
+    (skipped.length ? ' No matching driver: ' + skipped.join(', ') + '.' : '') +
+    (failed.length ? ' Failed: ' + failed.join(', ') + '.' : '') +
+    (low.length ? ' Average under $' + YTD_MIN_AVG.toFixed(2) + ': ' + low.join(', ') + '.' : '');
+  msg.hidden = false;
 });
 
 /* ===== INIT ===== */
