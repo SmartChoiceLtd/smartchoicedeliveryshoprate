@@ -82,6 +82,10 @@ async function computeYtd(driver, weekOrders, weekEnd) {
     if ((o.driver || '').toUpperCase() !== code) return;
     const day = orderIsoDate(o);
     if (!day || day < YTD_START_DATE || day > weekEnd) return;
+    // The starting figure (ytd_start_pay / ytd_start_deliveries) already
+    // covers everything up to and including ytd_through_date, so orders on
+    // or before that day are NOT counted again from the app.
+    if (driver.ytd_through_date && day <= driver.ytd_through_date) return;
     counted.set(o.id || (o.order_id + '|' + day + '|' + o.name), o);
   };
   fetched.forEach(consider);
@@ -96,7 +100,7 @@ async function computeYtd(driver, weekOrders, weekEnd) {
   const totalPay = baselinePay + ordersPay;
   const totalDel = baselineDel + list.length;
   return {
-    baseline: { pay: baselinePay, deliveries: baselineDel },
+    baseline: { pay: baselinePay, deliveries: baselineDel, through_date: driver.ytd_through_date || null },
     orders: {
       pay: ordersPay,
       deliveries: list.length,
@@ -354,6 +358,7 @@ export default async (req) => {
         ytd_start_date: YTD_START_DATE,
         ytd_start_pay: driver.ytd_start_pay ?? null,
         ytd_start_deliveries: driver.ytd_start_deliveries ?? null,
+        ytd_through_date: driver.ytd_through_date ?? null,
         baseline_avg: (parseInt(driver.ytd_start_deliveries) > 0) ? (parseFloat(driver.ytd_start_pay) || 0) / parseInt(driver.ytd_start_deliveries) : null,
         hire_date: driver.hire_date || null
       });
