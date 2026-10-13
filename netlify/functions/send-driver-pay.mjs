@@ -342,6 +342,29 @@ export default async (req) => {
       return new Response('No driver found with code "' + driverCode + '".', { status: 404, headers: { 'content-type': 'text/plain' } });
     }
 
+    // Lightweight debug views, answered BEFORE the slow whole-week order
+    // load below (that load plus the YTD scan is what made ?debug=1 time
+    // out on Netlify).
+    //   ?debug=baseline  -> instant: just the stored starting figures
+    //   ?debug=ytd       -> one scan of the orders for the YTD breakdown
+    const dbg = url.searchParams.get('debug');
+    if (dbg === 'baseline') {
+      return json({
+        driver: driverCode,
+        ytd_start_date: YTD_START_DATE,
+        ytd_start_pay: driver.ytd_start_pay ?? null,
+        ytd_start_deliveries: driver.ytd_start_deliveries ?? null,
+        baseline_avg: (parseInt(driver.ytd_start_deliveries) > 0) ? (parseFloat(driver.ytd_start_pay) || 0) / parseInt(driver.ytd_start_deliveries) : null,
+        hire_date: driver.hire_date || null
+      });
+    }
+    if (dbg === 'ytd') {
+      const t0 = Date.now();
+      const ytd = await computeYtd(driver, [], weekEnd);
+      return json({ driver: driverCode, week_end: weekEnd, ytd_start_date: YTD_START_DATE, ytd, took_ms: Date.now() - t0,
+        note: 'ytd.total = ytd.baseline + ytd.orders. avg = total.pay / total.deliveries.' });
+    }
+
     const { byDriver } = await getWeekOrdersByDriver(weekEnd);
     const orders = byDriver[driverCode] || [];
 
