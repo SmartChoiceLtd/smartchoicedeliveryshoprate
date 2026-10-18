@@ -110,9 +110,16 @@ export default async (req) => {
       const store = getStore('flower-orders');
       const url = new URL(req.url);
       const limitParam = parseInt(url.searchParams.get('limit') || '500');
-      const { blobs } = await store.list();
+      // week_end=YYYY-MM-DD returns EVERY order filed under that week. Order keys start with
+      // order_<week-ending>_, so this is a fast prefix lookup and is not affected by the
+      // 'most recent N orders' cap below (which silently hid older weeks once there were
+      // more than 500 orders in total).
+      const weekEnd = url.searchParams.get('week_end');
+      const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
+      const { blobs } = await (weekPrefix ? store.list({ prefix: weekPrefix }) : store.list());
+      const picked = weekPrefix ? blobs : blobs.slice(-Math.min(limitParam, 5000));
       const orders = await Promise.all(
-        blobs.slice(-Math.min(limitParam, 1000)).map(b => store.get(b.key, { type: 'json' }))
+        picked.map(b => store.get(b.key, { type: 'json' }))
       );
       return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
     } catch (e) {
