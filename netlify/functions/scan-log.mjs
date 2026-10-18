@@ -42,7 +42,7 @@ function addDays(dayStr, n) {
 // ---- Turning the log into numbers ---------------------------------------------------------
 function emptyCounters() {
   return { scans: 0, read: 0, no_address: 0, errors: 0, confirmed: 0, discarded: 0, replaced: 0, pending: 0, clean: 0,
-    e_order_id: 0, e_name: 0, e_address: 0, e_shop_code: 0, lat_sum: 0, lat_n: 0, in_tok: 0, out_tok: 0, tok_n: 0 };
+    e_order_id: 0, e_name: 0, e_address: 0, e_shop_code: 0, e_phone: 0, lat_sum: 0, lat_n: 0, in_tok: 0, out_tok: 0, tok_n: 0 };
 }
 function addRecord(c, r) {
   c.scans++;
@@ -55,6 +55,7 @@ function addRecord(c, r) {
       const edited = r.edited || [];
       if (!edited.length) c.clean++;
       edited.forEach(f => { if (('e_' + f) in c) c['e_' + f]++; });
+      if (r.phone_edited) c.e_phone++;   // tracked on its own so it never changes the 'clean scan' figure
     } else if (r.outcome === 'discarded') c.discarded++;
     else if (r.outcome === 'replaced') c.replaced++;
     else c.pending++;
@@ -150,6 +151,12 @@ export default async (req) => {
         rec.final[k] = clip(f[k]);
         if (norm(f[k]) !== norm(rec.extracted && rec.extracted[k])) { rec.edited.push(k); rec.edits[k] = { from: clip(rec.extracted && rec.extracted[k]), to: clip(f[k]) }; }
       }
+    }
+    if (outcome === 'confirmed') {
+      const f = body.final && typeof body.final === 'object' ? body.final : {};
+      const digits = v => String(v == null ? '' : v).replace(/\D/g, '');
+      rec.final.phone = clip(f.phone);
+      rec.phone_edited = digits(f.phone) !== digits(rec.extracted && rec.extracted.phone);
     }
     await store.setJSON(id, rec);
     return json({ ok: true, edited: rec.edited || [] });
