@@ -81,6 +81,11 @@ async function maybeApplyDailyPremium(driver, localDate) {
   }
 }
 
+// Recipient phone from the scan review card: only phone-number characters, short.
+function cleanPhone(v) {
+  return String(v == null ? '' : v).replace(/[^0-9+()\-.\sx]/gi, '').replace(/\s+/g, ' ').trim().slice(0, 25);
+}
+
 export default async (req) => {
   const store = getStore('flower-stops');
 
@@ -109,7 +114,7 @@ export default async (req) => {
         s.shop_code === body.shop_code
       );
       if (match) {
-        const updated = { ...match, driver: body.driver || match.driver, address: body.address || match.address, name: body.name || match.name, delivery_type: body.delivery_type || match.delivery_type };
+        const updated = { ...match, driver: body.driver || match.driver, address: body.address || match.address, name: body.name || match.name, phone: cleanPhone(body.phone) || match.phone || null, delivery_type: body.delivery_type || match.delivery_type };
         await store.setJSON(match.id, updated);
         await maybeApplyDailyPremium(body.driver, body.local_date);
         return json(updated);
@@ -125,6 +130,7 @@ export default async (req) => {
       address: body.address || null,
       name: body.name || null,
       order_id: body.order_id || null,
+      phone: cleanPhone(body.phone) || null,
       delivery_type: body.delivery_type || 'store',
       skipped: false,
       status: 'pending', // 'pending' | 'fulfilled' | 'abandoned'
