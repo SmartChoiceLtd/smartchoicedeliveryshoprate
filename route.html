@@ -353,6 +353,8 @@ function showScanReview(data) {
     '<input type="text" id="reviewName" value="' + escapeHtml(data.name || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
     '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Address</label>' +
     '<input type="text" id="reviewAddress" value="' + escapeHtml(data.address || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
+    '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Recipient phone</label>' +
+    '<input type="tel" id="reviewPhone" inputmode="tel" value="' + escapeHtml(data.phone || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
     '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Order ID</label>' +
     '<input type="text" id="reviewOrderId" value="' + escapeHtml(data.order_id || '') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;font-size:14px;">' +
     '<label style="font-size:12px;color:var(--ink-soft);display:block;margin-bottom:2px;">Shop</label>' +
@@ -476,6 +478,7 @@ async function confirmScanReview() {
   var name = document.getElementById('reviewName').value.trim();
   var address = document.getElementById('reviewAddress').value.trim();
   var orderId = document.getElementById('reviewOrderId').value.trim();
+  var phone = document.getElementById('reviewPhone').value.trim();
   var shopCode = reviewSelectedShopCode;
 
   if (!address) { alert('Address is required.'); return; }
@@ -490,6 +493,7 @@ async function confirmScanReview() {
         shop_code: shopCode || null,
         address: address,
         name: name || null,
+        phone: phone || null,
         order_id: orderId || null,
         delivery_type: document.getElementById('scanDeliveryType').value,
         local_date: (function() { var n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0'); })()
@@ -500,7 +504,7 @@ async function confirmScanReview() {
 
     document.getElementById('scanReviewCard').remove();
     reviewSelectedShopCode = '';
-    reportScanOutcome(reviewScanId, 'confirmed', { name: name, address: address, order_id: orderId, shop_code: shopCode });
+    reportScanOutcome(reviewScanId, 'confirmed', { name: name, address: address, order_id: orderId, shop_code: shopCode, phone: phone });
     reviewScanId = null;
     statusEl.hidden = false;
     statusEl.style.color = 'var(--green)';
@@ -606,10 +610,19 @@ function renderStops(active, skipped) {
     + (active.length > MAX_ROUTE_STOPS ? '<div style="font-size:12px;color:var(--ink-soft);margin:-8px 0 14px;">Complete these first, then refresh &mdash; the next stops will roll into your route automatically.</div>' : '')
     : '';
 
-  var activeHtml = active.map(function(s, i) {
+  // Tap-to-call link for the recipient's number (only digits and a leading + go into the tel: link).
+function phoneLink(s) {
+  if (!s.phone) return '';
+  var dial = String(s.phone).replace(/[^0-9+]/g, '');
+  if (!dial) return '';
+  return '<div class="stop-addr" style="margin-top:-6px;"><a href="tel:' + dial + '" style="color:var(--accent);font-weight:600;text-decoration:none;">&#9742; ' + escapeHtml(s.phone) + '</a></div>';
+}
+
+var activeHtml = active.map(function(s, i) {
     return '<div class="stop-card">'
       + '<div><span class="stop-num">' + (i+1) + '</span><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span>' + stopTypeLabel(s) + '</div>'
       + '<div class="stop-addr">' + escapeHtml(s.address || '') + (s.order_id ? ' &bull; Order #' + escapeHtml(s.order_id) : '') + '</div>'
+      + phoneLink(s)
       + '<div class="stop-actions">'
       + '<a class="btn btn-ghost" href="' + navigateUrl(s.address) + '" target="_blank" rel="noopener">Navigate</a>'
       + '<a class="btn" href="' + completeUrl(s) + '">Complete</a>'
@@ -623,6 +636,7 @@ function renderStops(active, skipped) {
     return '<div class="stop-card" style="opacity:0.7;">'
       + '<div><span class="stop-name">' + escapeHtml(s.name || 'Unnamed recipient') + '</span>' + stopTypeLabel(s) + '</div>'
       + '<div class="stop-addr">' + escapeHtml(s.address || '') + (s.order_id ? ' &bull; Order #' + escapeHtml(s.order_id) : '') + '</div>'
+      + phoneLink(s)
       + '<div class="stop-actions">'
       + '<a class="btn btn-ghost" href="' + navigateUrl(s.address) + '" target="_blank" rel="noopener">Navigate</a>'
       + '<a class="btn" href="' + completeUrl(s) + '">Complete</a>'
