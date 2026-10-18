@@ -280,7 +280,14 @@ document.getElementById('loadingMsg').hidden = false;
 document.getElementById('errorMsg').hidden = true;
 document.getElementById('ordersTable').hidden = true;
 document.getElementById('emptyMsg').hidden = true;
-fetch('/api/orders').then(function(res) {
+// Load the week on screen straight from the server (all of its orders, however many
+// orders exist overall). 'All dates' loads the most recent 5000 orders.
+function weekEndParam() {
+  var sun = getWeekBounds(weekOffset).end;
+  return sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
+}
+var ordersUrl = showAllWeeks ? '/api/orders?limit=5000' : '/api/orders?week_end=' + weekEndParam();
+fetch(ordersUrl).then(function(res) {
 if (!res.ok) throw new Error('Status ' + res.status);
 return res.json();
 }).then(function(data) {
@@ -427,13 +434,13 @@ document.getElementById('overrideModal').addEventListener('click', function(e) {
 if (e.target === this) this.hidden = true;
 });
 document.getElementById('prevWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset--; updateWeekLabel(); applyFilters();
+showAllWeeks = false; weekOffset--; updateWeekLabel(); loadOrders();
 });
 document.getElementById('nextWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset++; updateWeekLabel(); applyFilters();
+showAllWeeks = false; weekOffset++; updateWeekLabel(); loadOrders();
 });
 document.getElementById('allWeeks').addEventListener('click', function() {
-showAllWeeks = true; updateWeekLabel(); applyFilters();
+showAllWeeks = true; updateWeekLabel(); loadOrders();
 });
 document.getElementById('filterInput').addEventListener('input', applyFilters);
 document.getElementById('filterSource').addEventListener('change', applyFilters);
