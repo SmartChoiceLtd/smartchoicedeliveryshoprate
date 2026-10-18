@@ -414,7 +414,8 @@ function enterLookupView(shop){
   document.getElementById('topbarSubtitle').textContent='Quote lookup';
   const banner=document.getElementById('lookupBanner');
   banner.hidden=false;
-  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p>`;
+  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p><button class="btn btn-sm btn-ghost" id="lookupSheetBtn" style="margin-top:8px;">Print price sheet</button>`;
+  document.getElementById('lookupSheetBtn').addEventListener('click',showPricingSheet);
   styleCommunities();renderLegend();if(state.map)drawTownPins();
 }
 
@@ -640,7 +641,8 @@ function showPricingSheet(){
     <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${oRows}</tbody></table>
     <h3>Named town rates</h3>
     <table><thead><tr><th>Town</th><th>Zone / type</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${tRows}</tbody></table>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote - please call for a price.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="window.print()">Print</button>
       <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
