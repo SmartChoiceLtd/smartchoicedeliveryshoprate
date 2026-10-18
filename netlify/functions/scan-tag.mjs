@@ -28,6 +28,11 @@ async function writeScanLog(record) {
   }
 }
 
+// Keep only what a phone number can contain; anything else the model adds is dropped.
+function cleanPhone(v) {
+  return String(v == null ? '' : v).replace(/[^0-9+()\-.\sx]/gi, '').replace(/\s+/g, ' ').trim().slice(0, 25);
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -47,15 +52,16 @@ function buildExtractionPrompt(shopList) {
   }
   return `You are looking at a photo of a delivery tag attached to a flower/gift order. These tags come in many different shapes, sizes, and layouts - printed labels, handwritten cards, different fonts and orientations.
 
-Extract exactly these four fields from the tag:
+Extract exactly these fields from the tag:
 - order_id: the order number/tag code (often near "Order #", "Tag", or just a standalone number)
 - name: the recipient's name
 - address: the delivery address (street address, as complete as legible)
 - shop_name: the sending/originating shop's name exactly as printed on the tag (verbatim, don't guess or standardize it)
-- shop_code: the short code of the sending/originating shop, matched from the list below${shopSection}
+- shop_code: the short code of the sending/originating shop, matched from the list below
+- phone: the RECIPIENT's contact phone number (the person receiving the delivery), exactly as printed, digits only is fine. Do NOT use the sending shop's own phone number. If several numbers are printed, choose the one that belongs to the recipient or delivery contact; if you cannot tell which is the recipient's, use an empty string.${shopSection}
 
 Respond with ONLY a raw JSON object, no markdown formatting, no code fences, no explanation. Use this exact shape:
-{"order_id": "...", "name": "...", "address": "...", "shop_name": "...", "shop_code": "..."}
+{"order_id": "...", "name": "...", "address": "...", "shop_name": "...", "shop_code": "...", "phone": "..."}
 
 If a field is not legible or not present on the tag, use an empty string "" for that field rather than guessing or making up a value. Never fabricate information that isn't actually visible on the tag.`;
 }
@@ -198,7 +204,8 @@ export default async (req) => {
       name: extracted.name || '',
       address: extracted.address || '',
       shop_name: extracted.shop_name || '',
-      shop_code: (extracted.shop_code || '').toUpperCase()
+      shop_code: (extracted.shop_code || '').toUpperCase(),
+      phone: cleanPhone(extracted.phone)
     };
     await record(read.address ? 'read' : 'no_address', { model: modelUsed, ...usage, extracted: read });
 
@@ -208,6 +215,7 @@ export default async (req) => {
       address: extracted.address || '',
       shop_name: extracted.shop_name || '',
       shop_code: (extracted.shop_code || '').toUpperCase(),
+      phone: read.phone,
       model_used: modelUsed,
       scan_id: scanId
     });
