@@ -120,7 +120,7 @@ function render(d) {
   if (exKeys.length) { var only = {}; exKeys.forEach(function(k) { only[k] = ex[k]; }); h += table('iPhones: how the photo was prepared', only, 'iPhone type'); h += '<p class="note">\u201cPhone rotates photos itself\u201d is any recent iPhone; \u201cneeds manual rotation\u201d is an old iPhone (iOS before 13.4).</p>'; }
   h += table('By driver', d.by.driver, 'Driver');
 
-  var f = [['Order number', 'e_order_id'], ['Recipient name', 'e_name'], ['Address', 'e_address'], ['Shop', 'e_shop_code']];
+  var f = [['Order number', 'e_order_id'], ['Recipient name', 'e_name'], ['Address', 'e_address'], ['Shop', 'e_shop_code'], ['Recipient phone (not counted in \u201cadded without changes\u201d)', 'e_phone']];
   h += '<h2>Which fields get corrected</h2><div class="tablewrap"><table><thead><tr><th>Field</th><th>Corrected</th><th>Share of scans added</th></tr></thead><tbody>';
   f.forEach(function(x) { h += '<tr><td>' + x[0] + '</td><td>' + t[x[1]] + '</td><td>' + fmtPct(t[x[1]], t.confirmed) + '</td></tr>'; });
   h += '</tbody></table></div>';
