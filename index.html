@@ -129,10 +129,32 @@
       <div class="toggle-row" id="quoteTypeToggle">
         <button class="active" data-type="retail">Retail</button>
         <button data-type="wholesale">Wholesale</button>
+        <button data-type="wedding">Wedding</button>
+        <button data-type="funeral">Funeral</button>
+        <button data-type="event">Special event</button>
       </div>
       <div class="piece-row" id="pieceRow" hidden>
-        <label>Number of pieces:</label>
+        <label id="pieceLabel">Number of pieces:</label>
         <input type="number" id="pieceCount" min="1" value="1">
+      </div>
+      <div class="piece-row" id="funoRow" hidden>
+        <label for="funoPick">Cemetery (FUNO):</label>
+        <select id="funoPick">
+          <option value="">Not listed / use address</option>
+          <option value="edenbrook">Edenbrook (Springbank)</option>
+          <option value="choice">Choice Memorial Garden (Rocky View)</option>
+          <option value="mountainview">Mountain View (Rocky View)</option>
+        </select>
+      </div>
+      <div class="piece-row" id="quotedRow" hidden>
+        <label for="eventQuoted">Quoted price, if agreed ($):</label>
+        <input type="number" id="eventQuoted" min="0" step="0.01" placeholder="Leave blank to use WED / WEDO guidelines">
+      </div>
+      <div class="piece-row" id="setupRow" hidden>
+        <label>Setup crew (people):</label>
+        <input type="number" id="setupPeople" min="0" value="0">
+        <label>Setup hours each:</label>
+        <input type="number" id="setupHours" min="1" step="0.5" value="1">
       </div>
       <input id="destinationInput" placeholder="Destination address">
       <button class="btn btn-sm" id="quoteBtn">Calculate price</button>
@@ -197,6 +219,13 @@ const NAMED_TOWNS=[
 // Wholesale config
 const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
 const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
+const WED_INTOWN_BASE=27;   // in-town wedding (WED), includes first case
+const WED_EXTRA_PER_CASE=5; // per additional case (in and out of town); out-of-town base = zone rate (WEDO)
+const WED_SETUP_RATE=35;    // per person per hour, 1 hr minimum
+const FUN_INTOWN_BASE=17;   // in-town funeral, includes first piece
+const FUN_OUT_BASE=27;      // FUNO cemeteries (Edenbrook, Choice Memorial Garden, Mountain View) flat base, includes first piece; other out-of-town funerals = zone rate
+const FUNO_PATTERNS=[/edenbrook/i,/choice\s+memorial/i,/mountain\s*-?\s*view/i];
+const FUN_EXTRA_PER_PIECE=3;
 
 function outerBandForDistance(km){
   if(km<=20)return'OUT1';
@@ -222,6 +251,22 @@ function bandForDistance(km){if(km<=10)return'C1';if(km<=15)return'C2';if(km<=20
 function findNamedTown(pt){let best=null,bd=Infinity;for(const t of NAMED_TOWNS){const d=haversineKm(pt,{lat:t.lat,lng:t.lng});if(d<=t.radiusKm&&d<bd){best=t;bd=d;}}return best;}
 
 /* wholesale price calc */
+function calcEventPrice(kind,qty,isInTown,zoneRate,people,hours,funo,quoted){
+  const n=Math.max(1,parseInt(qty)||1);
+  if(kind==='funeral'){
+    const useFuno=!!funo&&!isInTown;
+    const base=isInTown?FUN_INTOWN_BASE:useFuno?FUN_OUT_BASE:(Number(zoneRate)||0);
+    const delivery=base+(n-1)*FUN_EXTRA_PER_PIECE;
+    return {kind,qty:n,isInTown,base,baseKind:(isInTown||useFuno)?'base':'zone',extra:FUN_EXTRA_PER_PIECE,unit:'piece',people:0,hours:0,delivery,setup:0,total:delivery,code:isInTown?'Funeral':useFuno?'Funeral (FUNO)':'Funeral (out of town)'};
+  }
+  const base=isInTown?WED_INTOWN_BASE:(Number(zoneRate)||0);
+  const p=Math.max(0,parseInt(people)||0);
+  const h=p>0?Math.max(1,parseFloat(hours)||1):0;
+  const delivery=base+(n-1)*WED_EXTRA_PER_CASE;
+  const setup=p*h*WED_SETUP_RATE;
+  const guide=delivery+setup;const q=parseFloat(quoted);const hasQ=kind==='event'&&q>0;
+  return {kind,qty:n,isInTown,base,baseKind:isInTown?'base':'zone',extra:WED_EXTRA_PER_CASE,unit:'case',people:p,hours:h,delivery,setup,guide,quoted:hasQ?q:null,total:hasQ?q:guide,code:isInTown?'WED':'WEDO'};
+}
 function calcWholesalePrice(basePrice,pieces,isInTown){
   const p=Math.max(1,parseInt(pieces)||1);
   if(isInTown){
@@ -429,7 +474,11 @@ document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
   const btn=e.target.closest('button');if(!btn)return;
   state.quoteType=btn.dataset.type;
   this.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));
-  document.getElementById('pieceRow').hidden=state.quoteType!=='wholesale';
+  document.getElementById('pieceRow').hidden=state.quoteType==='retail';
+  document.getElementById('setupRow').hidden=!['wedding','event'].includes(state.quoteType);
+  document.getElementById('quotedRow').hidden=state.quoteType!=='event';
+  document.getElementById('funoRow').hidden=state.quoteType!=='funeral';
+  document.getElementById('pieceLabel').textContent=['wedding','event'].includes(state.quoteType)?'Number of cases:':'Number of pieces:';
   document.getElementById('quoteResult').innerHTML='';
 });
 
@@ -461,6 +510,12 @@ async function generateQuote(){
   const input=document.getElementById('destinationInput');
   const pieces=parseInt(document.getElementById('pieceCount').value)||1;
   const isWholesale=state.quoteType==='wholesale';
+  const isWedding=['wedding','funeral','event'].includes(state.quoteType);
+  const evKind=state.quoteType;
+  const evQuoted=document.getElementById('eventQuoted').value;
+  const funoPick=document.getElementById('funoPick').value;
+  const funoName=(input.value||'');
+  const evPeople=document.getElementById('setupPeople').value,evHours=document.getElementById('setupHours').value;
   let dest=state.lastDestination&&state.lastDestination.address===input.value?state.lastDestination:null;
   setQuoteLoading(true);
   try{
@@ -471,9 +526,12 @@ async function generateQuote(){
     if(community){
       const zoneCode=shop.communityZones[community.name]||'C4';
       const retailPrice=shop.zonePrices[zoneCode]||0;
-      const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
+      let wedding=null;
+      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+      if(isWedding)wedding=calcEventPrice(evKind,pieces,!funoHit,shop.zonePrices[shop.communityZones[community.name]||'C4']||0,evPeople,evHours,funoHit,evQuoted);
+      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
       let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
-      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:true,communityName:community.name});
+      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:true,communityName:community.name});
       placeQuoteMarkers(shop,dest);return;
     }
 
@@ -482,8 +540,10 @@ async function generateQuote(){
     if(town){
       const flat=shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:null;
       const retailPrice=flat!==null?flat:(shop.zonePrices[town.zone]||0);
-      const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
-      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,retailPrice,finalPrice,isWholesale,pieces,isInTown:false});
+      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+      const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
+      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,retailPrice,finalPrice,isWholesale,wedding,pieces,isInTown:false});
       placeQuoteMarkers(shop,dest);return;
     }
 
@@ -495,20 +555,27 @@ async function generateQuote(){
       placeQuoteMarkers(shop,dest);return;
     }
     const retailPrice=shop.zonePrices[zoneCode]||0;
-    const finalPrice=isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
-    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown:false});
+    const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+    const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
+    const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:false});
     placeQuoteMarkers(shop,dest);
   }catch(err){showQuoteError(err.message);}
   finally{setQuoteLoading(false);}
 }
 
-function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,pieces,driveKm,isInTown,communityName}){
+function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown,communityName}){
   const wsDetail=isWholesale?(isInTown
     ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
     :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
+  const wedLabel=wedding?(wedding.kind==='funeral'?wedding.code:wedding.kind==='event'?`Special event (${wedding.code})`:`Wedding (${wedding.code})`):'';
+  const wedBaseTxt=wedding?(wedding.baseKind==='base'?`$${wedding.base} base`:`$${wedding.base} zone rate`):'';
+  const wedDetail=wedding?`${wedLabel}: ${wedBaseTxt} + ${wedding.qty-1} extra ${wedding.unit}${wedding.qty-1===1?'':'s'} &times; $${wedding.extra} = $${wedding.delivery.toFixed(2)}`+(wedding.kind!=='funeral'?(wedding.people>0?`<br>Setup: ${wedding.people} ${wedding.people===1?'person':'people'} &times; ${wedding.hours} hr &times; $${WED_SETUP_RATE}/hr = $${wedding.setup.toFixed(2)}`:`<br>Setup not included ($${WED_SETUP_RATE}/hr per person, 1 hr minimum)`)+(wedding.quoted!==null?`<br><strong>As quoted: $${wedding.quoted.toFixed(2)}</strong> (guideline would be $${wedding.guide.toFixed(2)})`:''):''):'';
   const quoteText=[
     `Delivery quote - ${shop.name}`,
-    `Type: ${isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
+    `Type: ${wedding?`${wedLabel} (${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''})`:isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
+    wedding&&wedding.setup>0?`Delivery: $${wedding.delivery.toFixed(2)}`:'',
+    wedding&&wedding.people>0?`Setup (${wedding.people} x ${wedding.hours} hr x $${WED_SETUP_RATE}): $${wedding.setup.toFixed(2)}`:'',
     `Destination: ${dest.address}`,
     `Zone: ${zoneCode} (${label} - ${sublabel})`,
     isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
@@ -526,6 +593,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
     <div class="quote-card">
       <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
       <div class="quote-meta">
+        ${wedding?`<span class="badge-ws">${wedLabel} &mdash; ${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''}</span><br><span style="color:var(--ink-soft)">${wedDetail}</span><br>`:''}
         ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
        <span class="badge" style="background:${getZoneColor(zoneCode)};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
         ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
@@ -546,7 +614,7 @@ function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,i
   });
   document.getElementById('printQuoteBtn').addEventListener('click',()=>{
     const w=window.open('','_blank','width=520,height=460');
-    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
+    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}${wedding?`<div class="ws">${wedDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
     w.document.close();
   });
   if(showSaveZone){
@@ -642,6 +710,9 @@ function showPricingSheet(){
     <h3>Named town rates</h3>
     <table><thead><tr><th>Town</th><th>Zone / type</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${tRows}</tbody></table>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote - please call for a price.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Weddings:</strong> in Calgary (WED) $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case. Out of town (WEDO) zone rate + $${WED_EXTRA_PER_CASE} per additional case. Setup, if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Special events:</strong> follow the wedding guidelines above (WED / WEDO, plus setup) and/or are priced as quoted.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Funerals:</strong> in Calgary $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. FUNO (Edenbrook, Choice Memorial Garden, Mountain View) $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere and similar): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece.</p>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="window.print()">Print</button>
@@ -658,6 +729,7 @@ function showPricingSheet(){
     ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
     'Named towns:',
     ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(shop.zonePrices[t.zone]||0);return`  ${t.name} (${t.zone}${flat!==null?' flat':' zone'}): $${Number(price).toFixed(2)}`;}),
+    '','WEDDINGS',`In Calgary (WED): $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case`,`Out of town (WEDO): zone rate + $${WED_EXTRA_PER_CASE} per additional case`,`Setup if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum`,'','SPECIAL EVENTS','Follow the wedding guidelines above (WED / WEDO, plus setup) and/or as quoted','','FUNERALS',`In Calgary: $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`FUNO (Edenbrook, Choice Memorial Garden, Mountain View): $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere, etc.): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece`,
     '','WHOLESALE PRICES',
     `In-town: $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece`,
     `Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece`,
