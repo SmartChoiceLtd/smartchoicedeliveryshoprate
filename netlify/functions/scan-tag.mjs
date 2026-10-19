@@ -93,7 +93,7 @@ function callVision(model, apiKey, mediaType, base64Data, prompt) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      max_tokens: 1500,
       messages: [
         {
           role: 'user',
@@ -180,12 +180,27 @@ export default async (req) => {
       return json({ error: 'Vision API request failed: ' + res.status + ' ' + errText }, 502);
     }
 
-    const data = await res.json();
-    const usage = { input_tokens: (data.usage && data.usage.input_tokens) || null, output_tokens: (data.usage && data.usage.output_tokens) || null };
-    const textBlock = (data.content || []).find(c => c.type === 'text');
+    let data = await res.json();
+    let usage = { input_tokens: (data.usage && data.usage.input_tokens) || null, output_tokens: (data.usage && data.usage.output_tokens) || null };
+    let textBlock = (data.content || []).find(c => c.type === 'text' && c.text);
+    if (!textBlock && modelUsed !== FALLBACK_MODEL) {
+      // The reply held no text (e.g. only reasoning, or a refusal). Log why, then retry once
+      // with the proven smaller model so the driver is not stuck. model_used shows the switch.
+      const why = 'stop_reason=' + data.stop_reason + ' blocks=' + (data.content || []).map(c => c.type).join(',');
+      console.error('scan-tag: ' + modelUsed + ' returned no text (' + why + '), retrying with ' + FALLBACK_MODEL);
+      await record('api_error', { model: modelUsed, ...usage, error: ('no text in reply; ' + why).slice(0, 200) });
+      modelUsed = FALLBACK_MODEL;
+      const res2 = await callVision(FALLBACK_MODEL, apiKey, mediaType, base64Data, prompt);
+      if (res2.ok) {
+        data = await res2.json();
+        usage = { input_tokens: (data.usage && data.usage.input_tokens) || null, output_tokens: (data.usage && data.usage.output_tokens) || null };
+        textBlock = (data.content || []).find(c => c.type === 'text' && c.text);
+      }
+    }
     if (!textBlock) {
-      await record('api_error', { model: modelUsed, ...usage, error: 'no text in reply' });
-      return json({ error: 'No text response from vision API' }, 502);
+      const why = 'stop_reason=' + data.stop_reason + ' blocks=' + (data.content || []).map(c => c.type).join(',');
+      await record('api_error', { model: modelUsed, ...usage, error: ('no text in reply; ' + why).slice(0, 200) });
+      return json({ error: 'No text response from vision API (' + why + ')' }, 502);
     }
 
     let extracted;
