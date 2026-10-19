@@ -83,9 +83,10 @@ function primaryModel() {
   return (process.env.SCAN_MODEL || '').trim() || DEFAULT_MODEL;
 }
 
-function callVision(model, apiKey, mediaType, base64Data, prompt) {
+function callVision(model, apiKey, mediaType, base64Data, prompt, timeoutMs) {
   return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(timeoutMs || 14000),
     headers: {
       'content-type': 'application/json',
       'x-api-key': apiKey,
@@ -164,7 +165,16 @@ export default async (req) => {
     const prompt = buildExtractionPrompt(body.shops);
     const PRIMARY = primaryModel();
     let modelUsed = PRIMARY;
-    let res = await callVision(PRIMARY, apiKey, mediaType, base64Data, prompt);
+    let res;
+    try {
+      res = await callVision(PRIMARY, apiKey, mediaType, base64Data, prompt, 14000);
+    } catch (te) {
+      if (PRIMARY === FALLBACK_MODEL) throw te;
+      console.error('scan-tag: ' + PRIMARY + ' timed out/failed (' + te.message + '), using ' + FALLBACK_MODEL);
+      await record('api_error', { model: PRIMARY, error: ('timeout: ' + te.message).slice(0, 200) });
+      modelUsed = FALLBACK_MODEL;
+      res = await callVision(FALLBACK_MODEL, apiKey, mediaType, base64Data, prompt, 12000);
+    }
     if (!res.ok && (res.status === 404 || res.status === 400) && PRIMARY !== FALLBACK_MODEL) {
       const rejection = await res.clone().text().catch(() => '');
       if (/model/i.test(rejection)) {
