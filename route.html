@@ -286,10 +286,18 @@ async function scanTagForRoute(file) {
     // whether this phone rotates photos itself. Neither changes how the tag is read.
     var exifAuto = null;
     try { if (isIOS) exifAuto = await browserAppliesExifOrientation(); } catch (e) { exifAuto = null; }
-    var res = await fetch('/api/scan-tag', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ photo_base64: photoBase64, shops: shopList, driver: driverCode, exif_auto: exifAuto })
-    });
+    var scanCtl = new AbortController();
+    var scanTimer = setTimeout(function() { scanCtl.abort(); }, 40000);
+    var res;
+    try {
+      res = await fetch('/api/scan-tag', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, signal: scanCtl.signal,
+        body: JSON.stringify({ photo_base64: photoBase64, shops: shopList, driver: driverCode, exif_auto: exifAuto })
+      });
+    } catch (fe) {
+      if (fe && fe.name === 'AbortError') throw new Error('The scan took too long. Please try again, or use Manual Entry.');
+      throw fe;
+    } finally { clearTimeout(scanTimer); }
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not read tag.');
 
