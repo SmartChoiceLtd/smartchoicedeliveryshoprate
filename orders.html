@@ -346,9 +346,15 @@ function findDuplicates() {
     function(all, weeks) { btn.disabled = false; btn.textContent = 'Find duplicates'; showDuplicates(all, weeks); },
     function(e) { btn.disabled = false; btn.textContent = 'Find duplicates'; alert('Duplicate check failed: ' + e.message); });
 }
+function isWholesaleOrder(o) {
+  if (o.delivery_type === 'wholesale') return true;
+  var z = String(o.zone_code || '').toUpperCase();
+  return z.charAt(0) === 'W' && z !== 'WED' && z !== 'WEDO';
+}
 function dupGroups(list) {
   var groups = {};
   list.forEach(function(o) {
+    if (isWholesaleOrder(o)) return;
     var id = dupNorm(o.order_id), nm = dupNorm(o.name), ad = dupNorm(o.formatted_address || o.address);
     if (!id || !nm || !ad) return;
     var key = id + '|' + nm + '|' + ad;
@@ -367,6 +373,8 @@ function dupBannerCheck() {
   }, function() { bar.hidden = true; });
 }
 function showDuplicates(list, weeksChecked) {
+  var wsCount = list.filter(isWholesaleOrder).length;
+  list = list.filter(function(o) { return !isWholesaleOrder(o); });
   var groups = {}, skipped = 0;
   list.forEach(function(o) {
     var id = dupNorm(o.order_id), nm = dupNorm(o.name), ad = dupNorm(o.formatted_address || o.address);
@@ -377,7 +385,7 @@ function showDuplicates(list, weeksChecked) {
   var dups = Object.keys(groups).map(function(k) { return groups[k]; }).filter(function(g) { return g.length > 1; });
   dups.sort(function(a, b) { return String(b[0].received_at || b[0].date || '').localeCompare(String(a[0].received_at || a[0].date || '')); });
   var extra = dups.reduce(function(n, g) { return n + g.length - 1; }, 0);
-  document.getElementById('dupSummary').textContent = 'Checked ' + list.length + ' orders across the last ' + weeksChecked + ' week(s). ' + dups.length + ' group(s) match on Order ID, name and address (' + extra + ' extra record(s)).' + (skipped ? ' ' + skipped + ' order(s) skipped because Order ID, name or address was blank.' : '');
+  document.getElementById('dupSummary').textContent = 'Checked ' + list.length + ' orders across the last ' + weeksChecked + ' week(s). ' + dups.length + ' group(s) match on Order ID, name and address (' + extra + ' extra record(s)).' + (skipped ? ' ' + skipped + ' order(s) skipped because Order ID, name or address was blank.' : '') + (wsCount ? ' ' + wsCount + ' wholesale order(s) excluded (they repeat by design).' : '');
   var html = '';
   if (!dups.length) html = '<div style="padding:18px;text-align:center;color:var(--ink-soft);">No duplicates found.</div>';
   dups.forEach(function(g) {
