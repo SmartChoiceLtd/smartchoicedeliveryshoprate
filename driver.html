@@ -320,6 +320,7 @@ var selectedZone = '';
 var eventType = '';
 var selectedStatuses = [];
 var formattedAddress = '';
+var lastPlaceLat = null, lastPlaceLng = null; // coords of the last picked autocomplete address, so a tab switch can redo the zone lookup
 var matchedCommunity = '';
 var matchedDistanceKm = null;
 var deliveryType = 'store';
@@ -534,8 +535,16 @@ function showNotFound() {
   document.getElementById('notFound').hidden = false;
 }
 
+// Event codes the driver can always pick by hand as a fallback when the
+// automatic zone / Events path misses. WED and WEDO start with W but are
+// event codes, not wholesale zones.
+var EVENT_ZONE_CODES = ['FUN', 'FUNO', 'WED', 'WEDO', 'SPEC'];
+
 function isWholesaleZone(code) {
-  return code && code.toUpperCase().startsWith('W');
+  if (!code) return false;
+  var u = code.toUpperCase();
+  if (EVENT_ZONE_CODES.indexOf(u) >= 0) return false;
+  return u.startsWith('W');
 }
 
 var WHOLESALER_BILLING = {
@@ -551,7 +560,9 @@ function setBillingDefault(code) {
 }
 
 function getAllNonWholesaleZones() {
-  return Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); }).sort();
+  var list = Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); });
+  EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
+  return list.sort();
 }
 
 function getNeighbourZones(code) {
@@ -628,6 +639,8 @@ function buildZoneButtons(suggested, showAll) {
     list = getAllNonWholesaleZones();
   } else {
     list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
+    // Always offer the event codes as a manual fallback, even in the short list.
+    EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
   }
   var container = document.getElementById('zoneButtons');
   container.innerHTML = '';
@@ -886,7 +899,7 @@ function abandonStop() {
 function resetForm() {
   clearDraft();
   abandonStop();
-  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
+  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; lastPlaceLat = null; lastPlaceLng = null; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
   document.getElementById('fOrderId').value = '';
@@ -1423,6 +1436,16 @@ async function init() {
       document.getElementById('zoneResult').hidden = true;
       document.getElementById('zoneManual').hidden = true;
       document.getElementById('payPreview').hidden = true;
+      // The zone belongs to the address, not to the tab. Clearing it above is
+      // right (wholesale zones differ), but if an address is already entered
+      // the zone must be looked up again - otherwise a driver who typed the
+      // address first and then switched to Events (or any tab) is left with
+      // no zone and cannot submit.
+      var addrNow = formattedAddress || document.getElementById('fAddress').value.trim();
+      if (addrNow) {
+        if (!formattedAddress) formattedAddress = addrNow;
+        lookupZone(addrNow, lastPlaceLat === null ? undefined : lastPlaceLat, lastPlaceLng === null ? undefined : lastPlaceLng);
+      }
       refreshPhotoUI(); // the red "photo required" note must follow the tab you are now on
     });
 
@@ -1628,6 +1651,7 @@ function loadMaps(key) {
       if (place.geometry) {
         formattedAddress = place.formatted_address;
         var loc = place.geometry.location;
+        lastPlaceLat = loc.lat(); lastPlaceLng = loc.lng();
         lookupZone(place.formatted_address, loc.lat(), loc.lng());
       }
     });
