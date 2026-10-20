@@ -327,9 +327,9 @@ function viewPhoto(id) {
    delete the extra copy yourself. Scans every order, not just the week on screen. */
 function dupNorm(v) { return String(v == null ? '' : v).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
 function dupScan(onProgress, done, fail) {
-  var all = [], w = 0, empty = 0, MAX = 8;
+  var all = [], w = 0, empty = 0, MAX = 3;
   function step() {
-    if (w >= MAX || empty >= 4) { done(all, w); return; }
+    if (w >= MAX || empty >= 3) { done(all, w); return; }
     var sun = getWeekBounds(-w).end;
     var we = sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
     if (onProgress) onProgress(w + 1, MAX);
