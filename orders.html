@@ -283,18 +283,56 @@ return '<tr><td colspan="13" style="color:red;font-size:12px;">Row error: ' + e.
 document.getElementById('ordersBody').innerHTML = rows.join('');
 }
 
+
+/* "All dates": the single all-orders call is too heavy now (times out), so pull one week at a
+   time, 3 weeks in parallel, newest first, and let the search box work on whatever has arrived.
+   Stops after 8 empty weeks in a row (or 3 years). */
+var allLoadToken = 0;
+function loadAllWeeks() {
+  var token = ++allLoadToken, w = 0, emptyRun = 0, MAXW = 156, collected = [], failed = 0;
+  var label = document.getElementById('weekLabel');
+  allOrders = [];
+  function weekEnd(i) {
+    var sun = getWeekBounds(-i).end;
+    return sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
+  }
+  function batch() {
+    if (token !== allLoadToken) return;
+    if (emptyRun >= 8 || w >= MAXW) {
+      label.textContent = 'All dates' + (failed ? ' (' + failed + ' week(s) failed to load)' : '');
+      document.getElementById('loadingMsg').hidden = true;
+      return;
+    }
+    var idx = [w, w + 1, w + 2];
+    label.textContent = 'All dates \u2013 loading\u2026 (' + w + ' weeks back)';
+    Promise.all(idx.map(function(i) {
+      return fetch('/api/orders?week_end=' + weekEnd(i)).then(function(r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .catch(function() { failed++; return []; });
+    })).then(function(res) {
+      if (token !== allLoadToken) return;
+      res.forEach(function(list) { if (list.length) { emptyRun = 0; collected = collected.concat(list); } else { emptyRun++; } });
+      w += 3;
+      allOrders = collected.slice();
+      document.getElementById('loadingMsg').hidden = true;
+      applyFilters();
+      batch();
+    });
+  }
+  batch();
+}
 function loadOrders() {
 document.getElementById('loadingMsg').hidden = false;
 document.getElementById('errorMsg').hidden = true;
 document.getElementById('ordersTable').hidden = true;
 document.getElementById('emptyMsg').hidden = true;
 // Load the week on screen straight from the server (all of its orders, however many
-// orders exist overall). 'All dates' loads the most recent 5000 orders.
+// orders exist overall). 'All dates' loads week by week (see loadAllWeeks).
 function weekEndParam() {
   var sun = getWeekBounds(weekOffset).end;
   return sun.getFullYear() + '-' + String(sun.getMonth() + 1).padStart(2, '0') + '-' + String(sun.getDate()).padStart(2, '0');
 }
-var ordersUrl = showAllWeeks ? '/api/orders?limit=5000' : '/api/orders?week_end=' + weekEndParam();
+if (showAllWeeks) { loadAllWeeks(); return; }
+var ordersUrl = '/api/orders?week_end=' + weekEndParam();
 fetch(ordersUrl).then(function(res) {
 if (!res.ok) throw new Error('Status ' + res.status);
 return res.json();
@@ -537,10 +575,10 @@ document.getElementById('overrideModal').addEventListener('click', function(e) {
 if (e.target === this) this.hidden = true;
 });
 document.getElementById('prevWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset--; updateWeekLabel(); loadOrders();
+showAllWeeks = false; allLoadToken++; weekOffset--; updateWeekLabel(); loadOrders();
 });
 document.getElementById('nextWeek').addEventListener('click', function() {
-showAllWeeks = false; weekOffset++; updateWeekLabel(); loadOrders();
+showAllWeeks = false; allLoadToken++; weekOffset++; updateWeekLabel(); loadOrders();
 });
 document.getElementById('allWeeks').addEventListener('click', function() {
 showAllWeeks = true; updateWeekLabel(); loadOrders();
