@@ -36,6 +36,7 @@
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @media print{.topbar .back-btn,.period-toggle,.btn{display:none;}.topbar{border:none;padding:0 0 12px;}.container{padding:0;max-width:100%;}}
+.pay-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin:18px 0;}.pay-card h2{font-family:Georgia,serif;font-size:16px;margin:0 0 8px;}.pay-wk{border-top:1px solid var(--border);padding:10px 0;font-size:13px;}.pay-wk:first-of-type{border-top:0;}.pay-row{display:flex;justify-content:space-between;gap:10px;color:var(--ink-soft);}.pay-row b{color:var(--ink);}.pay-bal{font-weight:700;margin-top:4px;}.pay-ok{color:var(--green);}.pay-due{color:var(--warm);}
 </style>
 </head>
 <body>
@@ -83,6 +84,12 @@
     <div id="deliveryList"></div>
 
     <div id="emptyDiv" class="empty" hidden>No deliveries for this period.</div>
+
+    <div class="pay-card" id="payCard" hidden>
+      <h2>Payments &amp; balance</h2>
+      <div id="payList"></div>
+      <div class="delivery-detail" style="margin-top:8px;">Statement = the pay statement emailed for that week. Balance = statement + adjustments &minus; payments received. Questions? Contact Smart Choice Delivery.</div>
+    </div>
 
     <button class="btn" onclick="window.print()">Print Summary</button>
     <button class="btn btn-secondary" id="backBtn2">Back to My Route</button>
@@ -233,6 +240,39 @@ function esc(s) {
   return d.innerHTML;
 }
 
+
+function pmoney(n){var v=Math.round((Number(n)||0)*100)/100;return (v<0?'-':'')+'$'+Math.abs(v).toFixed(2);}
+function pdate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Edmonton',month:'short',day:'numeric',year:'numeric'});}catch(e){return iso;}}
+function pweek(we){try{return new Date(we+'T12:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});}catch(e){return we;}}
+var PAY_LABEL={etransfer:'E-transfer',advance:'Advance',other_payment:'Payment'};
+function pinGet(){try{return localStorage.getItem('scdPayPin_'+urlDriverCode)||'';}catch(e){return '';}}
+function pinSet(v){try{if(v)localStorage.setItem('scdPayPin_'+urlDriverCode,v);else localStorage.removeItem('scdPayPin_'+urlDriverCode);}catch(e){}}
+function pinForm(msg){
+  document.getElementById('payList').innerHTML='<div class="pay-wk"><div style="margin-bottom:6px;">Enter your PIN to see your payments and balance.</div><input id="payPin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" style="padding:8px;border:1px solid var(--border);border-radius:8px;width:120px;"> <button class="btn" style="width:auto;padding:8px 14px;display:inline-block;" onclick="submitPin()">Show</button><div id="payErr" style="color:var(--warm);font-size:12px;margin-top:6px;">'+esc(msg||'')+'</div><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">Don\'t have a PIN? Ask Smart Choice Delivery.</div></div>';
+  document.getElementById('payCard').hidden=false;
+}
+function submitPin(){var v=(document.getElementById('payPin').value||'').trim();if(v)loadPayments(v);}
+async function loadPayments(pinIn) {
+  var pin = pinIn || pinGet();
+  if (!pin) { pinForm(''); return; }
+  try {
+    var r = await fetch('/api/pay-ledger', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'driver_view', driver: urlDriverCode, pin: pin }) });
+    var d = await r.json().catch(function(){ return {}; });
+    if (!r.ok) { pinSet(''); pinForm(d.error || 'Could not check your PIN.'); return; }
+    pinSet(pin);
+    if (!d.weeks || !d.weeks.length) { document.getElementById('payList').innerHTML = '<div class="pay-wk">No payments recorded yet.</div>'; document.getElementById('payCard').hidden = false; return; }
+    document.getElementById('payList').innerHTML = d.weeks.map(function(w) {
+      var h = '<div class="pay-wk"><div class="pay-row"><b>Week ending ' + esc(pweek(w.week_end)) + '</b><span>' + (w.statement === null ? '' : 'Statement ' + pmoney(w.statement)) + '</span></div>';
+      w.adjustments.forEach(function(a) { h += '<div class="pay-row"><span>Adjustment' + (a.note ? ' (' + esc(a.note) + ')' : '') + '</span><span>' + pmoney(a.amount) + '</span></div>'; });
+      w.payments.forEach(function(p) { h += '<div class="pay-row"><span>' + esc(PAY_LABEL[p.type] || 'Payment') + ' &mdash; ' + esc(pdate(p.date)) + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span><span>' + pmoney(p.amount) + '</span></div>'; });
+      if (!w.payments.length && !w.adjustments.length) h += '<div class="pay-row"><span>No payments recorded yet</span><span></span></div>';
+      if (w.balance !== null) h += '<div class="pay-bal ' + (Math.abs(w.balance) < 0.005 ? 'pay-ok' : 'pay-due') + '">' + (Math.abs(w.balance) < 0.005 ? 'Paid in full' : (w.balance > 0 ? 'Balance owing ' + pmoney(w.balance) : 'Overpaid by ' + pmoney(-w.balance))) + '</div>';
+      return h + '</div>';
+    }).join('') + '<div style="text-align:right;margin-top:6px;"><a href="#" style="font-size:12px;color:var(--accent);" onclick="pinSet(\'\');loadPayments();return false;">Lock this on this device</a></div>';
+    document.getElementById('payCard').hidden = false;
+  } catch (e) {}
+}
+
 async function init() {
   try {
     var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
@@ -255,6 +295,7 @@ async function init() {
     document.getElementById('loadingDiv').hidden = true;
     document.getElementById('contentDiv').hidden = false;
     render();
+    loadPayments();
 
   } catch(e) {
     document.getElementById('loadingDiv').innerHTML = '<p style="color:var(--ink-soft)">Could not load summary: ' + e.message + '</p>';
