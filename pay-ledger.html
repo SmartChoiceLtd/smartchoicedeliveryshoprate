@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Driver Pay Ledger</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FFF3CD;--red-soft:#F8DEDA;--radius:10px;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{padding:16px;max-width:1100px;margin:0 auto;}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}
+.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}
+.btn.sm{padding:4px 9px;font-size:12px;}.btn.danger{background:#fff;color:var(--warm);border:1px solid var(--warm);}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;}
+.sum{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;gap:22px;flex-wrap:wrap;}
+.sum b{display:block;font-size:18px;}.sum span{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+th{background:#1E6E93;color:#fff;font-size:12px;text-align:left;padding:8px 10px;}th.n,td.n{text-align:right;}
+td{padding:9px 10px;border-top:1px solid var(--border);vertical-align:top;}
+tr.drv{cursor:pointer;}tr.drv:hover td{background:#F7F3EA;}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;}
+.b-ok{background:var(--green-soft);color:var(--green);}.b-part{background:var(--amber-soft);color:var(--amber);}.b-un{background:var(--red-soft);color:var(--warm);}.b-over{background:var(--accent-soft);color:var(--accent);}.b-none{background:#eee;color:var(--ink-soft);}
+.flag{font-size:11px;color:var(--warm);display:block;margin-top:2px;}
+.detail td{background:#FCFAF5;}
+.log{width:100%;font-size:12px;margin-bottom:10px;border:1px solid var(--border);}.log td,.log th{padding:5px 8px;}.log th{background:#EFE9DB;color:var(--ink);}
+.void td{color:#999;text-decoration:line-through;}
+.form{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}.form label{font-size:11px;color:var(--ink-soft);display:block;}
+.msg{padding:9px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;}.msg.err{background:var(--red-soft);color:var(--warm);}.msg.ok{background:var(--green-soft);color:var(--green);}
+.note{font-size:12px;color:var(--ink-soft);margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Driver Pay Ledger</h1><a href="/hub.html">&larr; Hub</a><a href="/orders.html">Orders</a></div>
+<div class="main">
+  <div class="bar">
+    <button class="btn ghost sm" id="prev">&larr;</button>
+    <label>Week ending <input type="date" id="we"></label>
+    <button class="btn ghost sm" id="next">&rarr;</button>
+    <button class="btn" id="load">Load</button>
+    <button class="btn ghost" id="csv">Export CSV</button>
+  </div>
+  <div id="msg" class="msg" hidden></div>
+  <div class="sum" id="sum" hidden></div>
+  <table id="tbl" hidden><thead><tr><th>Driver</th><th class="n">Deliveries</th><th class="n">Statement</th><th>Emailed</th><th class="n">Adjust.</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th></tr></thead><tbody id="body"></tbody></table>
+  <div class="note">Statement = this week's driver pay as it stands now. Emailed = the last pay-statement email sent (logged automatically with date and time). E-transfers, advances and adjustments are entered here by hand &mdash; nothing is deleted; a wrong entry is voided with a reason. Times shown are Calgary time.</div>
+</div>
+<script>
+var DATA = { drivers: {}, week: '' };
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function money(n){var v=Math.round((Number(n)||0)*100)/100;return (v<0?'-':'')+'$'+Math.abs(v).toFixed(2);}
+function fdt(iso){if(!iso)return '';try{return new Date(iso).toLocaleString('en-CA',{timeZone:'America/Edmonton',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return iso;}}
+function showMsg(t,c){var m=$('msg');m.className='msg '+(c||'ok');m.textContent=t;m.hidden=!t;}
+function lastSunday(){var d=new Date();d.setDate(d.getDate()-d.getDay());return iso(d);}
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function shiftWeek(n){var v=$('we').value;if(!v)return;var d=new Date(v+'T12:00:00');d.setDate(d.getDate()+7*n);$('we').value=iso(d);load();}
+var TYPE_LABEL={statement_emailed:'Statement emailed',etransfer:'E-transfer',advance:'Advance',other_payment:'Other payment',adjustment:'Adjustment'};
+
+function calc(r){
+  var live=r.live||{total_pay:0,deliveries:0};
+  var entries=(r.record&&r.record.entries)||[];
+  var adj=0,paid=0,emailed=null;
+  entries.forEach(function(e){
+    if(e.voided)return;
+    if(e.type==='adjustment')adj+=e.amount;
+    else if(e.type==='statement_emailed')emailed=e;
+    else paid+=e.amount;
+  });
+  var due=Math.round((live.total_pay+adj)*100)/100;
+  var bal=Math.round((due-paid)*100)/100;
+  var status,cls;
+  if(Math.abs(due)<0.005&&paid<0.005){status='Nothing owed';cls='b-none';}
+  else if(bal<-0.005){status='Overpaid';cls='b-over';}
+  else if(Math.abs(bal)<=0.005){status='Paid in full';cls='b-ok';}
+  else if(paid>0.005){status='Partial';cls='b-part';}
+  else {status='Unpaid';cls='b-un';}
+  var flags=[];
+  if(!emailed&&live.total_pay>0)flags.push('Statement not emailed');
+  if(emailed&&Math.abs(emailed.amount-live.total_pay)>0.005)flags.push('Changed since emailed ('+money(emailed.amount)+' then, '+money(live.total_pay)+' now)');
+  return {adj:adj,paid:paid,due:due,bal:bal,status:status,cls:cls,emailed:emailed,flags:flags,entries:entries};
+}
+
+async function load(){
+  var we=$('we').value; if(!/^\d{4}-\d{2}-\d{2}$/.test(we)){showMsg('Pick a week-ending date.','err');return;}
+  showMsg('Loading…','ok'); $('load').disabled=true;
+  try{
+    var rs=await Promise.all([fetch('/api/send-driver-pay?action=week_totals&week_end='+we),fetch('/api/pay-ledger?week_end='+we)]);
+    if(rs[0].status===401||rs[1].status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+    if(!rs[0].ok)throw new Error('Week totals failed: '+rs[0].status);
+    if(!rs[1].ok)throw new Error('Ledger failed: '+rs[1].status);
+    var totals=await rs[0].json(), ledger=await rs[1].json();
+    var map={};
+    totals.drivers.forEach(function(d){map[d.code]={code:d.code,name:d.name,live:d};});
+    ledger.records.forEach(function(rec){var c=rec.driver;(map[c]=map[c]||{code:c,name:'',live:{total_pay:0,deliveries:0}}).record=rec;});
+    DATA={drivers:map,week:we}; showMsg('');
+    render();
+  }catch(e){showMsg(e.message,'err');}
+  finally{$('load').disabled=false;}
+}
+
+var OPEN={};
+function render(){
+  var codes=Object.keys(DATA.drivers).sort(), tOwed=0,tPaid=0,full=0,counted=0, rows=[];
+  codes.forEach(function(c){
+    var r=DATA.drivers[c], k=calc(r); r._k=k;
+    if(k.status!=='Nothing owed'){counted++;tOwed+=k.due;tPaid+=k.paid;if(k.status==='Paid in full')full++;}
+    rows.push('<tr class="drv" data-c="'+esc(c)+'"><td><b>'+esc(c)+'</b> '+esc(r.name)+'</td><td class="n">'+(r.live.deliveries||0)+'</td><td class="n">'+money(r.live.total_pay)+'</td>'
+      +'<td>'+(k.emailed?esc(fdt(k.emailed.recorded_at)):'<span style="color:#999">—</span>')+(k.flags.map(function(f){return '<span class="flag">⚠ '+esc(f)+'</span>';}).join(''))+'</td>'
+      +'<td class="n">'+(k.adj?money(k.adj):'')+'</td><td class="n">'+(k.paid?money(k.paid):'')+'</td><td class="n"><b>'+money(k.bal)+'</b></td><td><span class="badge '+k.cls+'">'+k.status+'</span></td></tr>');
+    if(OPEN[c]) rows.push('<tr class="detail"><td colspan="8">'+detailHtml(r)+'</td></tr>');
+  });
+  $('body').innerHTML=rows.join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:#888">No deliveries or ledger entries for this week.</td></tr>';
+  $('tbl').hidden=false;
+  $('sum').hidden=false;
+  $('sum').innerHTML='<div><b>'+full+' of '+counted+'</b><span>Paid in full</span></div><div><b>'+money(tOwed)+'</b><span>Total due</span></div><div><b>'+money(tPaid)+'</b><span>Total paid</span></div><div><b>'+money(tOwed-tPaid)+'</b><span>Outstanding</span></div>';
+}
+
+function detailHtml(r){
+  var k=r._k, h='';
+  h+='<table class="log"><thead><tr><th>Recorded</th><th>Type</th><th class="n">Amount</th><th>Paid/occurred</th><th>Ref</th><th>Note</th><th>By</th><th></th></tr></thead><tbody>';
+  if(!k.entries.length)h+='<tr><td colspan="8" style="color:#888">No entries yet.</td></tr>';
+  k.entries.forEach(function(e){
+    h+='<tr class="'+(e.voided?'void':'')+'"><td>'+esc(fdt(e.recorded_at))+'</td><td>'+esc(TYPE_LABEL[e.type]||e.type)+'</td><td class="n">'+money(e.amount)+'</td><td>'+esc(e.occurred_at?fdt(e.occurred_at):'')+'</td><td>'+esc(e.reference||'')+'</td><td>'+esc(e.note||'')+(e.voided?' <i>(voided '+esc(fdt(e.voided.at))+': '+esc(e.voided.reason)+')</i>':'')+'</td><td>'+esc(e.by||'')+'</td>'
+      +'<td>'+((!e.voided&&e.type!=='statement_emailed')?'<button class="btn danger sm" data-void="'+esc(e.id)+'" data-c="'+esc(r.code)+'">Void</button>':'')+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  var rem=Math.max(0,k.bal);
+  h+='<div class="form" data-form="'+esc(r.code)+'">'
+    +'<div><label>Type</label><select class="f-type"><option value="etransfer">E-transfer</option><option value="advance">Advance</option><option value="other_payment">Other payment</option><option value="adjustment">Adjustment (+/−)</option></select></div>'
+    +'<div><label>Amount</label><input class="f-amt" type="number" step="0.01" style="width:100px" value="'+(rem?rem.toFixed(2):'')+'"></div>'
+    +'<div><label>Date/time paid (optional)</label><input class="f-when" type="datetime-local"></div>'
+    +'<div><label>Reference / e-transfer #</label><input class="f-ref" style="width:150px"></div>'
+    +'<div style="flex:1;min-width:160px"><label>Note (required for adjustments)</label><input class="f-note" style="width:100%"></div>'
+    +'<button class="btn" data-add="'+esc(r.code)+'">Record</button></div>'
+    +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Amount is pre-filled with the balance remaining. For a partial payment, change the amount. For an adjustment use a negative number to reduce what is owed (e.g. recovering an advance).</div>';
+  return h;
+}
+
+async function post(body){
+  var r=await fetch('/api/pay-ledger',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok)throw new Error(d.error||('Status '+r.status));
+  return d;
+}
+
+$('body').addEventListener('click',async function(e){
+  var add=e.target.closest('[data-add]'), vd=e.target.closest('[data-void]');
+  if(add){
+    var c=add.dataset.add, f=add.closest('.form');
+    var when=f.querySelector('.f-when').value;
+    try{
+      var d=await post({week_end:DATA.week,driver:c,type:f.querySelector('.f-type').value,amount:f.querySelector('.f-amt').value,
+        occurred_at:when?new Date(when).toISOString():null,reference:f.querySelector('.f-ref').value,note:f.querySelector('.f-note').value});
+      DATA.drivers[c].record=d.record; showMsg('Recorded for '+c+'.','ok'); render();
+    }catch(x){showMsg(x.message,'err');}
+    return;
+  }
+  if(vd){
+    var reason=prompt('Reason for voiding this entry (required):'); if(!reason)return;
+    try{ var d2=await post({action:'void',week_end:DATA.week,driver:vd.dataset.c,entry_id:vd.dataset.void,reason:reason});
+      DATA.drivers[vd.dataset.c].record=d2.record; showMsg('Entry voided.','ok'); render(); }catch(x){showMsg(x.message,'err');}
+    return;
+  }
+  if(e.target.closest('.detail'))return;
+  var tr=e.target.closest('tr.drv'); if(!tr)return;
+  var code=tr.dataset.c; OPEN[code]=!OPEN[code]; render();
+});
+
+$('csv').addEventListener('click',function(){
+  var rows=[['Week ending','Driver','Name','Deliveries','Statement','Adjustments','Paid','Balance','Status','Statement emailed']];
+  Object.keys(DATA.drivers).sort().forEach(function(c){var r=DATA.drivers[c],k=r._k||calc(r);
+    rows.push([DATA.week,c,r.name,r.live.deliveries||0,r.live.total_pay.toFixed(2),k.adj.toFixed(2),k.paid.toFixed(2),k.bal.toFixed(2),k.status,k.emailed?fdt(k.emailed.recorded_at):'']);});
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='driver-pay-ledger-'+DATA.week+'.csv';document.body.appendChild(a);a.click();a.remove();
+});
+$('load').addEventListener('click',load);$('prev').addEventListener('click',function(){shiftWeek(-1);});$('next').addEventListener('click',function(){shiftWeek(1);});
+$('we').value=lastSunday();
+fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
+  if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+  load();
+}).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
+</script>
+</body>
+</html>
