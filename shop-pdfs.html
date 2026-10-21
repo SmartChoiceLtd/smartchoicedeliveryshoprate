@@ -54,6 +54,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
       <div class="row">
         <button class="btn" id="saveBtn">Save to folder</button>
         <button class="btn btn-ghost" id="zipBtn">Download zip</button>
+        <button class="btn btn-ghost" id="folderBtn" title="Pick the folder the PDFs are saved into">Change folder</button>
       </div>
     </div>
     <table><thead><tr><th><input type="checkbox" id="allChk" checked></th><th>Report</th><th class="num">Deliveries</th><th class="num">Total</th><th></th></tr></thead><tbody id="rows"></tbody></table>
@@ -232,6 +233,14 @@ async function getRoot(){
   await putSavedHandle(key,h);
   return h;
 }
+async function changeFolder(){
+  if(!HAS_FS){showMsg('This browser cannot pick a folder - use Download zip instead (Edge or Chrome can).','err');return;}
+  try{
+    var h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+    await putSavedHandle('root-'+type,h);
+    showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
+  }catch(e){ if(!(e&&e.name==='AbortError')) showMsg('Could not open the folder: '+e.message,'err'); }
+}
 async function saveToFolder(){
   var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
   var btn=document.getElementById('saveBtn');
@@ -250,7 +259,7 @@ async function saveToFolder(){
         var w=await fh.createWritable(); await w.write(blob); await w.close(); done++;
       }catch(e){failed.push(g.code+' ('+e.message+')');}
     }
-    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+monthFolder(we)+'\\'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
+    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+monthFolder(we)+'\\<shop folder>\\  (e.g. '+root.name+'\\'+monthFolder(we)+'\\'+groupFolder(sel[0])+'\\'+groupFile(sel[0],we)+'). Wrong place? Use Change folder.'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
   }catch(e){showMsg('Could not save: '+e.message,'err');}
   finally{btn.disabled=false;}
 }
@@ -277,6 +286,7 @@ function hint(){
 document.getElementById('loadBtn').addEventListener('click',load);
 document.getElementById('saveBtn').addEventListener('click',saveToFolder);
 document.getElementById('zipBtn').addEventListener('click',downloadZip);
+document.getElementById('folderBtn').addEventListener('click',changeFolder);
 document.getElementById('allChk').addEventListener('change',function(){var v=this.checked;document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){c.checked=v;});});
 document.getElementById('rows').addEventListener('click',function(e){
   var b=e.target.closest('[data-pdf]'); if(!b) return;
