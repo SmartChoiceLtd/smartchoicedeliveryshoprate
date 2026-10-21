@@ -593,7 +593,21 @@ loadOrders();
 function qbExport(){var now=new Date();var todayLocal=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');var weekEnd=prompt('Week ending date (YYYY-MM-DD):',todayLocal);if(!weekEnd)return;var startInv=prompt('Starting invoice number:','');if(!startInv)return;fetch('/api/qb-export?week_end='+weekEnd+'&start_invoice='+startInv).then(function(r){return r.blob();}).then(function(blob){var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='qb-invoices-'+weekEnd+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}).catch(function(e){alert('QB export failed: '+e.message);});}
 function logout(){fetch('/api/auth?action=logout',{method:'POST'}).finally(function(){window.location.href='/login.html';});}
  function openReport(type){
-  var isDay = confirm('Click OK for a single-day report, or Cancel for a full week.');
+  // A browser confirm() can't have its buttons renamed, so this is a small picker with Day / Week.
+  var m = document.getElementById('periodModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'periodModal'; m.className = 'modal-bg';
+    m.innerHTML = '<div class="modal" style="max-width:320px;text-align:center;"><h2 style="margin-bottom:6px;">Report period</h2><div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Run the report for a single day or a full week?</div><div class="modal-actions" style="justify-content:center;gap:10px;"><button class="btn" id="periodDay">Day</button><button class="btn" id="periodWeek">Week</button><button class="btn btn-ghost" id="periodClose">Close</button></div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function(e) { if (e.target === m) m.hidden = true; });
+    document.getElementById('periodClose').onclick = function() { m.hidden = true; };
+  }
+  m.hidden = false;
+  document.getElementById('periodDay').onclick = function() { m.hidden = true; runReport(type, true); };
+  document.getElementById('periodWeek').onclick = function() { m.hidden = true; runReport(type, false); };
+}
+function runReport(type, isDay){
   var now = new Date();
   var todayLocal = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   var dateLabel = isDay ? 'Date (YYYY-MM-DD):' : 'Week ending (YYYY-MM-DD):';
