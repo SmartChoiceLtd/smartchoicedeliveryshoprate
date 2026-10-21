@@ -114,7 +114,8 @@ async function computeYtd(driver, weekOrders, weekEnd) {
   };
 }
 
-async function buildPayStatementHtml(driver, orders, weekEnd, rates) {
+async function buildPayStatementHtml(driver, orders, weekEnd, rates, payDate) {
+  payDate = payDate || fmtCalgaryDate(new Date());
   const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
   const weekDel = orders.length;
   const weekAvg = weekDel > 0 ? weekPay / weekDel : 0;
@@ -231,7 +232,7 @@ async function buildPayStatementHtml(driver, orders, weekEnd, rates) {
       </table>
     </div>
     <div style="background:#FAF7F2;border:1px solid #E6DECF;border-radius:8px;padding:14px 16px;font-size:13px;margin-bottom:16px;">
-      <p style="margin:0 0 8px;"><strong>Payment:</strong> E-transfer sent Sunday to <strong>${driver.email}</strong></p>
+      <p style="margin:0 0 8px;"><strong>Payment:</strong> E-transfer sent ${payDate} to <strong>${driver.email}</strong></p>
       <a href="${driverLink}" style="color:#0C769E;font-weight:600;font-size:13px;">View full delivery detail →</a>
     </div>
     <p style="font-size:12px;color:#6B6256;margin:0;">Questions? Reply to this email or call Kevin at 403-880-9822.</p>
@@ -276,9 +277,28 @@ async function requireAuth(req) {
   return sess.username;
 }
 
+// Calendar date in Calgary time, e.g. "Oct 21, 2026".
+function fmtCalgaryDate(d) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric', month: 'short', day: 'numeric' }).format(d).replace('.', '');
+}
+// The date shown for the e-transfer: the date an e-transfer was recorded for this driver and week in
+// the pay ledger (the date it actually went out, if one was entered), otherwise today - the day this
+// email is being sent.
+async function etransferDate(driver, weekEnd) {
+  try {
+    const rec = await getStore('flower-driver-payments').get(weekEnd + '_' + (driver.code || '').toUpperCase(), { type: 'json' });
+    const hits = ((rec && rec.entries) || []).filter(e => e.type === 'etransfer' && !e.voided);
+    if (hits.length) {
+      const e = hits[hits.length - 1];
+      return fmtCalgaryDate(new Date(e.occurred_at || e.recorded_at));
+    }
+  } catch (e) {}
+  return fmtCalgaryDate(new Date());
+}
+
 async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
+  const html = await buildPayStatementHtml(driver, orders, weekEnd, rates, await etransferDate(driver, weekEnd));
 
   const result = await resend.emails.send({
     from: 'pay@smartchoicedelivery.ca',
@@ -444,7 +464,7 @@ export default async (req) => {
       });
     }
 
-    const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
+    const html = await buildPayStatementHtml(driver, orders, weekEnd, rates, await etransferDate(driver, weekEnd));
     const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pay Statement - ${driver.name || driverCode}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
     return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
   }
