@@ -152,7 +152,7 @@ async function buildPayStatementHtml(driver, orders, weekEnd, rates, payDate) {
   }).join('');
 
   const firstName = (driver.name || '').split(' ')[0];
-  const driverLink = `https://smartchoicedeliveryshoprate.netlify.app/api/reports?type=driver&week_end=${weekEnd}&code=${(driver.code || '').toLowerCase()}`;
+  const driverLink = `https://quotes.smartchoicedelivery.ca/driver-summary/${(driver.code || '').toLowerCase()}`;
 
   return `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100% !important;min-width:280px;">
@@ -233,7 +233,7 @@ async function buildPayStatementHtml(driver, orders, weekEnd, rates, payDate) {
     </div>
     <div style="background:#FAF7F2;border:1px solid #E6DECF;border-radius:8px;padding:14px 16px;font-size:13px;margin-bottom:16px;">
       <p style="margin:0 0 8px;"><strong>Payment:</strong> E-transfer sent ${payDate} to <strong>${driver.email}</strong></p>
-      <a href="${driverLink}" style="color:#0C769E;font-weight:600;font-size:13px;">View full delivery detail →</a>
+      <a href="${driverLink}" style="color:#0C769E;font-weight:600;font-size:13px;">View your delivery summary, payments &amp; balance →</a>
     </div>
     <p style="font-size:12px;color:#6B6256;margin:0;">Questions? Reply to this email or call Kevin at 403-880-9822.</p>
     <p style="font-size:13px;margin:12px 0 0;">Cheers,<br><strong>Kevin Michaud</strong><br>Smart Choice Delivery</p>
@@ -403,6 +403,8 @@ export default async (req) => {
   }
 
   if (req.method === 'GET') {
+    // The statement view (and its debug views) show a driver's pay, so they need a staff login.
+    if (!(await requireAuth(req))) return new Response('Not authenticated. Please sign in at /login.html and try again.', { status: 401, headers: { 'content-type': 'text/plain' } });
     const weekEnd = url.searchParams.get('week_end');
     const driverCode = (url.searchParams.get('driver_code') || url.searchParams.get('code') || '').toUpperCase();
     if (!weekEnd || !driverCode) {
