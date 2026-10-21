@@ -95,13 +95,14 @@ async function load(){
     var map={};
     totals.drivers.forEach(function(d){map[d.code]={code:d.code,name:d.name,live:d};});
     ledger.records.forEach(function(rec){var c=rec.driver;(map[c]=map[c]||{code:c,name:'',live:{total_pay:0,deliveries:0}}).record=rec;});
+    try{var pr=await fetch('/api/pay-ledger?pins=1'); if(pr.ok){(await pr.json()).pins.forEach(function(c){PINS[c]=true;});}}catch(x){}
     DATA={drivers:map,week:we}; showMsg('');
     render();
   }catch(e){showMsg(e.message,'err');}
   finally{$('load').disabled=false;}
 }
 
-var OPEN={};
+var OPEN={}, PINS={};
 function render(){
   var codes=Object.keys(DATA.drivers).sort(), tOwed=0,tPaid=0,full=0,counted=0, rows=[];
   codes.forEach(function(c){
@@ -135,6 +136,7 @@ function detailHtml(r){
     +'<div><label>Reference / e-transfer #</label><input class="f-ref" style="width:150px"></div>'
     +'<div style="flex:1;min-width:160px"><label>Note (required for adjustments)</label><input class="f-note" style="width:100%"></div>'
     +'<button class="btn" data-add="'+esc(r.code)+'">Record</button></div>'
+    +'<div style="margin-top:10px;font-size:12px;">Driver PIN (lets '+esc(r.code)+' see payments and balance in the app): <b>'+(PINS[r.code]?'set':'not set')+'</b> <button class="btn ghost sm" data-pin="'+esc(r.code)+'">'+(PINS[r.code]?'Reset PIN':'Create PIN')+'</button></div>'
     +'<div style="font-size:11px;color:var(--ink-soft);margin-top:6px">Amount is pre-filled with the balance remaining. For a partial payment, change the amount. For an adjustment use a negative number to reduce what is owed (e.g. recovering an advance).</div>';
   return h;
 }
@@ -147,7 +149,13 @@ async function post(body){
 }
 
 $('body').addEventListener('click',async function(e){
-  var add=e.target.closest('[data-add]'), vd=e.target.closest('[data-void]');
+  var add=e.target.closest('[data-add]'), vd=e.target.closest('[data-void]'), pn=e.target.closest('[data-pin]');
+  if(pn){
+    var pc=pn.dataset.pin;
+    if(!confirm((PINS[pc]?'Reset the PIN for ':'Create a PIN for ')+pc+'? '+(PINS[pc]?'Their old PIN will stop working.':''))) return;
+    try{ var pd=await post({action:'set_pin',driver:pc}); PINS[pc]=true; showMsg('PIN for '+pc+' is '+pd.pin+'  \u2014 shown only once. Give it to the driver privately.','ok'); render(); }catch(x){showMsg(x.message,'err');}
+    return;
+  }
   if(add){
     var c=add.dataset.add, f=add.closest('.form');
     var when=f.querySelector('.f-when').value;
