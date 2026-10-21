@@ -116,8 +116,35 @@ export default async (req) => {
       // more than 500 orders in total).
       const weekEnd = url.searchParams.get('week_end');
       const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
-      const { blobs } = await (weekPrefix ? store.list({ prefix: weekPrefix }) : store.list());
-      const picked = weekPrefix ? blobs : blobs.slice(-Math.min(limitParam, 5000));
+      if (weekPrefix) {
+        // Orders saved before the week-in-the-key scheme (and any filed under a different week)
+        // have no matching prefix, so the prefix lookup alone misses them. Same recovery the
+        // reports use: take other keys whose embedded timestamp is near this week, fetch them,
+        // and let the order's own date decide whether it belongs.
+        const DAY = 86400000;
+        const endD = new Date(weekEnd + 'T12:00:00');
+        const startD = new Date(endD); startD.setDate(startD.getDate() - 6);
+        const startIso = startD.getFullYear() + '-' + String(startD.getMonth() + 1).padStart(2, '0') + '-' + String(startD.getDate()).padStart(2, '0');
+        const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+        const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
+        const { blobs: prefixed } = await store.list({ prefix: weekPrefix });
+        const { blobs: all } = await store.list();
+        const fallback = all.filter(b => {
+          if (b.key.startsWith(weekPrefix)) return false;
+          const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+          if (!m) return false;
+          const ts = parseInt(m[1]);
+          return ts >= startMs && ts <= endMs;
+        });
+        const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+        const inWeek = fetched.filter(o => {
+          const d = normalizeOrderDate(o.date) || (o.received_at ? String(o.received_at).slice(0, 10) : null);
+          return d && d >= startIso && d <= weekEnd;
+        });
+        return json(inWeek.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+      }
+      const { blobs } = await store.list();
+      const picked = blobs.slice(-Math.min(limitParam, 5000));
       const orders = await Promise.all(
         picked.map(b => store.get(b.key, { type: 'json' }))
       );
