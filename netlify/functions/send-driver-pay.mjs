@@ -1,308 +1,517 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Shop PDFs</title>
-<style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
-*{box-sizing:border-box;}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
-[hidden]{display:none!important;}
-.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}
-.topbar h1{font-family:Georgia,serif;font-size:18px;margin:0;flex:1;}
-.topbar a{color:var(--accent);font-size:13px;text-decoration:none;}
-.wrap{max-width:900px;margin:0 auto;padding:20px;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
-label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px;}
-input[type=date]{padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
-.seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.seg button{border:none;background:none;padding:9px 16px;font-size:14px;cursor:pointer;color:var(--ink-soft);}
-.seg button.on{background:var(--accent);color:#fff;font-weight:600;}
-.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;}
-.btn:disabled{opacity:.5;cursor:default;}
-.btn-ghost{background:none;color:var(--accent);border:1px solid var(--accent);}
-.btn-sm{padding:5px 10px;font-size:12px;}
-table{width:100%;border-collapse:collapse;font-size:14px;}
-th{text-align:left;font-size:12px;color:var(--ink-soft);padding:6px 8px;border-bottom:2px solid var(--border);}
-td{padding:7px 8px;border-bottom:1px solid var(--border);}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
-.path{font-size:12px;color:var(--ink-soft);}
-.msg{padding:10px 12px;border-radius:8px;font-size:13px;margin-top:12px;white-space:pre-wrap;}
-.msg.ok{background:var(--green-soft);color:var(--green);border:1px solid #A8CFA8;}
-.msg.err{background:#FBEAEA;color:#7A2E22;border:1px solid #E3B3AE;}
-.msg.info{background:var(--accent-soft);color:#0a5a78;}
-.hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:8px;}
-</style>
-</head>
-<body>
-<div class="topbar"><h1>Shop &amp; Driver PDFs</h1><a href="/orders">&larr; Orders</a></div>
-<div class="wrap">
-  <div class="card">
-    <div class="row">
-      <div><label>Report type</label><div class="seg" id="typeSeg"><button data-t="shop" class="on">Shops</button><button data-t="driver">Drivers</button></div></div>
-      <div><label>Week ending (Sunday)</label><input type="date" id="weekEnd"></div>
-      <button class="btn" id="loadBtn">Load</button>
-    </div>
-    <div class="hint" id="rootHint"></div>
-  </div>
+import { getStore } from '@netlify/blobs';
+import { Resend } from 'resend';
 
-  <div class="card" id="listCard" hidden>
-    <div class="row" style="justify-content:space-between;margin-bottom:10px;">
-      <div id="summary" style="font-weight:600;"></div>
-      <div class="row">
-        <button class="btn" id="saveBtn">Save to folder</button>
-        <button class="btn btn-ghost" id="zipBtn">Download zip</button>
-        <button class="btn btn-ghost" id="folderBtn" title="Pick the folder the PDFs are saved into">Change folder</button>
-      </div>
-    </div>
-    <table><thead><tr><th><input type="checkbox" id="allChk" checked></th><th>Report</th><th class="num">Deliveries</th><th class="num">Total</th><th></th></tr></thead><tbody id="rows"></tbody></table>
-    <div class="path" id="pathEg" style="margin-top:10px;"></div>
-    <div id="msg" class="msg" hidden></div>
-  </div>
-  <div id="topMsg" class="msg err" hidden></div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script>
-var type = 'shop', data = null;
-var MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-var HAS_FS = typeof window.showDirectoryPicker === 'function';
-
-function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
-function safe(s){return String(s||'').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim().toUpperCase();}
-function money(n){return '$'+Number(n).toFixed(2);}
-function pad(n){return String(n).padStart(2,'0');}
-
-function lastSunday(){
-  var d=new Date(); var back=d.getDay()===0?0:d.getDay(); // most recent Sunday on/before today
-  d.setDate(d.getDate()-back);
-  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-}
-function monthFolder(weekEnd){var p=weekEnd.split('-');return MONTHS[parseInt(p[1],10)-1]+' '+p[0].slice(2);}
-function groupFolder(g){return safe(g.code+' '+(g.name||''));}
-function groupFile(g,weekEnd){return groupFolder(g)+' WE '+weekEnd+'.pdf';}
-function rootName(){return type==='shop'?'SC26 SHOP':'SC26 DRIVER';}
-
-function showTop(t){var m=document.getElementById('topMsg');m.textContent=t||'';m.hidden=!t;}
-function showMsg(t,cls){var m=document.getElementById('msg');m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;}
-
-/* ---------- PDF ---------- */
-function buildPdf(g){
-  var jsPDF=window.jspdf.jsPDF;
-  var doc=new jsPDF({orientation:'landscape',unit:'mm',format:'letter'});
-  var W=doc.internal.pageSize.getWidth(), M=8, y=M+4;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0);
-  doc.text(g.title,M,y);
-  doc.setFontSize(10); doc.text('SMART CHOICE DELIVERY',W-M,y,{align:'right'});
-  doc.setFont('helvetica','normal'); doc.setTextColor(68);
-  doc.text(g.subtitle,M,y+5);
-  doc.setFont('helvetica','bold'); doc.setTextColor(0);
-  doc.text(g.kind==='shop'?'Shop Weekly Detail':'Driver Weekly Detail',W-M,y+5,{align:'right'});
-  y+=8; doc.setDrawColor(0); doc.setLineWidth(0.5); doc.line(M,y,W-M,y); y+=4;
-
-  if(g.band){
-    doc.setFillColor(244,220,201); doc.rect(M,y,W-2*M,7,'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(184,71,43);
-    doc.text(g.band,M+2,y+4.6); y+=10;
-  }
-  if(g.stats){
-    var x=M;
-    g.stats.forEach(function(s){
-      doc.setDrawColor(210); doc.setLineWidth(0.2); doc.roundedRect(x,y,38,12,1.5,1.5);
-      doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(12,118,158);
-      doc.text(s[1],x+19,y+6,{align:'center'});
-      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100);
-      doc.text(s[0],x+19,y+10.2,{align:'center'});
-      x+=42;
-    });
-    y+=16;
-  }
-
-  // zone summary tables, side by side
-  var bottom=y, left=M;
-  g.zoneTables.forEach(function(t){
-    var body=t.rows.slice(); body.push(t.total);
-    doc.autoTable({
-      startY:y, margin:{left:left}, tableWidth:50, head:[t.head], body:body, theme:'plain',
-      styles:{fontSize:8,cellPadding:{top:0.9,bottom:0.9,left:1.5,right:1.5},textColor:0},
-      headStyles:{fillColor:[12,118,158],textColor:255,fontStyle:'bold'},
-      columnStyles:{1:{halign:'right'}},
-      didParseCell:function(h){
-        if(h.section==='body'&&h.row.index===body.length-1){h.cell.styles.fontStyle='bold';h.cell.styles.fillColor=[240,240,240];}
-        if(h.section==='body'&&h.row.index<body.length-1){h.cell.styles.lineWidth={bottom:0.1};h.cell.styles.lineColor=[225,225,225];}
-      }
-    });
-    bottom=Math.max(bottom,doc.lastAutoTable.finalY); left+=56;
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
   });
-  // grand total box
-  doc.setFillColor(244,220,201); doc.setDrawColor(168,207,168); doc.setLineWidth(0.2);
-  doc.rect(left,y,70,9,'FD');
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0);
-  doc.text(g.footer,left+3,y+6);
-  y=bottom+6;
+}
 
-  var colStyles={}, head=g.head;
-  // right-align money / count columns
-  head.forEach(function(h,i){ if(/^(KM|Pcs|Srate|drate|GDPI|Total)$/.test(h)) colStyles[i]={halign:'right'}; });
-  doc.autoTable({
-    startY:y, margin:{left:M,right:M,top:M+2,bottom:10},
-    head:[head.concat([''])], body:g.rows.map(function(r){return r.concat(['']);}),
-    styles:{fontSize:7.5,cellPadding:{top:0.9,bottom:0.9,left:1.3,right:1.3},overflow:'ellipsize',textColor:0,lineColor:[235,235,235],lineWidth:{bottom:0.1}},
-    headStyles:{fillColor:[12,118,158],textColor:255,fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[249,249,249]},
-    columnStyles:colStyles,
-    rowPageBreak:'avoid',
-    didDrawCell:function(h){
-      // tick box in the last column (the standard PDF fonts have no box glyph)
-      if(h.section==='body'&&h.column.index===head.length){
-        doc.setDrawColor(90); doc.setLineWidth(0.2);
-        doc.rect(h.cell.x+h.cell.width/2-1.3,h.cell.y+h.cell.height/2-1.3,2.6,2.6);
-      }
-    }
+function getWeekBounds(weekEnd) {
+  const end = new Date(weekEnd + 'T23:59:59');
+  const start = new Date(end);
+  start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  return { start, end };
+}
+
+// Date-only values are pinned to noon so they can't slip across a day
+// boundary; see orderIsoDate for the formats handled.
+function parseOrderDate(o) {
+  const iso = orderIsoDate(o);
+  return iso ? new Date(iso + 'T12:00:00') : new Date(0);
+}
+
+function fmt(n) {
+  return '$' + (parseFloat(n) || 0).toFixed(2);
+}
+
+function fmtWeekEnd(weekEnd) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d = new Date(weekEnd + 'T12:00:00');
+  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+const YTD_START_DATE = '2025-12-29';
+
+// The calendar day (YYYY-MM-DD) an order belongs to, whatever format its
+// date arrived in: ISO from the driver form, DD-Mon-YYYY / D/M/YYYY from
+// the Zoho webhook, or a full timestamp. Null if there's no usable date.
+function orderIsoDate(o) {
+  const raw = o && (o.date || o.received_at);
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return null;
+}
+
+// Year-to-date, as plainly as it can be defined: total pay = the sum of
+// every one of this driver's deliveries from YTD_START_DATE through the
+// end of the pay week, deliveries = how many there are, average = pay /
+// deliveries. An order counts if its DELIVERY DATE is in range - not when
+// the record happened to be created - and this week's orders are always
+// included exactly once, so YTD can never come out smaller than "This Week".
+// The key timestamp is used only as a cheap pre-filter to avoid fetching
+// the whole store; its upper bound is padded 14 days so late-entered
+// orders aren't cut off before the exact date check.
+async function computeYtd(driver, weekOrders, weekEnd) {
+  const store = getStore('flower-orders');
+  const { blobs } = await store.list();
+  const DAY = 86400000;
+  const startMs = new Date(YTD_START_DATE + 'T00:00:00').getTime() - 2 * DAY;
+  const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 14 * DAY;
+  const candidates = blobs.filter(b => {
+    const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+    if (!m) return false;
+    const ts = parseInt(m[1]);
+    return ts >= startMs && ts <= endMs;
   });
-  var pages=doc.getNumberOfPages();
-  for(var p=1;p<=pages;p++){
-    doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120);
-    doc.text(g.code+' \u2022 '+data.period_label+' \u2022 page '+p+' of '+pages,W-M,doc.internal.pageSize.getHeight()-4,{align:'right'});
-  }
-  return doc.output('blob');
+  const fetched = (await Promise.all(candidates.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+
+  const code = (driver.code || '').toUpperCase();
+  const counted = new Map();
+  const consider = o => {
+    if ((o.driver || '').toUpperCase() !== code) return;
+    const day = orderIsoDate(o);
+    if (!day || day < YTD_START_DATE || day > weekEnd) return;
+    // The starting figure (ytd_start_pay / ytd_start_deliveries) already
+    // covers everything up to and including ytd_through_date, so orders on
+    // or before that day are NOT counted again from the app.
+    if (driver.ytd_through_date && day <= driver.ytd_through_date) return;
+    counted.set(o.id || (o.order_id + '|' + day + '|' + o.name), o);
+  };
+  fetched.forEach(consider);
+  weekOrders.forEach(consider);
+
+  const list = Array.from(counted.values());
+  const days = list.map(orderIsoDate).sort();
+  const ordersPay = list.reduce((sum, o) => sum + (parseFloat(o.driver_pay) || 0), 0);
+
+  const baselinePay = parseFloat(driver.ytd_start_pay) || 0;
+  const baselineDel = parseInt(driver.ytd_start_deliveries) || 0;
+  const totalPay = baselinePay + ordersPay;
+  const totalDel = baselineDel + list.length;
+  return {
+    baseline: { pay: baselinePay, deliveries: baselineDel, through_date: driver.ytd_through_date || null },
+    orders: {
+      pay: ordersPay,
+      deliveries: list.length,
+      first_date: days[0] || null,
+      last_date: days[days.length - 1] || null,
+      zero_pay_orders: list.filter(o => !(parseFloat(o.driver_pay) > 0)).length,
+      premium_records: list.filter(o => o.order_id === 'PREMIUM').length,
+      candidates_scanned: candidates.length
+    },
+    total: { pay: totalPay, deliveries: totalDel, avg: totalDel > 0 ? totalPay / totalDel : 0 }
+  };
 }
 
-/* ---------- load ---------- */
-function selected(){
-  var out=[]; document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){ if(c.checked) out.push(data.groups[parseInt(c.dataset.i,10)]); });
-  return out;
-}
-function render(){
-  var we=data.week_end, tb=document.getElementById('rows');
-  if(!data.groups.length){
-    document.getElementById('listCard').hidden=false;
-    tb.innerHTML='<tr><td colspan="5" style="color:#6B6256">No '+(type==='shop'?'shop':'driver')+' deliveries found for week ending '+esc(we)+'.</td></tr>';
-    document.getElementById('summary').textContent='Nothing to save'; document.getElementById('pathEg').textContent='';
-    document.getElementById('saveBtn').disabled=true; document.getElementById('zipBtn').disabled=true; return;
-  }
-  document.getElementById('saveBtn').disabled=false; document.getElementById('zipBtn').disabled=false;
-  var tot=0; data.groups.forEach(function(g){tot+=g.total;});
-  document.getElementById('summary').textContent=data.groups.length+(type==='shop'?' shops':' drivers')+' \u2022 week ending '+we+' \u2022 '+money(tot);
-  tb.innerHTML=data.groups.map(function(g,i){
-    return '<tr><td><input type="checkbox" data-i="'+i+'" checked></td><td><strong>'+esc(g.code)+'</strong> '+esc(g.name||'')+'</td><td class="num">'+g.count+'</td><td class="num">'+money(g.total)+'</td><td><button class="btn btn-ghost btn-sm" data-pdf="'+i+'">PDF</button></td></tr>';
+async function buildPayStatementHtml(driver, orders, weekEnd, rates) {
+  const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
+  const weekDel = orders.length;
+  const weekAvg = weekDel > 0 ? weekPay / weekDel : 0;
+
+  const weekGdpi = orders.reduce((s, o) => {
+    const r = rates[o.zone_code] || {};
+    return s + (parseFloat(r.gdpi) || 0);
+  }, 0);
+
+  const tYtd = Date.now();
+  const ytd = await computeYtd(driver, orders, weekEnd);
+  console.log('YTD for', driver.code, ':', Date.now() - tYtd, 'ms,', ytd.orders.candidates_scanned, 'candidates scanned');
+  const ytdPay = ytd.total.pay;
+  const ytdDel = ytd.total.deliveries;
+  const ytdAvg = ytd.total.avg;
+
+  const zoneBreak = {};
+  orders.forEach(o => {
+    const z = o.zone_code || 'UNK';
+    if (!zoneBreak[z]) zoneBreak[z] = { del: 0, pay: 0, gdpi: 0 };
+    zoneBreak[z].del++;
+    zoneBreak[z].pay += parseFloat(o.driver_pay) || 0;
+    zoneBreak[z].gdpi += parseFloat((rates[z] || {}).gdpi) || 0;
+  });
+
+  const zoneRows = Object.keys(zoneBreak).sort().map(z => {
+    const zb = zoneBreak[z];
+    return `<tr style="border-bottom:1px solid #E6DECF;">
+      <td style="padding:7px 10px;font-weight:600;">${z}</td>
+      <td style="padding:7px 10px;text-align:center;">${zb.del}</td>
+      <td style="padding:7px 10px;text-align:right;">${fmt(zb.pay)}</td>
+      <td style="padding:7px 10px;text-align:right;color:#6B6256;">${fmt(zb.gdpi)}</td>
+    </tr>`;
   }).join('');
-  var g0=data.groups[0];
-  document.getElementById('pathEg').textContent='Saves as: '+rootName()+'\\'+monthFolder(we)+'\\'+groupFolder(g0)+'\\'+groupFile(g0,we);
-  document.getElementById('listCard').hidden=false; showMsg('');
-  document.getElementById('allChk').checked=true;
-}
-async function load(){
-  var we=document.getElementById('weekEnd').value;
-  showTop(''); showMsg('');
-  if(!we){showTop('Pick a week-ending date.');return;}
-  var btn=document.getElementById('loadBtn'); btn.disabled=true; btn.textContent='Loading\u2026';
-  try{
-    var r=await fetch('/api/reports?format=json&type='+type+'&code=all&week_end='+we);
-    if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);return;}
-    if(!r.ok) throw new Error('Server said '+r.status);
-    data=await r.json(); render();
-  }catch(e){showTop('Could not load: '+e.message);}
-  finally{btn.disabled=false;btn.textContent='Load';}
+
+  const firstName = (driver.name || '').split(' ')[0];
+  const driverLink = `https://smartchoicedeliveryshoprate.netlify.app/api/reports?type=driver&week_end=${weekEnd}&code=${(driver.code || '').toLowerCase()}`;
+
+  return `
+<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;width:100% !important;min-width:280px;">
+  <div style="background:#0C769E;padding:18px 24px;border-bottom:4px solid #B8472B;width:100% !important;box-sizing:border-box;">
+    <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:20px;">Smart Choice Delivery</h1>
+    <p style="color:#D6EEF7;margin:4px 0 0;font-size:12px;">Driver Pay Statement</p>
+  </div>
+  <div style="padding:20px 24px;background:#fff;">
+    <p style="font-size:15px;margin:0 0 4px;">Hi ${firstName},</p>
+    <p style="font-size:13px;color:#6B6256;margin:0 0 20px;">Week Ending <strong style="color:#2B2620;">${fmtWeekEnd(weekEnd)}</strong></p>
+    <div style="background:#D6EEF7;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#0C769E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">This Week</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #B0D4E8;border-bottom:1px solid #B0D4E8;width:50%;">
+            <div style="font-size:24px;font-weight:700;color:#0C769E;">${fmt(weekPay)}</div>
+            <div style="font-size:11px;color:#6B6256;">Total Pay</div>
+          </td>
+          <td style="text-align:center;padding:6px 4px;border-bottom:1px solid #B0D4E8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${fmt(weekGdpi)}</div>
+            <div style="font-size:11px;color:#6B6256;">GDPI</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #B0D4E8;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${weekDel}</div>
+            <div style="font-size:11px;color:#6B6256;">Deliveries</div>
+          </td>
+          <td style="text-align:center;padding:6px 4px;">
+            <div style="font-size:18px;font-weight:700;color:#2B2620;">${fmt(weekAvg)}</div>
+            <div style="font-size:11px;color:#6B6256;">Avg/Del</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:14px 20px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#2C6B2C;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">Year to Date — Dec 29, 2025</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="text-align:center;padding:6px 4px;" colspan="2">
+            <div style="font-size:22px;font-weight:700;color:#2C6B2C;">${fmt(ytdPay)}</div>
+            <div style="font-size:11px;color:#6B6256;">Total Pay</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="text-align:center;padding:6px 4px;border-right:1px solid #A8CFA8;border-top:1px solid #A8CFA8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2C6B2C;">${ytdDel}</div>
+            <div style="font-size:11px;color:#6B6256;">Deliveries</div>
+          </td>
+          <td style="text-align:center;padding:6px 4px;border-top:1px solid #A8CFA8;width:50%;">
+            <div style="font-size:18px;font-weight:700;color:#2C6B2C;">${fmt(ytdAvg)}</div>
+            <div style="font-size:11px;color:#6B6256;">Avg/Del</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:#2B2620;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;border-bottom:2px solid #B8472B;padding-bottom:4px;">Zone Breakdown</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#0C769E;color:#fff;">
+            <th style="padding:7px 10px;text-align:left;">Zone</th>
+            <th style="padding:7px 10px;text-align:center;">Deliveries</th>
+            <th style="padding:7px 10px;text-align:right;">Pay</th>
+            <th style="padding:7px 10px;text-align:right;">GDPI</th>
+          </tr>
+        </thead>
+        <tbody>${zoneRows}</tbody>
+        <tfoot>
+          <tr style="background:#F4DCC9;font-weight:700;">
+            <td style="padding:7px 10px;">TOTAL</td>
+            <td style="padding:7px 10px;text-align:center;">${weekDel}</td>
+            <td style="padding:7px 10px;text-align:right;color:#B8472B;">${fmt(weekPay)}</td>
+            <td style="padding:7px 10px;text-align:right;color:#B8472B;">${fmt(weekGdpi)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div style="background:#FAF7F2;border:1px solid #E6DECF;border-radius:8px;padding:14px 16px;font-size:13px;margin-bottom:16px;">
+      <p style="margin:0 0 8px;"><strong>Payment:</strong> E-transfer sent Sunday to <strong>${driver.email}</strong></p>
+      <a href="${driverLink}" style="color:#0C769E;font-weight:600;font-size:13px;">View full delivery detail →</a>
+    </div>
+    <p style="font-size:12px;color:#6B6256;margin:0;">Questions? Reply to this email or call Kevin at 403-880-9822.</p>
+    <p style="font-size:13px;margin:12px 0 0;">Cheers,<br><strong>Kevin Michaud</strong><br>Smart Choice Delivery</p>
+  </div>
+  <div style="background:#0C769E;padding:10px 24px;text-align:center;">
+    <p style="color:#D6EEF7;font-size:11px;margin:0;">Smart Choice Delivery &mdash; Calgary, AB &mdash; Your Delivery Service Partner</p>
+  </div>
+</div>`;
 }
 
-/* ---------- save ---------- */
-function download(blob,name){
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+// ---- Pay ledger hooks (see pay-ledger.mjs) -------------------------------------------------
+// Every statement email is logged against the driver and week, with the amount it showed, so the
+// ledger page can later compare what was emailed with what was paid. A logging problem must never
+// stop or fail the email itself.
+function weekTotalPay(orders) {
+  return Math.round(orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0) * 100) / 100;
 }
-function idb(){return new Promise(function(res,rej){var q=indexedDB.open('scd-pdf',1);q.onupgradeneeded=function(){q.result.createObjectStore('h');};q.onsuccess=function(){res(q.result);};q.onerror=function(){rej(q.error);};});}
-async function getSavedHandle(key){try{var db=await idb();return await new Promise(function(res){var r=db.transaction('h').objectStore('h').get(key);r.onsuccess=function(){res(r.result||null);};r.onerror=function(){res(null);};});}catch(e){return null;}}
-async function putSavedHandle(key,h){try{var db=await idb();db.transaction('h','readwrite').objectStore('h').put(h,key);}catch(e){}}
+async function logStatementEmailed(driver, weekEnd, orders) {
+  try {
+    const store = getStore('flower-driver-payments');
+    const code = (driver.code || '').toUpperCase();
+    const key = weekEnd + '_' + code;
+    const rec = (await store.get(key, { type: 'json' })) || { week_end: weekEnd, driver: code, entries: [] };
+    rec.entries.push({
+      id: Math.random().toString(36).slice(2, 10),
+      type: 'statement_emailed',
+      amount: weekTotalPay(orders),
+      deliveries: orders.length,
+      note: 'Pay statement emailed to ' + driver.email,
+      recorded_at: new Date().toISOString(),
+      by: 'system'
+    });
+    await store.setJSON(key, rec);
+  } catch (e) { console.error('pay ledger log failed:', e.message); }
+}
+async function requireAuth(req) {
+  const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
+  if (!m) return null;
+  const sess = await getStore('flower-sessions').get(m[1], { type: 'json' });
+  if (!sess || new Date(sess.expires_at) < new Date()) return null;
+  return sess.username;
+}
 
-async function getRoot(){
-  var key='root-'+type, h=await getSavedHandle(key);
-  if(h){
-    try{
-      var perm=await h.queryPermission({mode:'readwrite'});
-      if(perm!=='granted') perm=await h.requestPermission({mode:'readwrite'});
-      if(perm==='granted') return h;
-    }catch(e){}
+async function sendDriverPayEmail(driver, orders, weekEnd, rates) {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
+
+  const result = await resend.emails.send({
+    from: 'pay@smartchoicedelivery.ca',
+    to: driver.email,
+    subject: `Smart Choice Delivery — Pay Statement Week Ending ${fmtWeekEnd(weekEnd)}`,
+    html
+  });
+  // The Resend SDK doesn't always throw for API-level failures (unverified
+  // sender domain, invalid recipient, etc.) - it can resolve normally with
+  // an .error field set instead. Treat that the same as a thrown error,
+  // rather than letting it silently look like a successful send.
+  if (result && result.error) {
+    throw new Error(result.error.message || JSON.stringify(result.error));
   }
-  h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
-  await putSavedHandle(key,h);
-  return h;
+  return result;
 }
-async function changeFolder(){
-  if(!HAS_FS){showMsg('This browser cannot pick a folder - use Download zip instead (Edge or Chrome can).','err');return;}
-  try{
-    var h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
-    await putSavedHandle('root-'+type,h);
-    showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
-  }catch(e){ if(!(e&&e.name==='AbortError')) showMsg('Could not open the folder: '+e.message,'err'); }
+
+async function getWeekOrdersByDriver(week_end) {
+  const bounds = getWeekBounds(week_end);
+  const timings = {};
+  const t0 = Date.now();
+
+  const ordersStore = getStore('flower-orders');
+
+  // New-format orders (created after the week-embedded key change) are
+  // found directly via a fast, server-side prefix filter - the week is
+  // right there in the key, so this never needs to look at anything
+  // outside the target week at all, regardless of how large the store
+  // grows overall.
+  const { blobs: newFormatBlobs } = await ordersStore.list({ prefix: `order_${week_end}_` });
+  timings.new_format_count = newFormatBlobs.length;
+
+  // Fallback for orders created before this key format existed - only
+  // matters until historical orders age out of any realistic pay-run
+  // window. Bounds are the exact Monday-Sunday week, no buffer needed
+  // since week boundaries are unambiguous.
+  const { blobs: allBlobs } = await ordersStore.list();
+  timings.orders_list_count = allBlobs.length;
+  const oldFormatCandidates = allBlobs.filter(b => {
+    if (b.key.startsWith(`order_${week_end}_`)) return false; // already captured above
+    // Matches the old format (order_<timestamp>_<random>) AND new-format keys
+    // filed under a different week prefix - webhook orders with non-ISO dates
+    // were briefly filed under a bogus week key, so they're recovered here by
+    // their embedded timestamp. The exact-date filter below keeps results correct.
+    const match = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+    if (!match) return false;
+    const ts = parseInt(match[1]);
+    return ts >= bounds.start.getTime() && ts <= bounds.end.getTime();
+  });
+  timings.old_format_count = oldFormatCandidates.length;
+
+  const relevantBlobs = newFormatBlobs.concat(oldFormatCandidates);
+  timings.orders_relevant_count = relevantBlobs.length;
+
+  const allOrders = await Promise.all(relevantBlobs.map(b => ordersStore.get(b.key, { type: 'json' })));
+  timings.orders_fetch_ms = Date.now() - t0;
+
+  const weekOrders = allOrders.filter(o => {
+    if (!o) return false;
+    const d = parseOrderDate(o);
+    return d >= bounds.start && d <= bounds.end;
+  });
+
+  const byDriver = {};
+  weekOrders.forEach(o => {
+    const code = (o.driver || '').toUpperCase();
+    if (!code) return;
+    if (!byDriver[code]) byDriver[code] = [];
+    byDriver[code].push(o);
+  });
+
+  return { byDriver, timings };
 }
-async function saveToFolder(){
-  var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
-  var btn=document.getElementById('saveBtn');
-  if(!HAS_FS){showMsg('This browser cannot write to a folder directly - use Download zip instead (Edge or Chrome can save straight to the folder).','err');return;}
-  var root;
-  try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError'){return;} showMsg('Could not open the folder: '+e.message,'err'); return; }
-  btn.disabled=true; var we=data.week_end, done=0, failed=[];
-  try{
-    var mDir=await root.getDirectoryHandle(monthFolder(we),{create:true});
-    for(var i=0;i<sel.length;i++){
-      var g=sel[i]; showMsg('Saving '+(i+1)+' of '+sel.length+': '+g.code+'\u2026','info');
-      try{
-        var blob=buildPdf(g);
-        var sDir=await mDir.getDirectoryHandle(groupFolder(g),{create:true});
-        var fh=await sDir.getFileHandle(groupFile(g,we),{create:true});
-        var w=await fh.createWritable(); await w.write(blob); await w.close(); done++;
-      }catch(e){failed.push(g.code+' ('+e.message+')');}
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*' } });
+  }
+
+  const url = new URL(req.url);
+
+  // View-only page: lets a driver (or dispatcher, on their behalf) see the
+  // exact same statement even if the email was never received, or serves
+  // as a printable/shareable page to send another way. No email/Resend
+  // involved at all - pure lookup and render.
+  if (req.method === 'GET' && url.searchParams.get('action') === 'week_totals') {
+    // Live per-driver totals for a week (used by the pay ledger page). Login required.
+    if (!(await requireAuth(req))) return json({ error: 'Not authenticated' }, 401);
+    const we = url.searchParams.get('week_end');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(we || '')) return json({ error: 'week_end (YYYY-MM-DD) required' }, 400);
+    const { byDriver } = await getWeekOrdersByDriver(we);
+    const dStore = getStore('flower-drivers');
+    const { blobs: dB } = await dStore.list();
+    const dList = (await Promise.all(dB.map(b => dStore.get(b.key, { type: 'json' })))).filter(Boolean);
+    const names = {};
+    dList.forEach(d => { if (d.code) names[d.code.toUpperCase()] = d; });
+    const out = Object.keys(byDriver).sort().map(code => ({
+      code, name: (names[code] && names[code].name) || '', email: (names[code] && names[code].email) || '',
+      deliveries: byDriver[code].length, total_pay: weekTotalPay(byDriver[code])
+    }));
+    return json({ week_end: we, drivers: out });
+  }
+
+  if (req.method === 'GET') {
+    const weekEnd = url.searchParams.get('week_end');
+    const driverCode = (url.searchParams.get('driver_code') || url.searchParams.get('code') || '').toUpperCase();
+    if (!weekEnd || !driverCode) {
+      return new Response('Both week_end (YYYY-MM-DD) and driver_code are required.', { status: 400, headers: { 'content-type': 'text/plain' } });
     }
-    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+monthFolder(we)+'\\<shop folder>\\  (e.g. '+root.name+'\\'+monthFolder(we)+'\\'+groupFolder(sel[0])+'\\'+groupFile(sel[0],we)+'). Wrong place? Use Change folder.'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
-  }catch(e){showMsg('Could not save: '+e.message,'err');}
-  finally{btn.disabled=false;}
-}
-async function downloadZip(){
-  var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
-  var we=data.week_end, zip=new JSZip();
-  sel.forEach(function(g){ zip.file(monthFolder(we)+'/'+groupFolder(g)+'/'+groupFile(g,we), buildPdf(g)); });
-  var blob=await zip.generateAsync({type:'blob'});
-  download(blob,rootName()+' WE '+we+'.zip');
-  showMsg('Zip downloaded - unzip it into your '+rootName()+' folder; the month and shop folders merge with the existing ones.','ok');
-}
 
-/* ---------- wiring ---------- */
-document.getElementById('typeSeg').addEventListener('click',function(e){
-  var b=e.target.closest('button'); if(!b) return; type=b.dataset.t;
-  this.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
-  document.getElementById('listCard').hidden=true; data=null; hint();
-});
-function hint(){
-  document.getElementById('rootHint').textContent=HAS_FS
-    ? 'Save to folder: choose your '+rootName()+' folder once; the app remembers it. PDFs go into MONTH YY \\ CODE NAME \\ CODE NAME WE date.pdf, filed by the invoice (week-ending) month.'
-    : 'This browser cannot save into a folder directly. Download zip gives the same folder layout; Edge or Chrome can save straight to the folder.';
-}
-document.getElementById('loadBtn').addEventListener('click',load);
-document.getElementById('saveBtn').addEventListener('click',saveToFolder);
-document.getElementById('zipBtn').addEventListener('click',downloadZip);
-document.getElementById('folderBtn').addEventListener('click',changeFolder);
-document.getElementById('allChk').addEventListener('change',function(){var v=this.checked;document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){c.checked=v;});});
-document.getElementById('rows').addEventListener('click',function(e){
-  var b=e.target.closest('[data-pdf]'); if(!b) return;
-  var g=data.groups[parseInt(b.dataset.pdf,10)]; download(buildPdf(g),groupFile(g,data.week_end));
-});
+    const driversStore = getStore('flower-drivers');
+    const { blobs: driverBlobs } = await driversStore.list();
+    const driverList = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
+    const driver = driverList.find(d => d && (d.code || '').toUpperCase() === driverCode);
+    if (!driver) {
+      return new Response('No driver found with code "' + driverCode + '".', { status: 404, headers: { 'content-type': 'text/plain' } });
+    }
 
-(function init(){
-  var q=new URLSearchParams(location.search);
-  document.getElementById('weekEnd').value=q.get('week_end')||lastSunday();
-  if(q.get('type')==='driver'){type='driver';document.querySelectorAll('#typeSeg button').forEach(function(x){x.classList.toggle('on',x.dataset.t==='driver');});}
-  hint();
-  fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
-    if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);return;}
-    load();
-  }).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname+location.search);});
-})();
-</script>
-</body>
-</html>
+    // Lightweight debug views, answered BEFORE the slow whole-week order
+    // load below (that load plus the YTD scan is what made ?debug=1 time
+    // out on Netlify).
+    //   ?debug=baseline  -> instant: just the stored starting figures
+    //   ?debug=ytd       -> one scan of the orders for the YTD breakdown
+    const dbg = url.searchParams.get('debug');
+    if (dbg === 'baseline') {
+      return json({
+        driver: driverCode,
+        ytd_start_date: YTD_START_DATE,
+        ytd_start_pay: driver.ytd_start_pay ?? null,
+        ytd_start_deliveries: driver.ytd_start_deliveries ?? null,
+        ytd_through_date: driver.ytd_through_date ?? null,
+        baseline_avg: (parseInt(driver.ytd_start_deliveries) > 0) ? (parseFloat(driver.ytd_start_pay) || 0) / parseInt(driver.ytd_start_deliveries) : null,
+        hire_date: driver.hire_date || null
+      });
+    }
+    if (dbg === 'ytd') {
+      const t0 = Date.now();
+      const ytd = await computeYtd(driver, [], weekEnd);
+      return json({ driver: driverCode, week_end: weekEnd, ytd_start_date: YTD_START_DATE, ytd, took_ms: Date.now() - t0,
+        note: 'ytd.total = ytd.baseline + ytd.orders. avg = total.pay / total.deliveries.' });
+    }
+
+    const { byDriver } = await getWeekOrdersByDriver(weekEnd);
+    const orders = byDriver[driverCode] || [];
+
+    const ratesStore = getStore('flower-rates');
+    let rates = {};
+    try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+
+    // ?debug=1 shows exactly what the YTD figures are made of, instead of
+    // the statement itself - baseline vs. counted orders, the date range
+    // covered, and how many zero-pay / premium records are in the count.
+    if (url.searchParams.get('debug') === '1') {
+      const ytd = await computeYtd(driver, orders, weekEnd);
+      const weekPay = orders.reduce((s, o) => s + (parseFloat(o.driver_pay) || 0), 0);
+      return json({
+        driver: driverCode,
+        week_end: weekEnd,
+        week: { pay: weekPay, deliveries: orders.length, avg: orders.length ? weekPay / orders.length : 0 },
+        ytd_start_date: YTD_START_DATE,
+        ytd,
+        note: 'ytd.total = ytd.baseline + ytd.orders. avg = total.pay / total.deliveries.'
+      });
+    }
+
+    const html = await buildPayStatementHtml(driver, orders, weekEnd, rates);
+    const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pay Statement - ${driver.name || driverCode}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
+    return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
+  }
+
+  if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
+
+  let body;
+  try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
+
+  const { week_end } = body;
+  if (!week_end) return json({ error: 'week_end required (YYYY-MM-DD)' }, 400);
+
+  const t0 = Date.now();
+  const { byDriver, timings } = await getWeekOrdersByDriver(week_end);
+
+  const tDrivers = Date.now();
+  const driversStore = getStore('flower-drivers');
+  const { blobs: driverBlobs } = await driversStore.list();
+  const driverList = await Promise.all(driverBlobs.map(b => driversStore.get(b.key, { type: 'json' })));
+  const activeDrivers = driverList.filter(d => d && d.active && d.email);
+  timings.drivers_fetch_ms = Date.now() - tDrivers;
+
+  const tRates = Date.now();
+  const ratesStore = getStore('flower-rates');
+  let rates = {};
+  try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+  timings.rates_fetch_ms = Date.now() - tRates;
+  timings.total_before_send_ms = Date.now() - t0;
+
+  const filterCode = (body.driver_code || '').toUpperCase();
+  const driversToSend = (filterCode === 'ALL' || !filterCode)
+    ? activeDrivers
+    : activeDrivers.filter(d => (d.code || '').toUpperCase() === filterCode);
+
+  if (filterCode && filterCode !== 'ALL' && driversToSend.length === 0) {
+    // The requested driver code doesn't match any active driver with an
+    // email on file at all - surface this clearly rather than silently
+    // returning an empty, easy-to-miss result.
+    return json({ success: true, week_end, emails_sent: [], warning: `No active driver found with code "${filterCode}" and an email on file.`, _timings: timings });
+  }
+
+  const results = [];
+  for (const driver of driversToSend) {
+    const code = (driver.code || '').toUpperCase();
+    const orders = byDriver[code] || [];
+    if (!orders.length) {
+      // Previously this silently skipped with no record at all - the
+      // outer response still said "success" with an empty emails_sent
+      // list, which looked identical to a real send if you didn't read
+      // the detail closely. Record explicitly why nothing was sent.
+      results.push({ driver: code, status: 'skipped_no_deliveries', deliveries: 0 });
+      continue;
+    }
+    const tSend = Date.now();
+    try {
+      await sendDriverPayEmail(driver, orders, week_end, rates);
+      await logStatementEmailed(driver, week_end, orders);
+      results.push({ driver: code, status: 'sent', deliveries: orders.length, send_ms: Date.now() - tSend });
+      console.log('Pay email sent:', driver.name, driver.email);
+    } catch(e) {
+      results.push({ driver: code, status: 'failed', error: e.message, send_ms: Date.now() - tSend });
+      console.error('Pay email failed:', driver.name, e.message);
+    }
+  }
+
+  timings.total_ms = Date.now() - t0;
+  return json({ success: true, week_end, emails_sent: results, _timings: timings });
+};
+
+export const config = { path: '/api/send-driver-pay' };
