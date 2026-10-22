@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Rate &amp; Price History</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber-soft:#FFF3CD;--red-soft:#F8DEDA;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{max-width:820px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:0 0 10px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;}.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}.btn:disabled{opacity:.55;}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th{text-align:left;color:var(--ink-soft);font-weight:600;padding:5px 6px;}td{padding:6px;border-top:1px solid var(--border);}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;}.ok{background:var(--green-soft);color:var(--green);}.bad{background:var(--red-soft);color:var(--warm);}.warn{background:var(--amber-soft);color:#8A5A00;}
+.msg{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;}.msg.err{background:var(--red-soft);color:var(--warm);}.msg.okm{background:var(--green-soft);color:var(--green);}.msg.info{background:#EEF6FA;color:#0C5A7A;}
+.small{font-size:12px;color:var(--ink-soft);}
+.rec{border-top:1px solid var(--border);padding:7px 0;display:flex;gap:8px;align-items:flex-start;font-size:12px;}.rec code{display:block;color:var(--ink-soft);word-break:break-all;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Rate &amp; Price History</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="card">
+    <h2>Change log</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <select id="kind"><option value="">All changes</option><option value="rate">Zone rates</option><option value="shop">Shop prices</option></select>
+      <input id="q" placeholder="Search zone, shop, user&hellip;" style="flex:1;min-width:160px;">
+      <button class="btn" id="go">Search</button>
+    </div>
+    <div id="msg"></div>
+    <div id="list" style="margin-top:10px;">Loading&hellip;</div>
+  </div>
+  <div class="card">
+    <h2>Rates as of a date</h2>
+    <div class="small" style="margin-bottom:8px;">Shows the zone rate table as it stood at the end of that day, worked out from the recorded changes. Only changes made since this log began can be undone.</div>
+    <input type="date" id="asof"> <button class="btn ghost" id="asofGo">Show</button>
+    <div id="asofOut" style="margin-top:10px;"></div>
+  </div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmtAt(iso){try{return new Date(iso).toLocaleString('en-CA',{timeZone:'America/Edmonton',dateStyle:'medium',timeStyle:'short'});}catch(e){return iso;}}
+function val(v){return v===null||v===undefined?'<span class="small">(none)</span>':esc(typeof v==='object'?JSON.stringify(v):v);}
+async function api(u){
+  var r=await fetch(u,{credentials:'same-origin'});
+  if(r.status===401){location.href='/hub.html';throw new Error('Please sign in');}
+  var j=await r.json();if(!r.ok)throw new Error(j.error||('Error '+r.status));return j;
+}
+async function load(){
+  var list=document.getElementById('list'),msg=document.getElementById('msg');msg.innerHTML='';
+  try{
+    var j=await api('/api/rate-history?kind='+encodeURIComponent(document.getElementById('kind').value)+'&q='+encodeURIComponent(document.getElementById('q').value));
+    if(!j.items.length){list.innerHTML='<div class="small">No changes recorded'+(j.total_records?' for that filter':' yet - changes made from now on will appear here')+'.</div>';return;}
+    list.innerHTML=j.items.map(function(e){
+      var title=e.kind==='shop'?('Shop: '+esc(e.target||'')):'Zone rates';
+      var rows=(e.changes||[]).map(function(c){
+        var what=e.kind==='shop'?esc(c.field):(esc(c.zone)+' &middot; '+esc(c.field));
+        return '<tr><td>'+what+'</td><td>'+val(c.from)+'</td><td>&rarr;</td><td><b>'+val(c.to)+'</b></td></tr>';
+      }).join('');
+      return '<div style="border-top:1px solid var(--border);padding:10px 0;"><div><b>'+title+'</b> <span class="small">&mdash; '+fmtAt(e.at)+' by '+esc(e.by||'?')+'</span></div><table style="margin-top:4px;"><tr><th>Item</th><th>Was</th><th></th><th>Now</th></tr>'+rows+'</table></div>';
+    }).join('');
+  }catch(e){list.innerHTML='';msg.innerHTML='<div class="msg err">'+esc(e.message)+'</div>';}
+}
+document.getElementById('go').onclick=load;
+document.getElementById('q').addEventListener('keydown',function(e){if(e.key==='Enter')load();});
+document.getElementById('kind').onchange=load;
+document.getElementById('asofGo').onclick=async function(){
+  var d=document.getElementById('asof').value,out=document.getElementById('asofOut');
+  if(!d){out.innerHTML='<div class="msg err">Pick a date.</div>';return;}
+  try{
+    var j=await api('/api/rate-history?asof='+d);
+    var z=Object.keys(j.rates).sort();
+    var cols={};z.forEach(function(k){Object.keys(j.rates[k]).forEach(function(f){if(typeof j.rates[k][f]==='number')cols[f]=1;});});
+    var fs=Object.keys(cols);
+    var note=j.history_starts?('History starts '+esc(j.history_starts)+'; '+j.changes_undone+' later change(s) undone.'):'No history recorded yet, so this is today\'s table.';
+    if(j.history_starts&&d<j.history_starts)note+=' <b>This date is before the log began, so it may not be exact.</b>';
+    out.innerHTML='<div class="msg info">'+note+'</div><table><tr><th>Zone</th>'+fs.map(function(f){return '<th>'+esc(f)+'</th>';}).join('')+'</tr>'+z.map(function(k){return '<tr><td>'+esc(k)+'</td>'+fs.map(function(f){return '<td>'+val(j.rates[k][f])+'</td>';}).join('')+'</tr>';}).join('')+'</table>';
+  }catch(e){out.innerHTML='<div class="msg err">'+esc(e.message)+'</div>';}
+};
+load();
+</script>
+</body>
+</html>
