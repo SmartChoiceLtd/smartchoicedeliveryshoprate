@@ -245,31 +245,47 @@ function pmoney(n){var v=Math.round((Number(n)||0)*100)/100;return (v<0?'-':'')+
 function pdate(iso){try{return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Edmonton',month:'short',day:'numeric',year:'numeric'});}catch(e){return iso;}}
 function pweek(we){try{return new Date(we+'T12:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'});}catch(e){return we;}}
 var PAY_LABEL={etransfer:'E-transfer',advance:'Advance',other_payment:'Payment'};
-function pinGet(){try{return localStorage.getItem('scdPayPin_'+urlDriverCode)||'';}catch(e){return '';}}
-function pinSet(v){try{if(v)localStorage.setItem('scdPayPin_'+urlDriverCode,v);else localStorage.removeItem('scdPayPin_'+urlDriverCode);}catch(e){}}
+/* Payment details are private: nothing is remembered. The PIN is asked for every time, and the details
+   are wiped from the screen by the Close button, after 60 seconds, or the moment the page is hidden
+   (tab switch, app switch, screen off). */
+var PAY_SECONDS = 60, payTimer = null, payLeft = 0;
+try { localStorage.removeItem('scdPayPin_' + urlDriverCode); } catch (e) {} // clear the old remembered PIN
 function pinForm(msg){
+  clearInterval(payTimer); payTimer = null;
   document.getElementById('payList').innerHTML='<div class="pay-wk"><div style="margin-bottom:6px;">Enter your PIN to see your payments and balance.</div><input id="payPin" type="text" name="scd-pay-code" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="PIN" style="padding:8px;border:1px solid var(--border);border-radius:8px;width:120px;-webkit-text-security:disc;text-security:disc;"> <button class="btn" style="width:auto;padding:8px 14px;display:inline-block;" onclick="submitPin()">Show</button><div id="payErr" style="color:var(--warm);font-size:12px;margin-top:6px;">'+esc(msg||'')+'</div><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">Don\'t have a PIN? Ask Smart Choice Delivery.</div></div>';
   document.getElementById('payCard').hidden=false;
 }
-function submitPin(){var v=(document.getElementById('payPin').value||'').trim();if(v)loadPayments(v);}
-async function loadPayments(pinIn) {
-  var pin = pinIn || pinGet();
+function closePay(msg){ pinForm(msg || ''); }
+function startPayTimer(){
+  clearInterval(payTimer); payLeft = PAY_SECONDS;
+  payTimer = setInterval(function(){
+    payLeft--;
+    var el = document.getElementById('payCountdown'); if (el) el.textContent = payLeft;
+    if (payLeft <= 0) closePay('Closed for your privacy. Enter your PIN to view again.');
+  }, 1000);
+}
+document.addEventListener('visibilitychange', function(){ if (document.hidden && payTimer) closePay('Closed for your privacy. Enter your PIN to view again.'); });
+window.addEventListener('pagehide', function(){ if (payTimer) closePay(''); });
+function submitPin(){var inp=document.getElementById('payPin');var v=(inp.value||'').trim();inp.value='';if(v)loadPayments(v);}
+async function loadPayments(pin) {
   if (!pin) { pinForm(''); return; }
   try {
     var r = await fetch('/api/pay-ledger', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'driver_view', driver: urlDriverCode, pin: pin }) });
+    pin = '';
     var d = await r.json().catch(function(){ return {}; });
-    if (!r.ok) { pinSet(''); pinForm(d.error || 'Could not check your PIN.'); return; }
-    pinSet(pin);
-    if (!d.weeks || !d.weeks.length) { document.getElementById('payList').innerHTML = '<div class="pay-wk">No payments recorded yet.</div>'; document.getElementById('payCard').hidden = false; return; }
-    document.getElementById('payList').innerHTML = d.weeks.map(function(w) {
+    if (!r.ok) { pinForm(d.error || 'Could not check your PIN.'); return; }
+    var closeBar = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;color:var(--ink-soft);">Closes automatically in <b id="payCountdown">' + PAY_SECONDS + '</b>s</span><button class="btn btn-secondary" style="width:auto;padding:6px 12px;display:inline-block;margin:0;" onclick="closePay(\'\')">Close</button></div>';
+    if (!d.weeks || !d.weeks.length) { document.getElementById('payList').innerHTML = closeBar + '<div class="pay-wk">No payments recorded yet.</div>'; document.getElementById('payCard').hidden = false; startPayTimer(); return; }
+    document.getElementById('payList').innerHTML = closeBar + d.weeks.map(function(w) {
       var h = '<div class="pay-wk"><div class="pay-row"><b>Week ending ' + esc(pweek(w.week_end)) + '</b><span>' + (w.statement === null ? '' : 'Statement ' + pmoney(w.statement)) + '</span></div>';
       w.adjustments.forEach(function(a) { h += '<div class="pay-row"><span>Adjustment' + (a.note ? ' (' + esc(a.note) + ')' : '') + '</span><span>' + pmoney(a.amount) + '</span></div>'; });
       w.payments.forEach(function(p) { h += '<div class="pay-row"><span>' + esc(PAY_LABEL[p.type] || 'Payment') + ' &mdash; ' + esc(pdate(p.date)) + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span><span>' + pmoney(p.amount) + '</span></div>'; });
       if (!w.payments.length && !w.adjustments.length) h += '<div class="pay-row"><span>No payments recorded yet</span><span></span></div>';
       if (w.balance !== null) h += '<div class="pay-bal ' + (Math.abs(w.balance) < 0.005 ? 'pay-ok' : 'pay-due') + '">' + (Math.abs(w.balance) < 0.005 ? 'Paid in full' : (w.balance > 0 ? 'Balance owing ' + pmoney(w.balance) : 'Overpaid by ' + pmoney(-w.balance))) + '</div>';
       return h + '</div>';
-    }).join('') + '<div style="text-align:right;margin-top:6px;"><a href="#" style="font-size:12px;color:var(--accent);" onclick="pinSet(\'\');loadPayments();return false;">Lock this on this device</a></div>';
+    }).join('');
     document.getElementById('payCard').hidden = false;
+    startPayTimer();
   } catch (e) {}
 }
 
