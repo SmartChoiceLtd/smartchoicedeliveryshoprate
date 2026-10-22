@@ -105,7 +105,10 @@ export default async (req) => {
     // duplicate - which would leave the original stop looking falsely
     // "abandoned" forever even though the delivery genuinely got done -
     // treat this as the same stop continuing under a new driver.
-    if (body.order_id && body.shop_code) {
+    // "1" is the placeholder for a tag with no order number (legacy process + scan default), so many
+    // different deliveries from the same shop legitimately carry it. It must NOT be treated as the
+    // same delivery or one stop would overwrite another.
+    if (body.order_id && String(body.order_id).trim() !== '1' && body.shop_code) {
       const { blobs } = await store.list();
       const existing = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
       const match = existing.find(s =>
