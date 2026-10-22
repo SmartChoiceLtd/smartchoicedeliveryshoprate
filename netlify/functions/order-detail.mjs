@@ -44,6 +44,47 @@ async function nameForCode(code) {
   return shop ? shop.name : null;
 }
 
+// ---- Week lock (see week-lock.mjs) -----------------------------------------------------------
+function isoDay(raw) {
+  if (!raw) return null;
+  const t = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = t.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return null;
+}
+function weekEndOf(order) {
+  const day = isoDay(order && order.date) || isoDay(order && order.received_at);
+  if (!day) return null;
+  const d = new Date(day + 'T12:00:00');
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// Returns { locked:[records], response } - response is a 423 when a closed week is touched without a reason.
+async function lockCheck(weeks, reason) {
+  const locks = getStore('flower-week-locks');
+  const hit = [];
+  for (const w of [...new Set(weeks.filter(Boolean))]) {
+    const rec = await locks.get(w, { type: 'json' }).catch(() => null);
+    if (rec && rec.locked) hit.push(rec);
+  }
+  if (hit.length && !String(reason || '').trim()) {
+    return { locked: hit, response: new Response(JSON.stringify({ error: 'Week ending ' + hit[0].week_end + ' is closed (paid). Give a reason to change it.', code: 'week_locked', week_end: hit[0].week_end }), { status: 423, headers: { 'content-type': 'application/json' } }) };
+  }
+  return { locked: hit, response: null };
+}
+async function lockLog(recs, entry) {
+  const locks = getStore('flower-week-locks');
+  for (const rec of recs) {
+    rec.changes = rec.changes || [];
+    rec.changes.push({ at: new Date().toISOString(), ...entry });
+    await locks.setJSON(rec.week_end, rec);
+  }
+}
+
 export default async (req) => {
   const username = await requireAuth(req);
   if (!username) return json({ error: 'Not authenticated' }, 401);
@@ -63,7 +104,10 @@ export default async (req) => {
     if (!existing) return json({ error: 'Order not found' }, 404);
     let body;
     try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
+    const lockReason = body.lock_reason; delete body.lock_reason;
     let updated = { ...existing, ...body, id };
+    const lc = await lockCheck([weekEndOf(existing), weekEndOf(updated)], lockReason);
+    if (lc.response) return lc.response;
 
     // The Override screen sends only a shop CODE. Without this, the stored shop NAME
     // stayed whatever the order was created with, so a corrected order showed the new
@@ -140,12 +184,20 @@ export default async (req) => {
     }
 
     await store.setJSON(id, updated);
+    if (lc.locked.length) {
+      const changedKeys = Object.keys(body).filter(k => JSON.stringify(body[k]) !== JSON.stringify(existing[k]));
+      await lockLog(lc.locked, { by: username, id, order_id: existing.order_id, action: 'edited', fields: changedKeys, reason: String(lockReason).trim().slice(0, 300) });
+    }
     return json(updated);
   }
 
   if (req.method === 'DELETE') {
     const existing = await store.get(id, { type: 'json' });
     if (!existing) return json({ error: 'Order not found' }, 404);
+    const delReason = url.searchParams.get('reason');
+    const dl = await lockCheck([weekEndOf(existing)], delReason);
+    if (dl.response) return dl.response;
+    if (dl.locked.length) await lockLog(dl.locked, { by: username, id, order_id: existing.order_id, action: 'deleted', reason: String(delReason).trim().slice(0, 300) });
     // Soft delete: keep a copy in the Deleted bin (30 days) so a mistaken delete can be undone.
     await getStore('flower-deleted-orders').setJSON(id, { id, deleted_at: new Date().toISOString(), deleted_by: username, order: existing });
     await store.delete(id);
