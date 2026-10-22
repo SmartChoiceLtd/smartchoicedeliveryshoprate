@@ -224,18 +224,23 @@ export default async (req) => {
       return json({ error: 'Could not parse extraction result', raw: textBlock.text }, 502);
     }
 
+    // Tags with no order number get "1", the same placeholder the legacy process uses, so the
+    // driver never has to type it and the order is never left blank. order_id_defaulted records that
+    // the model did NOT find a number (so scan quality can still tell the two cases apart).
+    const rawOrderId = String(extracted.order_id || '').trim();
     const read = {
-      order_id: extracted.order_id || '',
+      order_id: rawOrderId || '1',
       name: extracted.name || '',
       address: extracted.address || '',
       shop_name: extracted.shop_name || '',
       shop_code: (extracted.shop_code || '').toUpperCase(),
       phone: cleanPhone(extracted.phone)
     };
-    await record(read.address ? 'read' : 'no_address', { model: modelUsed, ...usage, extracted: read });
+    await record(read.address ? 'read' : 'no_address', { model: modelUsed, ...usage, extracted: read, order_id_defaulted: !rawOrderId });
 
     return json({
-      order_id: extracted.order_id || '',
+      order_id: read.order_id,
+      order_id_defaulted: !rawOrderId,
       name: extracted.name || '',
       address: extracted.address || '',
       shop_name: extracted.shop_name || '',
