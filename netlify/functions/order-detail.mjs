@@ -146,6 +146,8 @@ export default async (req) => {
   if (req.method === 'DELETE') {
     const existing = await store.get(id, { type: 'json' });
     if (!existing) return json({ error: 'Order not found' }, 404);
+    // Soft delete: keep a copy in the Deleted bin (30 days) so a mistaken delete can be undone.
+    await getStore('flower-deleted-orders').setJSON(id, { id, deleted_at: new Date().toISOString(), deleted_by: username, order: existing });
     await store.delete(id);
     return new Response(null, { status: 204 });
   }
