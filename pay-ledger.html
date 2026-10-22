@@ -185,7 +185,7 @@ $('csv').addEventListener('click',function(){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='driver-pay-ledger-'+DATA.week+'.csv';document.body.appendChild(a);a.click();a.remove();
 });
 $('load').addEventListener('click',load);$('prev').addEventListener('click',function(){shiftWeek(-1);});$('next').addEventListener('click',function(){shiftWeek(1);});
-$('we').value=lastSunday();
+$('we').value=(new URLSearchParams(location.search).get('week_end'))||lastSunday();
 fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
   if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
   load();
