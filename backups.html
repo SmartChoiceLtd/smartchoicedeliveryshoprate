@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Backups</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber-soft:#FFF3CD;--red-soft:#F8DEDA;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{max-width:820px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:0 0 10px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;}.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}.btn:disabled{opacity:.55;}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th{text-align:left;color:var(--ink-soft);font-weight:600;padding:5px 6px;}td{padding:6px;border-top:1px solid var(--border);}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;}.ok{background:var(--green-soft);color:var(--green);}.bad{background:var(--red-soft);color:var(--warm);}.warn{background:var(--amber-soft);color:#8A5A00;}
+.msg{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;}.msg.err{background:var(--red-soft);color:var(--warm);}.msg.okm{background:var(--green-soft);color:var(--green);}.msg.info{background:#EEF6FA;color:#0C5A7A;}
+.small{font-size:12px;color:var(--ink-soft);}
+.rec{border-top:1px solid var(--border);padding:7px 0;display:flex;gap:8px;align-items:flex-start;font-size:12px;}.rec code{display:block;color:var(--ink-soft);word-break:break-all;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Backups</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="card">
+    <h2>Daily backup</h2>
+    <div id="status">Loading&hellip;</div>
+    <div style="margin-top:12px;"><button class="btn" id="runBtn">Back up now</button></div>
+    <div id="runMsg"></div>
+    <p class="small" style="margin-top:12px;">A backup runs automatically every day at about 5 am Calgary time. Each data group (orders, shops, rates, drivers, pay ledger, stops, scan log and so on) is emailed as its own file to the backup address. Not included, on purpose: login accounts and driver PINs, order photos, and the year-to-date cache.</p>
+  </div>
+  <div class="card">
+    <h2>Recent runs</h2>
+    <table><thead><tr><th>When</th><th>How</th><th>Result</th></tr></thead><tbody id="hist"></tbody></table>
+  </div>
+  <div class="card">
+    <h2>Restore from a backup file</h2>
+    <p class="small" style="margin-top:0;">Choose one of the emailed files (<b>.json.gz</b>, for example <i>scd-flower-orders-2026-10-22.json.gz</i>). Nothing changes until you press a Restore button. By default only records that are <b>missing</b> are put back; existing records are never overwritten unless you tick the box.</p>
+    <input type="file" id="file" accept=".gz,.json,application/gzip,application/json">
+    <div id="fileInfo" class="small" style="margin-top:8px;"></div>
+    <div id="restoreArea" hidden>
+      <div style="margin:10px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input id="filter" placeholder="Find a record (name, address, order #, shop&hellip;)" style="flex:1;min-width:220px;">
+        <label class="small"><input type="checkbox" id="overwrite"> Overwrite records that still exist</label>
+      </div>
+      <div id="matches"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" id="restoreSel">Restore ticked records</button>
+        <button class="btn" id="restoreAll">Restore everything in this file</button>
+      </div>
+    </div>
+    <div id="restoreMsg"></div>
+  </div>
+</div>
+<script>
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fdt(iso){try{return new Date(iso).toLocaleString('en-CA',{timeZone:'America/Edmonton',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return iso;}}
+function msg(id,t,c){$(id).innerHTML=t?'<div class="msg '+c+'">'+esc(t)+'</div>':'';}
+
+async function loadStatus(){
+  var r=await fetch('/api/backup'); if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+  var d=await r.json(), l=d.last, h='';
+  if(!d.email_configured) h+='<div class="msg err">BACKUP_EMAIL is not set. Add it in Netlify (Site settings &gt; Environment variables), then redeploy. Until then backups cannot be sent anywhere.</div>';
+  if(!l){h+='<div class="msg info">No backup has run yet. Press <b>Back up now</b> to make the first one.</div>';}
+  else{
+    h+='<div><span class="pill '+(l.ok?'ok':'bad')+'">'+(l.ok?'Last backup OK':'Last backup had a problem')+'</span> <b>'+esc(fdt(l.at))+'</b> <span class="small">('+esc(l.trigger)+', '+Math.round((l.took_ms||0)/100)/10+' s'+(l.emailed?', emailed':', NOT emailed')+')</span></div>';
+    if(l.error)h+='<div class="msg err">'+esc(l.error)+'</div>';
+    h+='<table style="margin-top:10px;"><thead><tr><th>Data</th><th>Records</th><th>Size</th></tr></thead><tbody>'+Object.keys(l.stores||{}).map(function(n){var s=l.stores[n];return '<tr><td>'+esc(n)+'</td><td>'+(s.error?'<span class="pill bad">'+esc(s.error)+'</span>':s.records)+'</td><td>'+(s.kb!=null?s.kb+' KB':'')+'</td></tr>';}).join('')+'</tbody></table>';
+    var age=(Date.now()-new Date(l.at).getTime())/3600000;
+    if(age>30)h+='<div class="msg err">The last backup is more than a day old. Check the Netlify function logs.</div>';
+  }
+  $('status').innerHTML=h;
+  $('hist').innerHTML=(d.history||[]).map(function(x){return '<tr><td>'+esc(fdt(x.at))+'</td><td>'+esc(x.trigger)+'</td><td><span class="pill '+(x.ok?'ok':'bad')+'">'+(x.ok?'OK':'Problem')+'</span> '+esc(x.error||'')+'</td></tr>';}).join('')||'<tr><td colspan="3" class="small">Nothing yet.</td></tr>';
+}
+$('runBtn').addEventListener('click',async function(){
+  var b=this;b.disabled=true;b.textContent='Backing up…';msg('runMsg','','');
+  try{
+    var r=await fetch('/api/backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'run'})});
+    var t=await r.text(), d; try{d=JSON.parse(t);}catch(e){throw new Error('The backup took longer than the server allows (it still may have finished - check Recent runs in a minute). The automatic daily run has more time.');}
+    msg('runMsg',d.ok?'Backup finished and emailed.':'Backup finished with a problem: '+(d.error||'see the table above'),d.ok?'okm':'err');
+  }catch(e){msg('runMsg',e.message,'err');}
+  b.disabled=false;b.textContent='Back up now';loadStatus();
+});
+
+var BK=null, SEL={};
+async function readFile(f){
+  var buf=await f.arrayBuffer(), bytes=new Uint8Array(buf);
+  var text;
+  if(bytes[0]===0x1f&&bytes[1]===0x8b){
+    var ds=new DecompressionStream('gzip'); var stream=new Blob([buf]).stream().pipeThrough(ds);
+    text=await new Response(stream).text();
+  } else text=new TextDecoder().decode(bytes);
+  return JSON.parse(text);
+}
+$('file').addEventListener('change',async function(){
+  BK=null;SEL={};$('restoreArea').hidden=true;msg('restoreMsg','','');
+  var f=this.files[0]; if(!f)return;
+  try{
+    BK=await readFile(f);
+    if(!BK.store||!BK.records)throw new Error('This does not look like a Smart Choice backup file.');
+    $('fileInfo').textContent='Backup of "'+BK.store+'" made '+fdt(BK.created_at)+' with '+Object.keys(BK.records).length+' records.';
+    $('restoreArea').hidden=false; showMatches();
+  }catch(e){$('fileInfo').textContent='';msg('restoreMsg','Could not read that file: '+e.message,'err');}
+});
+function summarize(v){
+  if(!v||typeof v!=='object')return String(v);
+  var parts=[v.date||(v.received_at||'').slice(0,10),v.order_id&&('#'+v.order_id),v.name,v.formatted_address||v.address,v.shop_code||v.code,v.driver];
+  return parts.filter(Boolean).join(' · ')||JSON.stringify(v).slice(0,140);
+}
+function showMatches(){
+  if(!BK)return; var q=$('filter').value.trim().toLowerCase(), keys=Object.keys(BK.records), out=[];
+  for(var i=0;i<keys.length&&out.length<40;i++){var k=keys[i];
+    if(!q||k.toLowerCase().indexOf(q)>=0||JSON.stringify(BK.records[k]).toLowerCase().indexOf(q)>=0)out.push(k);}
+  $('matches').innerHTML=(out.length?'':'<div class="small">No records match.</div>')+out.map(function(k){
+    return '<div class="rec"><input type="checkbox" data-k="'+esc(k)+'" '+(SEL[k]?'checked':'')+'><div>'+esc(summarize(BK.records[k]))+'<code>'+esc(k)+'</code></div></div>';}).join('')
+    +(Object.keys(BK.records).length>40&&!q?'<div class="small" style="margin-top:6px;">Showing the first 40 - use the search to find a specific record.</div>':'');
+}
+$('filter').addEventListener('input',showMatches);
+$('matches').addEventListener('change',function(e){var k=e.target.dataset&&e.target.dataset.k;if(k)SEL[k]=e.target.checked;});
+async function restore(keys){
+  if(!keys.length){msg('restoreMsg','Nothing selected.','err');return;}
+  var ow=$('overwrite').checked;
+  if(!confirm('Restore '+keys.length+' record(s) of "'+BK.store+'"'+(ow?' and OVERWRITE any that still exist':' (only ones that are currently missing)')+'?'))return;
+  var restored=0,skipped=0,failed=0;
+  try{
+    for(var i=0;i<keys.length;i+=100){
+      msg('restoreMsg','Restoring '+Math.min(i+100,keys.length)+' of '+keys.length+'…','info');
+      var chunk=keys.slice(i,i+100).map(function(k){return {key:k,value:BK.records[k]};});
+      var r=await fetch('/api/backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'restore',store:BK.store,overwrite:ow,records:chunk})});
+      var d=await r.json(); if(!r.ok)throw new Error(d.error||('Status '+r.status));
+      restored+=d.restored;skipped+=d.skipped_existing;failed+=d.failed;
+    }
+    msg('restoreMsg','Restored '+restored+'. Left alone because they already exist: '+skipped+'. Failed: '+failed+'.',failed?'err':'okm');
+  }catch(e){msg('restoreMsg','Restore stopped: '+e.message+' (restored so far: '+restored+')','err');}
+}
+$('restoreSel').addEventListener('click',function(){restore(Object.keys(SEL).filter(function(k){return SEL[k];}));});
+$('restoreAll').addEventListener('click',function(){restore(Object.keys(BK.records));});
+fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
+  if(!d.authenticated)location.href='/login.html?redirect='+encodeURIComponent(location.pathname);else loadStatus();
+}).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
+</script>
+</body>
+</html>
