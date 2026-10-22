@@ -389,38 +389,42 @@ function isWholesaleOrder(o) {
   var z = String(o.zone_code || '').toUpperCase();
   return z.charAt(0) === 'W' && z !== 'WED' && z !== 'WEDO';
 }
-function dupGroups(list) {
-  var groups = {};
+/* Orders with a real order number match on number + name + address. Orders numbered "1" (no number on
+   the tag) can legitimately repeat to the same address from the same shop, so they only count when it
+   looks like a double submission: same name, address, driver and day, entered within 10 minutes. */
+var DUP_WINDOW_MS = 10 * 60 * 1000;
+function dupGroups(list, counts) {
+  var groups = {}, placeholder = {};
   list.forEach(function(o) {
     if (isWholesaleOrder(o)) return;
     var id = dupNorm(o.order_id), nm = dupNorm(o.name), ad = dupNorm(o.formatted_address || o.address);
-    if (!id || !nm || !ad) return;
+    if (!id || !nm || !ad) { if (counts) counts.skipped++; return; }
+    if (id === '1') {
+      var k1 = nm + '|' + ad + '|' + dupNorm(o.driver) + '|' + String(o.date || (o.received_at || '').slice(0, 10));
+      (placeholder[k1] = placeholder[k1] || []).push(o);
+      return;
+    }
     var key = id + '|' + nm + '|' + ad;
     (groups[key] = groups[key] || []).push(o);
   });
-  return Object.keys(groups).map(function(k) { return groups[k]; }).filter(function(g) { return g.length > 1; });
-}
-// Quiet check that runs when the page opens and shows a banner only if something is found.
-function dupBannerCheck() {
-  var bar = document.getElementById('dupBanner');
-  dupScan(null, function(all, weeks) {
-    var n = dupGroups(all).length;
-    if (!n) { bar.hidden = true; return; }
-    bar.innerHTML = '&#9888;&#65039; <strong>' + n + ' possible duplicate group' + (n === 1 ? '' : 's') + '</strong> in the last ' + weeks + ' weeks (same Order ID, name and address). <button class="btn btn-sm" onclick="showDuplicates(window.__dupAll,' + weeks + ')">Review</button>';
-    window.__dupAll = all; bar.hidden = false;
-  }, function() { bar.hidden = true; });
+  var out = Object.keys(groups).map(function(k) { return groups[k]; }).filter(function(g) { return g.length > 1; });
+  Object.keys(placeholder).forEach(function(k) {
+    var arr = placeholder[k].slice().sort(function(a, b) { return new Date(a.received_at) - new Date(b.received_at); });
+    var cluster = [arr[0]];
+    function flush() { if (cluster.length > 1) out.push(cluster); }
+    for (var i = 1; i < arr.length; i++) {
+      var gap = new Date(arr[i].received_at) - new Date(cluster[cluster.length - 1].received_at);
+      if (gap <= DUP_WINDOW_MS) cluster.push(arr[i]); else { flush(); cluster = [arr[i]]; }
+    }
+    flush();
+  });
+  return out;
 }
 function showDuplicates(list, weeksChecked) {
   var wsCount = list.filter(isWholesaleOrder).length;
   list = list.filter(function(o) { return !isWholesaleOrder(o); });
-  var groups = {}, skipped = 0;
-  list.forEach(function(o) {
-    var id = dupNorm(o.order_id), nm = dupNorm(o.name), ad = dupNorm(o.formatted_address || o.address);
-    if (!id || !nm || !ad) { skipped++; return; }
-    var key = id + '|' + nm + '|' + ad;
-    (groups[key] = groups[key] || []).push(o);
-  });
-  var dups = Object.keys(groups).map(function(k) { return groups[k]; }).filter(function(g) { return g.length > 1; });
+  var cnt = { skipped: 0 };
+  var dups = dupGroups(list, cnt), skipped = cnt.skipped;
   dups.sort(function(a, b) { return String(b[0].received_at || b[0].date || '').localeCompare(String(a[0].received_at || a[0].date || '')); });
   var extra = dups.reduce(function(n, g) { return n + g.length - 1; }, 0);
   document.getElementById('dupSummary').textContent = 'Checked ' + list.length + ' orders across the last ' + weeksChecked + ' week(s). ' + dups.length + ' group(s) match on Order ID, name and address (' + extra + ' extra record(s)).' + (skipped ? ' ' + skipped + ' order(s) skipped because Order ID, name or address was blank.' : '') + (wsCount ? ' ' + wsCount + ' wholesale order(s) excluded (they repeat by design).' : '');
