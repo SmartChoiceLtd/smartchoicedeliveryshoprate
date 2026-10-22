@@ -11,7 +11,7 @@ import { gzipSync } from 'node:zlib';
 
 export const BACKUP_STORES = [
   'flower-orders', 'flower-shops', 'flower-rates', 'flower-drivers', 'flower-driver-payments',
-  'flower-stops', 'flower-scan-log', 'flower-daily-premiums', 'driver-applications', 'email-templates'
+  'flower-stops', 'flower-scan-log', 'flower-daily-premiums', 'driver-applications', 'email-templates', 'flower-deleted-orders'
 ];
 
 async function mapLimit(items, limit, fn) {
