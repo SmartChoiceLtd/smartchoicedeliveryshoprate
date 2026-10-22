@@ -61,7 +61,7 @@ export async function runBackup({ trigger = 'schedule' } = {}) {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const total = files.reduce((s, f) => s + f.content.length, 0);
     const summary = Object.keys(status.stores).map(n => n + ': ' + (status.stores[n].error ? 'ERROR ' + status.stores[n].error : status.stores[n].records + ' records, ' + status.stores[n].kb + ' KB')).join('\n');
-    const groups = total < 25 * 1024 * 1024 ? [files] : files.map(f => [f]);
+    const groups = total < 14 * 1024 * 1024 ? [files] : files.map(f => [f]); // attachments grow ~33% when emailed; Yahoo and most inboxes stop at 25 MB
     for (let i = 0; i < groups.length; i++) {
       const r = await resend.emails.send({
         from: 'backup@smartchoicedelivery.ca', to,
