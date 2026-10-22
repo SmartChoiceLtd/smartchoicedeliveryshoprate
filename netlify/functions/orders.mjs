@@ -1,139 +1,383 @@
 import { getStore } from '@netlify/blobs';
 
-// Every change to a rate is recorded in flower-rate-history (who, when, zone, field, from -> to), so a
-// price or pay dispute can be answered with what applied on a given date. Saving rates needs a login.
-async function requireAuth(req) {
-  const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
-  if (!m) return null;
-  const s = await getStore('flower-sessions').get(m[1], { type: 'json' });
-  if (!s || new Date(s.expires_at) < new Date()) return null;
-  return s.username;
-}
-function diffRates(before, after) {
-  const changes = [];
-  const zones = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
-  zones.forEach(z => {
-    const b = (before && before[z]) || null, a = (after && after[z]) || null;
-    if (!b && a) { Object.keys(a).forEach(f => changes.push({ zone: z, field: f, from: null, to: a[f] })); return; }
-    if (b && !a) { Object.keys(b).forEach(f => changes.push({ zone: z, field: f, from: b[f], to: null })); return; }
-    new Set([...Object.keys(b), ...Object.keys(a)]).forEach(f => {
-      if (JSON.stringify(b[f]) !== JSON.stringify(a[f])) changes.push({ zone: z, field: f, from: b[f] === undefined ? null : b[f], to: a[f] === undefined ? null : a[f] });
-    });
-  });
-  return changes;
-}
-async function logRateChanges(user, before, after) {
-  try {
-    const changes = diffRates(before, after);
-    if (!changes.length) return;
-    const at = new Date().toISOString();
-    await getStore('flower-rate-history').setJSON(at + '_' + Math.random().toString(36).slice(2, 6), { at, by: user, kind: 'rate', changes });
-  } catch (e) { console.error('rate history log failed:', e.message); }
-}
-
 function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
 }
 
-const DEFAULT_RATES = {
-  C1:{drate:8.25,dratex:1.5,gdpi:0.11,srate:13.5,sratex:3},
-  C2:{drate:8,dratex:1.5,gdpi:0.5,srate:15,sratex:3},
-  C3:{drate:8.25,dratex:1.5,gdpi:0.5,srate:16.5,sratex:3},
-  C4:   { drate:8.75,  dratex:1.5, gdpi:0.5,  srate:17, sratex:3 },
-  C5:   { drate:14.95, dratex:1.5, gdpi:0.75, srate:18, sratex:3 },
-  TSA:  { drate:14.95, dratex:1.5, gdpi:0.75, srate:23, sratex:3 },
-  AIR:{drate:16.25,dratex:1.5,gdpi:1,srate:25,sratex:3},
-  BAL:{drate:14.3,dratex:1.5,gdpi:0.5,srate:22,sratex:3},
-  BNF:{drate:65,dratex:1.5,gdpi:5,srate:100,sratex:3},
-  BPW:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
-  BRG:{drate:22.75,dratex:1.5,gdpi:1,srate:35,sratex:3},
-  CAN:{drate:52,dratex:1.5,gdpi:5,srate:80,sratex:3},
-  CAR:{drate:45,dratex:1.5,gdpi:5,srate:60,sratex:5},
-  CHE:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
-  COC:{drate:19.5,dratex:1.5,gdpi:1,srate:30,sratex:3},
-  CRO:{drate:26,dratex:1.5,gdpi:1,srate:45,sratex:3},
-  DEW:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
-  DVA:{drate:32.5,dratex:1.5,gdpi:1.5,srate:50,sratex:3},
-  ERV:{drate:14.3,dratex:1.5,gdpi:0.75,srate:23,sratex:3},
-  EVA:{drate:14.3,dratex:1.5,gdpi:0.75,srate:23,sratex:3},
-  FUN:{drate:9.75,dratex:1.5,gdpi:0.5,srate:15,sratex:3},
-  FUNO:{drate:16.25,dratex:3,gdpi:1,srate:25,sratex:3},
-  HOT:{drate:16.25,dratex:0,gdpi:0.5,srate:25,sratex:0},
-  HPT:{drate:14.3,dratex:1.5,gdpi:0.75,srate:23,sratex:3},
-  HRV:{drate:26,dratex:1.5,gdpi:1.5,srate:40,sratex:3},
-  KAN:{drate:45,dratex:1.5,gdpi:3,srate:65,sratex:3},
-  LAN:{drate:19.5,dratex:1.5,gdpi:1,srate:30,sratex:3},
-  LKL:{drate:130,dratex:1.5,gdpi:3,srate:200,sratex:3},
-  LYA:{drate:22.75,dratex:1.5,gdpi:1,srate:38,sratex:3},
-  MDF:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
-  MIL:{drate:27,dratex:1.5,gdpi:2.5,srate:45,sratex:3},
-  NAN:{drate:50,dratex:1.5,gdpi:1.5,srate:75,sratex:3},
-  NCH:{drate:0,dratex:0,gdpi:0,srate:0,sratex:0},
-  OKO:{drate:16.25,dratex:1.5,gdpi:1,srate:25,sratex:3},
-  PRI:{drate:19.5,dratex:1.5,gdpi:1,srate:30,sratex:3},
-  RED:{drate:113.75,dratex:1.5,gdpi:5,srate:175,sratex:3},
-  RVS:{drate:14.95,dratex:1.5,gdpi:1,srate:23,sratex:3},
-  SBK:{drate:16.25,dratex:1.5,gdpi:1,srate:25,sratex:3},
-  SC2:{drate:40,dratex:0,gdpi:0,srate:40,sratex:0},
-  SC3:{drate:60,dratex:0,gdpi:0,srate:60,sratex:0},
-  STR:{drate:22.75,dratex:1.5,gdpi:2,srate:35,sratex:3},
-  TSU:{drate:16.25,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
-  WAI:{drate:16.25,dratex:1,gdpi:1,srate:25,sratex:1.5},
-  WCO:{drate:19.5,dratex:1,gdpi:1,srate:30,sratex:1.5},
-  WED:{drate:16.25,dratex:1,gdpi:1,srate:25,sratex:5},
-  WEDO:{drate:16.25,dratex:1,gdpi:3.32,srate:25,sratex:5},
-  WHR:{drate:26,dratex:1,gdpi:1,srate:40,sratex:1.5},
-  WLO:{drate:40,dratex:1,gdpi:5,srate:60,sratex:1.5},
-  WLY:{drate:23,dratex:1.5,gdpi:1,srate:38,sratex:1.5},
-  WPO:{drate:16.25,dratex:1,gdpi:1,srate:25,sratex:1.5},
-  WPU:{drate:9.75,dratex:1.5,gdpi:1,srate:15,sratex:1.5},
-  WST:{drate:24.7,dratex:1.5,gdpi:2,srate:38,sratex:1.5},
-  WBR:{drate:30,dratex:1.5,gdpi:2,srate:40,sratex:1.5},
-  WPH:{drate:15,dratex:1,gdpi:0.75,srate:20,sratex:1},
-};
+// Map Zoho's "Shop (with Group Name)" to shop code
+// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
+function extractShopCode(shopWithGroup) {
+  if (!shopWithGroup) return null;
+  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Map Zoho's "Zone (with Group Name)" to zone code
+// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
+function extractZoneCode(zoneWithGroup) {
+  if (!zoneWithGroup) return null;
+  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Determine if zone needs auto-calculation
+function needsZoneCalculation(zoneCode) {
+  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
+  return false;
+}
+
+// Event-type pricing codes from driver.html's Event Type overlay (Special
+// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
+// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
+// are tracked under their own code. None of them should ever be
+// re-suggested or overwritten by the address-based zone matcher below.
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
+function isEventZoneCode(zoneCode) {
+  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
+}
+
+// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
+// the given date. Embedded directly in each order's storage key so a
+// specific week's orders can be found via a fast, server-side prefix
+// filter on .list() instead of fetching and filtering every order ever
+// created - which became a real bottleneck once the store grew into the
+// thousands of records.
+// Normalizes the date formats an order can arrive with to YYYY-MM-DD.
+// Driver-form orders send ISO dates, but the Zoho webhook sends
+// DD-Mon-YYYY (or D/M/YYYY) - the same formats reports.mjs and orders.html
+// already parse. Without this, those orders' week key came out wrong.
+// Returns null if the format isn't recognized.
+function normalizeOrderDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return null;
+}
+
+function weekEndingSunday(dateStr) {
+  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
+  // An unparseable date must still land on a real Sunday - previously this
+  // returned today's date as-is, which is almost never a Sunday, so the
+  // order got filed under a week key that no weekly report or pay run
+  // would ever look up.
+  if (!d || isNaN(d.getTime())) d = new Date();
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+async function suggestZone(address, shopLat, shopLng, key) {
+  try {
+    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
+    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone-v2?${params}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getShopLocation(shopCode) {
+  try {
+    const store = getStore('flower-shops');
+    const { blobs } = await store.list();
+    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
+    const match = shops.filter(Boolean).find(s =>
+      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
+    );
+    return match ? { lat: match.lat, lng: match.lng } : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 export default async (req) => {
-  const store = getStore('flower-rates');
-
+  // Handle GET — list all orders. NOT auth-gated: this is shared with
+  // driver-summary.html (driver-facing, no login system at all) in
+  // addition to orders.html's dashboard - same category as shops.mjs/
+  // rates.mjs/stops.mjs, which were deliberately left open for the same
+  // reason. Protecting the dashboard relies on its page-level login
+  // redirect instead of blocking this endpoint outright.
   if (req.method === 'GET') {
     try {
-      const stored = await store.get('rates', { type: 'json' });
-      return json(stored || DEFAULT_RATES);
-    } catch(e) {
-      return json(DEFAULT_RATES);
+      const store = getStore('flower-orders');
+      const url = new URL(req.url);
+      const limitParam = parseInt(url.searchParams.get('limit') || '500');
+      // week_end=YYYY-MM-DD returns EVERY order filed under that week. Order keys start with
+      // order_<week-ending>_, so this is a fast prefix lookup and is not affected by the
+      // 'most recent N orders' cap below (which silently hid older weeks once there were
+      // more than 500 orders in total).
+      const weekEnd = url.searchParams.get('week_end');
+      const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
+      if (weekPrefix) {
+        // Orders saved before the week-in-the-key scheme (and any filed under a different week)
+        // have no matching prefix, so the prefix lookup alone misses them. Same recovery the
+        // reports use: take other keys whose embedded timestamp is near this week, fetch them,
+        // and let the order's own date decide whether it belongs.
+        const DAY = 86400000;
+        const endD = new Date(weekEnd + 'T12:00:00');
+        const startD = new Date(endD); startD.setDate(startD.getDate() - 6);
+        const startIso = startD.getFullYear() + '-' + String(startD.getMonth() + 1).padStart(2, '0') + '-' + String(startD.getDate()).padStart(2, '0');
+        const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+        const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
+        const { blobs: prefixed } = await store.list({ prefix: weekPrefix });
+        const { blobs: all } = await store.list();
+        const fallback = all.filter(b => {
+          if (b.key.startsWith(weekPrefix)) return false;
+          const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+          if (!m) return false;
+          const ts = parseInt(m[1]);
+          return ts >= startMs && ts <= endMs;
+        });
+        const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+        const inWeek = fetched.filter(o => {
+          const d = normalizeOrderDate(o.date) || (o.received_at ? String(o.received_at).slice(0, 10) : null);
+          return d && d >= startIso && d <= weekEnd;
+        });
+        return json(inWeek.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+      }
+      const { blobs } = await store.list();
+      const picked = blobs.slice(-Math.min(limitParam, 5000));
+      const orders = await Promise.all(
+        picked.map(b => store.get(b.key, { type: 'json' }))
+      );
+      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+    } catch (e) {
+      return json({ error: 'Could not load orders: ' + e.message }, 500);
     }
-  }
+  }  
+  // Handle POST — receive Zoho webhook
+  if
+   (req.method === 'POST') {
+    const key = process.env.GOOGLE_MAPS_KEY;
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+   let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return json({ error: 'Invalid JSON payload' }, 400);
+    }
 
-  if (req.method === 'PUT') {
-    const user = await requireAuth(req);
-    if (!user) return json({ error: 'Not authenticated - sign in to change rates' }, 401);
-    let body;
-    try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
-    let before = DEFAULT_RATES;
-    try { before = (await store.get('rates', { type: 'json' })) || DEFAULT_RATES; } catch(e) {}
-    await store.setJSON('rates', body);
-    await logRateChanges(user, before, body);
-    return json(body);
-  }
+      // Map Zoho field names to our internal structure
+    const raw = {
+      date:             body['Date']                     || body['date']              || null,
+      order_id:         body['Order ID']                 || body['order_id']          || null,
+      name:             body['Name']                     || body['name']              || null,
+      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
+      unit: body.unit || body['Unit'] || null,
+      time_request: body.time_request || body['Time Request'] || null,
+      rush: !!body.rush,
+      shop:             body['Shop']                     || body['shop']              || null,
+     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
+      driver:           body['Driver']                   || body['driver']            || null,
+      driver_pay: body.driver_pay || body['driver_pay'] || 0,
+     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
+      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
+      zone:             body['Zone']                     || body['zone']              || null,
+      zone_full:        body['Zone (with Group Name)']   || null,
+      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
+      delivery_time:    body['Delivery Time']            || body.delivery_time    || null,
+      contact_method:   body['Recipient Contact Method'] || body.contact_method   || null,
+      neighboured_to:   body['Neighboured To']           || body.neighboured_to   || null,
+      accepted_by:      body['Delivery Accepted By']     || body.accepted_by      || null,
+      comments:         body['Comments']                 || null,
+    };
 
-  if (req.method === 'POST') {
-    const user = await requireAuth(req);
-    if (!user) return json({ error: 'Not authenticated - sign in to change rates' }, 401);
-    let body;
-    try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
-    const { zone, ...updates } = body;
-    if (!zone) return json({ error: 'zone required' }, 400);
-    let current;
-    try { current = await store.get('rates', { type: 'json' }) || DEFAULT_RATES; }
-    catch(e) { current = { ...DEFAULT_RATES }; }
-    const before = JSON.parse(JSON.stringify(current));
-    current[zone] = { ...current[zone], ...updates };
-    await store.setJSON('rates', current);
-    await logRateChanges(user, before, current);
-    return json(current[zone]);
-  }
+    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
 
+    // Wholesale deliveries use their own separate zone system (WPU, WAI,
+    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
+    // entered directly from Zoho). Checked BEFORE zone determination below:
+    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
+    // etc, and re-running a wholesale order's address through it could
+    // silently overwrite a correct wholesale code with an unrelated retail
+    // one - the same category of bug we already fixed for event-type codes.
+    const isWholesale = (raw.delivery_type === 'wholesale') ||
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
+
+    // Auto-calculate zone if not entered or flagged as needing calculation
+    let zoneCode = enteredZoneCode;
+    let zoneSource = 'manual';
+    let zoneSuggestion = null;
+
+    if (isWholesale) {
+      // Wholesale zone codes are authoritative as entered - never
+      // re-suggested against the retail address matcher. If no zone was
+      // entered at all, this needs a human to fill in rather than guessing
+      // a retail zone that doesn't apply to wholesale pricing.
+      if (enteredZoneCode) {
+        zoneCode = enteredZoneCode.toUpperCase();
+        zoneSource = 'manual';
+      } else {
+        zoneSource = 'needs_review';
+      }
+    } else if (isEventZoneCode(enteredZoneCode)) {
+      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
+      // never re-suggested/overwritten. Still look up the address for its
+      // community name (for tracking/reports), but ignore any suggested
+      // zone code that comes back with it.
+      zoneCode = enteredZoneCode.toUpperCase();
+      zoneSource = 'manual';
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+      }
+    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
+      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+      zoneSuggestion = await suggestZone(
+        raw.address,
+        shopLoc?.lat || 51.0447,
+        shopLoc?.lng || -114.0719,
+        key
+      );
+      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
+        zoneCode = zoneSuggestion.suggested;
+        zoneSource = 'auto';
+      } else {
+        zoneSource = 'needs_review';
+      }
+  } else if (enteredZoneCode) {
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
+        } else {
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
+        }
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
+      }
+    }
+  
+    
+
+    // Flag if manual zone differs from suggestion
+    const zoneConflict = !isWholesale &&
+      !isEventZoneCode(enteredZoneCode) &&
+      zoneSuggestion?.suggested &&
+      enteredZoneCode &&
+      zoneSuggestion.suggested !== enteredZoneCode &&
+      zoneSuggestion.confidence === 'high';
+
+    const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
+    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const order = {
+      id: orderId,
+      received_at: new Date().toISOString(),
+      date: raw.date,
+      order_id: raw.order_id,
+      name: raw.name,
+      address: raw.address,
+      unit: raw.unit || null,
+      time_request: raw.time_request || null,
+      formatted_address: zoneSuggestion?.formatted_address || raw.address,
+      community: zoneSuggestion?.community || null,
+      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
+      shop_code: shopCode,
+      shop_full: raw.shop_full || raw.shop || null,
+      driver: raw.driver,
+      driver_pay: (function() {
+        if (raw.driver_pay) return parseFloat(raw.driver_pay);
+        const r = ratesData ? ratesData[zoneCode] : null;
+        if (!r) return 0;
+        const pieces = parseInt(raw.total_pieces || 1);
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        const base = ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium;
+      })(),
+      total_pieces: raw.total_pieces,
+      zone_entered: enteredZoneCode,
+      zone_code: zoneCode,
+      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
+      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
+      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
+      rush: !!raw.rush,
+      // Snapshot of the rate table entry actually in effect for this zone
+      // at the moment this order was created. Reports should prefer this
+      // over a live rate-table lookup - otherwise, changing a rate later
+      // would silently rewrite what an already-invoiced order says every
+      // time a shop report gets re-run, which is a real billing-integrity
+      // problem, not just a cosmetic one.
+      rate_snapshot: (ratesData && ratesData[zoneCode]) ? ratesData[zoneCode] : null,
+      // Same historical-accuracy reasoning applies to the rush premium -
+      // if HOT's rate changes later, old rush orders shouldn't silently
+      // reflect the new amount.
+      hot_rate_snapshot: (raw.rush && ratesData && ratesData['HOT']) ? ratesData['HOT'] : null,
+      delivery_status: raw.delivery_status,
+      delivery_time: raw.delivery_time,
+      contact_method: raw.contact_method,
+      neighboured_to: raw.neighboured_to,
+      accepted_by: raw.accepted_by,
+      comments: raw.comments,
+      has_photo: !!body.photo_base64,
+    };
+
+    try {
+      const store = getStore('flower-orders');
+      await store.setJSON(orderId, order);
+      // Photo is stored in a separate blob store, not embedded in the order
+      // record itself - GET /api/orders loads every order's full JSON on
+      // every page view, so embedding potentially-large photo data there
+      // would slow that down for every order, viewed or not. The photo is
+      // only fetched on-demand when someone actually wants to view it.
+      if (body.photo_base64) {
+        try {
+          const photoStore = getStore('flower-order-photos');
+          await photoStore.set(orderId, body.photo_base64);
+        } catch (e) {
+          // Order itself already saved successfully - don't fail the whole
+          // submission just because the photo couldn't be stored, but the
+          // has_photo flag above would then be misleading. Downgrade it.
+          order.has_photo = false;
+          await store.setJSON(orderId, order);
+        }
+      }
+      // has_photo reports whether the photo was actually stored (it is downgraded to
+      // false above if the photo write failed), so the driver form can tell the driver
+      // the truth instead of assuming the photo made it.
+      // If this week has been closed, list the late order against it (not blocked - just visible).
+      try {
+        const lockStore = getStore('flower-week-locks');
+        const lk = await lockStore.get(weekEnd, { type: 'json' });
+        if (lk && lk.locked) {
+          lk.changes = lk.changes || [];
+          lk.changes.push({ at: new Date().toISOString(), by: 'new entry', id: orderId, order_id: order.order_id, action: 'added', reason: 'Order entered after the week was closed' });
+          await lockStore.setJSON(weekEnd, lk);
+        }
+      } catch (e) { /* the order is saved; logging is best-effort */ }
+      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
+    } catch (e) {
+      return json({ error: 'Could not store order: ' + e.message }, 500);
+   }
+  }
   return json({ error: 'Method not allowed' }, 405);
 };
 
-export const config = { path: '/api/rates' };
+export const config = { path: '/api/orders' };
