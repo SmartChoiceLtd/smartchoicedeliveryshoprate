@@ -362,6 +362,16 @@ export default async (req) => {
       // has_photo reports whether the photo was actually stored (it is downgraded to
       // false above if the photo write failed), so the driver form can tell the driver
       // the truth instead of assuming the photo made it.
+      // If this week has been closed, list the late order against it (not blocked - just visible).
+      try {
+        const lockStore = getStore('flower-week-locks');
+        const lk = await lockStore.get(weekEnd, { type: 'json' });
+        if (lk && lk.locked) {
+          lk.changes = lk.changes || [];
+          lk.changes.push({ at: new Date().toISOString(), by: 'new entry', id: orderId, order_id: order.order_id, action: 'added', reason: 'Order entered after the week was closed' });
+          await lockStore.setJSON(weekEnd, lk);
+        }
+      } catch (e) { /* the order is saved; logging is best-effort */ }
       return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
