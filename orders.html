@@ -572,6 +572,15 @@ function sendDriverPay() {
 }
  
 function initOrdersPage() {
+// Deep links from the Weekly Close page: ?week_end=YYYY-MM-DD&source=conflict|needs_review
+try {
+  var qp0 = new URLSearchParams(location.search), qwe = qp0.get('week_end'), qsrc = qp0.get('source');
+  if (qwe && /^\d{4}-\d{2}-\d{2}$/.test(qwe)) {
+    var curSun = getWeekBounds(0).end, tgt = new Date(qwe + 'T12:00:00'), wk0 = new Date(curSun); wk0.setHours(12, 0, 0, 0);
+    weekOffset = Math.round((tgt - wk0) / (7 * 86400000)); updateWeekLabel();
+  }
+  if (qsrc) { var fs0 = document.getElementById('filterSource'); if (fs0) fs0.value = qsrc; }
+} catch (e0) {}
 setTimeout(dupBannerCheck, 2500); // let the week's orders load first, then check quietly
 document.getElementById('ovSaveBtn').addEventListener('click', function() {
 var newZone = document.getElementById('ovNew').value.trim().toUpperCase();
