@@ -1,5 +1,36 @@
 import { getStore } from '@netlify/blobs';
 
+// Every change to a rate is recorded in flower-rate-history (who, when, zone, field, from -> to), so a
+// price or pay dispute can be answered with what applied on a given date. Saving rates needs a login.
+async function requireAuth(req) {
+  const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
+  if (!m) return null;
+  const s = await getStore('flower-sessions').get(m[1], { type: 'json' });
+  if (!s || new Date(s.expires_at) < new Date()) return null;
+  return s.username;
+}
+function diffRates(before, after) {
+  const changes = [];
+  const zones = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+  zones.forEach(z => {
+    const b = (before && before[z]) || null, a = (after && after[z]) || null;
+    if (!b && a) { Object.keys(a).forEach(f => changes.push({ zone: z, field: f, from: null, to: a[f] })); return; }
+    if (b && !a) { Object.keys(b).forEach(f => changes.push({ zone: z, field: f, from: b[f], to: null })); return; }
+    new Set([...Object.keys(b), ...Object.keys(a)]).forEach(f => {
+      if (JSON.stringify(b[f]) !== JSON.stringify(a[f])) changes.push({ zone: z, field: f, from: b[f] === undefined ? null : b[f], to: a[f] === undefined ? null : a[f] });
+    });
+  });
+  return changes;
+}
+async function logRateChanges(user, before, after) {
+  try {
+    const changes = diffRates(before, after);
+    if (!changes.length) return;
+    const at = new Date().toISOString();
+    await getStore('flower-rate-history').setJSON(at + '_' + Math.random().toString(36).slice(2, 6), { at, by: user, kind: 'rate', changes });
+  } catch (e) { console.error('rate history log failed:', e.message); }
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
@@ -74,13 +105,20 @@ export default async (req) => {
   }
 
   if (req.method === 'PUT') {
+    const user = await requireAuth(req);
+    if (!user) return json({ error: 'Not authenticated - sign in to change rates' }, 401);
     let body;
     try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
+    let before = DEFAULT_RATES;
+    try { before = (await store.get('rates', { type: 'json' })) || DEFAULT_RATES; } catch(e) {}
     await store.setJSON('rates', body);
+    await logRateChanges(user, before, body);
     return json(body);
   }
 
   if (req.method === 'POST') {
+    const user = await requireAuth(req);
+    if (!user) return json({ error: 'Not authenticated - sign in to change rates' }, 401);
     let body;
     try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
     const { zone, ...updates } = body;
@@ -88,8 +126,10 @@ export default async (req) => {
     let current;
     try { current = await store.get('rates', { type: 'json' }) || DEFAULT_RATES; }
     catch(e) { current = { ...DEFAULT_RATES }; }
+    const before = JSON.parse(JSON.stringify(current));
     current[zone] = { ...current[zone], ...updates };
     await store.setJSON('rates', current);
+    await logRateChanges(user, before, current);
     return json(current[zone]);
   }
 
