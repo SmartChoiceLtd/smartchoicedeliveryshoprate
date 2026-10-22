@@ -62,53 +62,126 @@ function orderIsoDate(o) {
 // The key timestamp is used only as a cheap pre-filter to avoid fetching
 // the whole store; its upper bound is padded 14 days so late-entered
 // orders aren't cut off before the exact date check.
-async function computeYtd(driver, weekOrders, weekEnd) {
+// ---- Year-to-date, made fast -----------------------------------------------------------------
+// The old version fetched EVERY order since Dec 29 for EVERY driver on every statement, which now
+// takes longer than the server allows. Instead, each COMPLETED week's per-driver figures are worked
+// out once and kept (store flower-ytd-cache, key = the week's Sunday). The 3 most recent completed
+// weeks are always re-read live so late edits still count; older weeks come from the cache. The
+// first run after this change builds the cache; if it cannot finish inside the time limit it says so
+// and saves its progress, and the next attempt carries on (open ?action=warm_ytd to run it directly).
+const YTD_BUDGET_MS = 8000;
+let ytdDeadline = Date.now() + YTD_BUDGET_MS;
+function resetYtdBudget() { ytdDeadline = Date.now() + YTD_BUDGET_MS; }
+
+function isoOfDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function addDaysIso(iso, n) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOfDate(d); }
+function sundayOnOrAfter(iso) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + ((7 - d.getDay()) % 7)); return isoOfDate(d); }
+
+let blobListMemo = null; // { t, blobs } - one listing of the order store shared across drivers in a request
+async function listOrderBlobs() {
+  if (blobListMemo && Date.now() - blobListMemo.t < 30000) return blobListMemo.blobs;
+  const { blobs } = await getStore('flower-orders').list();
+  blobListMemo = { t: Date.now(), blobs };
+  return blobs;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k]); }
+  }));
+  return out;
+}
+
+// Every driver's deliveries for one Mon-Sun week, as { CODE: [[day, pay, isPremium], ...] }.
+async function computeWeekData(we) {
   const store = getStore('flower-orders');
-  const { blobs } = await store.list();
+  const blobs = await listOrderBlobs();
+  const startIso = addDaysIso(we, -6);
   const DAY = 86400000;
-  const startMs = new Date(YTD_START_DATE + 'T00:00:00').getTime() - 2 * DAY;
-  const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 14 * DAY;
-  const candidates = blobs.filter(b => {
+  const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+  const endMs = new Date(we + 'T23:59:59').getTime() + 7 * DAY;
+  const prefix = 'order_' + we + '_';
+  const picked = blobs.filter(b => {
+    if (b.key.startsWith(prefix)) return true;
     const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
     if (!m) return false;
     const ts = parseInt(m[1]);
     return ts >= startMs && ts <= endMs;
   });
-  const fetched = (await Promise.all(candidates.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
-
-  const code = (driver.code || '').toUpperCase();
-  const counted = new Map();
-  const consider = o => {
-    if ((o.driver || '').toUpperCase() !== code) return;
+  const orders = (await mapLimit(picked, 40, b => store.get(b.key, { type: 'json' }))).filter(Boolean);
+  const drivers = {};
+  orders.forEach(o => {
+    const code = (o.driver || '').toUpperCase();
     const day = orderIsoDate(o);
-    if (!day || day < YTD_START_DATE || day > weekEnd) return;
-    // The starting figure (ytd_start_pay / ytd_start_deliveries) already
-    // covers everything up to and including ytd_through_date, so orders on
-    // or before that day are NOT counted again from the app.
-    if (driver.ytd_through_date && day <= driver.ytd_through_date) return;
-    counted.set(o.id || (o.order_id + '|' + day + '|' + o.name), o);
-  };
-  fetched.forEach(consider);
-  weekOrders.forEach(consider);
+    if (!code || !day || day < startIso || day > we) return;
+    (drivers[code] = drivers[code] || []).push([day, parseFloat(o.driver_pay) || 0, o.order_id === 'PREMIUM' ? 1 : 0]);
+  });
+  return { week_end: we, drivers, orders_read: orders.length, computed_at: new Date().toISOString() };
+}
 
-  const list = Array.from(counted.values());
-  const days = list.map(orderIsoDate).sort();
-  const ordersPay = list.reduce((sum, o) => sum + (parseFloat(o.driver_pay) || 0), 0);
+const liveWeekMemo = new Map(); // week_end -> { t, data }  (recent weeks, short-lived)
+async function getWeekData(we, cacheable) {
+  if (!cacheable) {
+    const m = liveWeekMemo.get(we);
+    if (m && Date.now() - m.t < 30000) return m.data;
+    const data = await computeWeekData(we);
+    liveWeekMemo.set(we, { t: Date.now(), data });
+    return data;
+  }
+  const cache = getStore('flower-ytd-cache');
+  const hit = await cache.get(we, { type: 'json' }).catch(() => null);
+  if (hit) return hit;
+  if (Date.now() > ytdDeadline) throw new Error('YTD_WARMING');
+  const data = await computeWeekData(we);
+  await cache.setJSON(we, data);
+  return data;
+}
 
+// Weeks (Sundays) from the first YTD week through the week before the pay week.
+function priorWeekEnds(weekEnd) {
+  const list = [];
+  let we = sundayOnOrAfter(YTD_START_DATE);
+  const last = addDaysIso(sundayOnOrAfter(weekEnd), -7);
+  while (we <= last) { list.push(we); we = addDaysIso(we, 7); }
+  return list;
+}
+
+async function computeYtd(driver, weekOrders, weekEnd) {
+  const code = (driver.code || '').toUpperCase();
+  const prior = priorWeekEnds(weekEnd);
+  const liveFrom = addDaysIso(sundayOnOrAfter(weekEnd), -21); // this week and the 3 before it are read live
+  const rows = [];
+  let scanned = 0;
+  // Cached weeks first (in order, so a time-out saves progress), then the live ones.
+  const cachedWeeks = prior.filter(we => we < liveFrom), liveWeeks = prior.filter(we => we >= liveFrom);
+  for (const we of cachedWeeks) { const d = await getWeekData(we, true); scanned += d.orders_read || 0; (d.drivers[code] || []).forEach(r => rows.push(r)); }
+  for (const we of liveWeeks) { const d = await getWeekData(we, false); scanned += d.orders_read || 0; (d.drivers[code] || []).forEach(r => rows.push(r)); }
+  // The pay week itself: the orders already loaded for the statement (or read live if none were given).
+  if (weekOrders) {
+    weekOrders.forEach(o => { const day = orderIsoDate(o); if (day) rows.push([day, parseFloat(o.driver_pay) || 0, o.order_id === 'PREMIUM' ? 1 : 0]); });
+  } else {
+    const d = await getWeekData(sundayOnOrAfter(weekEnd), false); (d.drivers[code] || []).forEach(r => rows.push(r));
+  }
+  // The starting figure (ytd_start_pay / ytd_start_deliveries) already covers everything up to and
+  // including ytd_through_date, so orders on or before that day are NOT counted again.
+  const counted = rows.filter(r => r[0] >= YTD_START_DATE && r[0] <= weekEnd && !(driver.ytd_through_date && r[0] <= driver.ytd_through_date));
+  const days = counted.map(r => r[0]).sort();
+  const ordersPay = counted.reduce((sum, r) => sum + r[1], 0);
   const baselinePay = parseFloat(driver.ytd_start_pay) || 0;
   const baselineDel = parseInt(driver.ytd_start_deliveries) || 0;
   const totalPay = baselinePay + ordersPay;
-  const totalDel = baselineDel + list.length;
+  const totalDel = baselineDel + counted.length;
   return {
     baseline: { pay: baselinePay, deliveries: baselineDel, through_date: driver.ytd_through_date || null },
     orders: {
       pay: ordersPay,
-      deliveries: list.length,
+      deliveries: counted.length,
       first_date: days[0] || null,
       last_date: days[days.length - 1] || null,
-      zero_pay_orders: list.filter(o => !(parseFloat(o.driver_pay) > 0)).length,
-      premium_records: list.filter(o => o.order_id === 'PREMIUM').length,
-      candidates_scanned: candidates.length
+      zero_pay_orders: counted.filter(r => !(r[1] > 0)).length,
+      premium_records: counted.filter(r => r[2]).length,
+      candidates_scanned: scanned
     },
     total: { pay: totalPay, deliveries: totalDel, avg: totalDel > 0 ? totalPay / totalDel : 0 }
   };
@@ -379,6 +452,27 @@ export default async (req) => {
   }
 
   const url = new URL(req.url);
+  resetYtdBudget();
+
+  // ?action=warm_ytd&week_end=YYYY-MM-DD (login required): builds the saved weekly figures a bit at a
+  // time. Open it repeatedly until it says "done". Add &refresh=1 to throw the saved weeks away first.
+  if (req.method === 'GET' && url.searchParams.get('action') === 'warm_ytd') {
+    if (!(await requireAuth(req))) return json({ error: 'Not authenticated' }, 401);
+    const we = url.searchParams.get('week_end');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(we || '')) return json({ error: 'week_end (YYYY-MM-DD) required' }, 400);
+    const cache = getStore('flower-ytd-cache');
+    if (url.searchParams.get('refresh') === '1') {
+      const { blobs } = await cache.list();
+      await Promise.all(blobs.map(b => cache.delete(b.key)));
+    }
+    const liveFrom = addDaysIso(sundayOnOrAfter(we), -21);
+    const need = priorWeekEnds(we).filter(w => w < liveFrom);
+    let done = 0, remaining = 0;
+    for (const w of need) {
+      try { await getWeekData(w, true); done++; } catch (e) { if (e.message === 'YTD_WARMING') remaining++; else throw e; }
+    }
+    return json({ status: remaining ? 'not finished - run this link again' : 'done', weeks_ready: done, weeks_remaining: remaining });
+  }
 
   // View-only page: lets a driver (or dispatcher, on their behalf) see the
   // exact same statement even if the email was never received, or serves
@@ -438,7 +532,7 @@ export default async (req) => {
     }
     if (dbg === 'ytd') {
       const t0 = Date.now();
-      const ytd = await computeYtd(driver, [], weekEnd);
+      const ytd = await computeYtd(driver, null, weekEnd);
       return json({ driver: driverCode, week_end: weekEnd, ytd_start_date: YTD_START_DATE, ytd, took_ms: Date.now() - t0,
         note: 'ytd.total = ytd.baseline + ytd.orders. avg = total.pay / total.deliveries.' });
     }
@@ -466,7 +560,12 @@ export default async (req) => {
       });
     }
 
-    const html = await buildPayStatementHtml(driver, orders, weekEnd, rates, await etransferDate(driver, weekEnd));
+    let html;
+    try { html = await buildPayStatementHtml(driver, orders, weekEnd, rates, await etransferDate(driver, weekEnd)); }
+    catch (e) {
+      if (e.message === 'YTD_WARMING') return new Response('Pay history is being prepared for the first time. Wait a few seconds and reload this page - repeat once or twice if it asks again.', { status: 503, headers: { 'content-type': 'text/plain', 'retry-after': '5' } });
+      throw e;
+    }
     const page = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pay Statement - ${driver.name || driverCode}</title></head><body style="margin:0;padding:20px 12px;background:#FAF7F2;">${html}</body></html>`;
     return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
   }
@@ -527,7 +626,7 @@ export default async (req) => {
       results.push({ driver: code, status: 'sent', deliveries: orders.length, send_ms: Date.now() - tSend });
       console.log('Pay email sent:', driver.name, driver.email);
     } catch(e) {
-      results.push({ driver: code, status: 'failed', error: e.message, send_ms: Date.now() - tSend });
+      results.push({ driver: code, status: 'failed', error: e.message === 'YTD_WARMING' ? 'Pay history is being prepared - click Send again in a few seconds (nothing was sent)' : e.message, send_ms: Date.now() - tSend });
       console.error('Pay email failed:', driver.name, e.message);
     }
   }
