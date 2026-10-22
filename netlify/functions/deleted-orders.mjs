@@ -1,3 +1,4 @@
+
 import { getStore } from '@netlify/blobs';
 
 // The Deleted bin for orders. Deleting an order (order-detail.mjs) copies it here first; it can be
@@ -48,6 +49,17 @@ export default async (req) => {
     if (existing) return json({ error: 'An order with this ID already exists, so nothing was restored.' }, 409);
     await orders.setJSON(id, rec.order);
     await bin.delete(id);
+    try {
+      const raw = (rec.order && (rec.order.date || rec.order.received_at)) || '';
+      const mm = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+      if (mm) {
+        const dt = new Date(mm[1] + 'T12:00:00'); dt.setDate(dt.getDate() + ((7 - dt.getDay()) % 7));
+        const we = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+        const locks = getStore('flower-week-locks');
+        const lk = await locks.get(we, { type: 'json' });
+        if (lk && lk.locked) { lk.changes = lk.changes || []; lk.changes.push({ at: new Date().toISOString(), by: user, id, order_id: rec.order.order_id, action: 'restored', reason: 'Restored from the Deleted bin' }); await locks.setJSON(we, lk); }
+      }
+    } catch (e) { /* best-effort log */ }
     return json({ ok: true, restored: id });
   }
   if (body.action === 'purge') {
