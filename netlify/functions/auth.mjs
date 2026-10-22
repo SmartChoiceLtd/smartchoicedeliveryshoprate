@@ -99,6 +99,37 @@ export default async (req) => {
     return json({ authenticated: true, username: session.username });
   }
 
+  if (req.method === 'POST' && action === 'change-password') {
+    // Signed-in user changes their own password. The current password must be given again, and every
+    // OTHER session for this account is signed out afterwards (this one stays).
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
+    if (!match) return json({ error: 'Not signed in' }, 401);
+    const session = await sessionsStore.get(match[1], { type: 'json' });
+    if (!session || new Date(session.expires_at) < new Date()) return json({ error: 'Not signed in' }, 401);
+    let body;
+    try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
+    const current = body.current_password || '';
+    const next = body.new_password || '';
+    if (!current || !next) return json({ error: 'Current and new password required' }, 400);
+    if (next.length < 10) return json({ error: 'New password must be at least 10 characters' }, 400);
+    if (next === current) return json({ error: 'New password must be different from the current one' }, 400);
+    const user = await usersStore.get(session.username, { type: 'json' });
+    if (!user) return json({ error: 'Account not found' }, 404);
+    const ok = await verifyPassword(current, user.password_hash, user.password_salt);
+    if (!ok) return json({ error: 'Current password is incorrect' }, 401);
+    const { hash, salt } = await hashPassword(next);
+    await usersStore.setJSON(session.username, { ...user, password_hash: hash, password_salt: salt, password_changed_at: new Date().toISOString() });
+    try {
+      const { blobs: sBlobs } = await sessionsStore.list();
+      await Promise.all(sBlobs.filter(b => b.key !== match[1]).map(async b => {
+        const s = await sessionsStore.get(b.key, { type: 'json' });
+        if (s && s.username === session.username) await sessionsStore.delete(b.key);
+      }));
+    } catch (e) { /* the password is already changed; failing to sign out other devices is not fatal */ }
+    return json({ success: true });
+  }
+
   if (req.method === 'GET' && action === 'needs-setup') {
     const { blobs } = await usersStore.list();
     return json({ needs_setup: blobs.length === 0 });
