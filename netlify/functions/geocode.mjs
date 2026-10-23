@@ -1,4 +1,4 @@
-Unexpected token '<', "<!DOCTYPE "... is not valid JSONexport default async (req) => {
+export default async (req) => {
   const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
   if (!key) return new Response(JSON.stringify({ error: 'Maps key not configured.' }), { status: 500, headers: { 'content-type': 'application/json' } });
   const url = new URL(req.url);
@@ -12,4 +12,3 @@ Unexpected token '<', "<!DOCTYPE "... is not valid JSONexport default async (req
   return new Response(JSON.stringify({ formatted: r.formatted_address, lat: r.geometry.location.lat, lng: r.geometry.location.lng }), { status: 200, headers: { 'content-type': 'application/json' } });
 };
 export const config = { path: '/api/geocode' };
-Unexpected token '<', "<!DOCTYPE "... is not valid JSON
