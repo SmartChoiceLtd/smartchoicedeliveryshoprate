@@ -748,7 +748,7 @@ function loadRoute() {
   document.getElementById('emptyMsg').hidden = true;
 
   Promise.all([
-    fetch('/api/stops').then(function(r) { return r.json(); }),
+    fetch('/api/stops?days=30&status=pending&driver=' + encodeURIComponent(driverCode)).then(function(r) { return r.json(); }),
     fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
   ]).then(function(results) {
     var allStops = results[0];
