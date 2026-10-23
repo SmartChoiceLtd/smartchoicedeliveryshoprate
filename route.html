@@ -681,11 +681,13 @@ function toggleSkip(stopId, skip) {
 function optimizeOrder(stops, mapsKey, originLatLng) {
   if (stops.length < 2) return Promise.resolve(stops);
   // The server asks Google (browsers are not allowed to call the Directions service directly).
+  var t1 = performance.now();
   return fetch('/api/route-order', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ origin: originLatLng || null, stops: stops.map(function(s) { return { id: s.id, address: s.address }; }) })
   }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); }).then(function(x) {
+    console.log('[route timing] ordering answered in ' + Math.round(performance.now() - t1) + ' ms');
     if (!x.ok || !x.d.ids) { console.warn('Route ordering unavailable:', x.d && (x.d.google_status || x.d.error), x.d && x.d.google_message); return stops; }
     var byId = {}; stops.forEach(function(s) { byId[s.id] = s; });
     var ordered = x.d.ids.map(function(id) { return byId[id]; }).filter(Boolean);
@@ -732,14 +734,16 @@ function removeStop(stopId, btn) {
 }
 
 function loadRoute() {
+  var t0 = performance.now();
   document.getElementById('loadingMsg').hidden = false;
   document.getElementById('content').hidden = true;
   document.getElementById('emptyMsg').hidden = true;
 
   Promise.all([
-    fetch('/api/stops?days=30&status=pending&driver=' + encodeURIComponent(driverCode)).then(function(r) { return r.json(); }),
+    fetch('/api/stops?days=2&status=pending&driver=' + encodeURIComponent(driverCode)).then(function(r) { return r.json(); }),
     fetch('/api/config').then(function(r) { return r.ok ? r.json() : {}; }).catch(function() { return {}; })
   ]).then(function(results) {
+    console.log('[route timing] stops + config loaded in ' + Math.round(performance.now() - t0) + ' ms');
     var allStops = results[0];
     var mapsKey = results[1] && results[1].key;
     var justCompletedId = new URLSearchParams(location.search).get('just_completed');
