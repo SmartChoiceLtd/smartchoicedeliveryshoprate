@@ -55,6 +55,20 @@ export default async (req) => {
   if (req.method === 'DELETE') {
     const code = url.searchParams.get('code');
     if (!code) return json({ error: 'code required' }, 400);
+    // Keep a copy in the Deleted bin (Hub > Deleted Shops & Drivers) so a mistaken delete can be undone.
+    try {
+      const rec = await store.get(code.toLowerCase(), { type: 'json' });
+      if (rec) {
+        let by = 'unknown';
+        try {
+          const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
+          if (!m) by = 'not signed in';
+          else { const s = await getStore('flower-sessions').get(m[1], { type: 'json' }); by = (s && new Date(s.expires_at) > new Date()) ? s.username : 'not signed in'; }
+        } catch (e) {}
+        const bid = 'driver_' + code.toLowerCase() + '_' + Date.now();
+        await getStore('flower-deleted-records').setJSON(bid, { bin_id: bid, type: 'driver', key: code.toLowerCase(), label: (rec.name || code) + ' (' + code.toUpperCase() + ')', deleted_at: new Date().toISOString(), deleted_by: by, record: rec });
+      }
+    } catch (e) { console.error('bin copy failed:', e.message); }
     await store.delete(code.toLowerCase());
     return json({ deleted: code });
   }
