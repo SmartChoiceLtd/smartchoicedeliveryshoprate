@@ -1,10 +1,11 @@
-
 import { getStore } from '@netlify/blobs';
 
-// The Deleted bin for orders. Deleting an order (order-detail.mjs) copies it here first; it can be
-// restored for 30 days, after which it is removed for good the next time the list is opened.
+// The Deleted bin for shops and drivers. shop-detail.mjs and drivers.mjs copy a record here before
+// deleting it. It can be restored for 90 days; after that it is removed for good the next time the list
+// is opened. A driver's pay ledger and PIN are kept separately and are not touched by a delete.
 
-const KEEP_DAYS = 30;
+const KEEP_DAYS = 90;
+const TARGET = { shop: 'flower-shops', driver: 'flower-drivers' };
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
@@ -17,9 +18,8 @@ async function requireAuth(req) {
 }
 
 export default async (req) => {
-  const user = await requireAuth(req);
-  if (!user) return json({ error: 'Not authenticated' }, 401);
-  const bin = getStore('flower-deleted-orders');
+  if (!(await requireAuth(req))) return json({ error: 'Not authenticated' }, 401);
+  const bin = getStore('flower-deleted-records');
 
   if (req.method === 'GET') {
     const { blobs } = await bin.list();
@@ -29,7 +29,7 @@ export default async (req) => {
       const rec = await bin.get(b.key, { type: 'json' });
       if (!rec) continue;
       if (new Date(rec.deleted_at).getTime() < cutoff) { await bin.delete(b.key); continue; }
-      items.push(rec);
+      items.push({ bin_id: rec.bin_id || b.key, type: rec.type, key: rec.key, label: rec.label, deleted_at: rec.deleted_at, deleted_by: rec.deleted_by });
     }
     items.sort((a, b) => String(b.deleted_at).localeCompare(String(a.deleted_at)));
     return json({ keep_days: KEEP_DAYS, items });
@@ -44,23 +44,14 @@ export default async (req) => {
   if (!rec) return json({ error: 'Not found in the Deleted bin' }, 404);
 
   if (body.action === 'restore') {
-    const orders = getStore('flower-orders');
-    const existing = await orders.get(id, { type: 'json' });
-    if (existing) return json({ error: 'An order with this ID already exists, so nothing was restored.' }, 409);
-    await orders.setJSON(id, rec.order);
+    const storeName = TARGET[rec.type];
+    if (!storeName) return json({ error: 'Unknown record type' }, 400);
+    const target = getStore(storeName);
+    const existing = await target.get(rec.key, { type: 'json' });
+    if (existing) return json({ error: 'A ' + rec.type + ' with this ID/code already exists, so nothing was restored.' }, 409);
+    await target.setJSON(rec.key, rec.record);
     await bin.delete(id);
-    try {
-      const raw = (rec.order && (rec.order.date || rec.order.received_at)) || '';
-      const mm = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
-      if (mm) {
-        const dt = new Date(mm[1] + 'T12:00:00'); dt.setDate(dt.getDate() + ((7 - dt.getDay()) % 7));
-        const we = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
-        const locks = getStore('flower-week-locks');
-        const lk = await locks.get(we, { type: 'json' });
-        if (lk && lk.locked) { lk.changes = lk.changes || []; lk.changes.push({ at: new Date().toISOString(), by: user, id, order_id: rec.order.order_id, action: 'restored', reason: 'Restored from the Deleted bin' }); await locks.setJSON(we, lk); }
-      }
-    } catch (e) { /* best-effort log */ }
-    return json({ ok: true, restored: id });
+    return json({ ok: true, restored: rec.label });
   }
   if (body.action === 'purge') {
     await bin.delete(id);
@@ -69,4 +60,4 @@ export default async (req) => {
   return json({ error: 'Unknown action' }, 400);
 };
 
-export const config = { path: '/api/deleted-orders' };
+export const config = { path: '/api/deleted-records' };
