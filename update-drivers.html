@@ -3,144 +3,185 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Driver Data Update</title>
+<title>Smart Choice Delivery — Weekly Close</title>
 <style>
-body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:20px;background:#FAF7F2;color:#2B2620;}
-h1{font-family:Georgia,serif;font-size:20px;color:#0C769E;}
-.btn{background:#0C769E;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;cursor:pointer;width:100%;margin-top:16px;}
-.btn:disabled{opacity:0.5;}
-.log{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:14px;margin-top:16px;font-size:12px;font-family:monospace;max-height:500px;overflow-y:auto;white-space:pre-wrap;}
-.progress{background:#E6DECF;border-radius:999px;height:8px;margin-top:12px;}
-.progress-bar{background:#0C769E;border-radius:999px;height:8px;width:0;transition:width 0.3s;}
-.stats{display:flex;gap:16px;margin-top:12px;font-size:13px;}
-.stat{background:#fff;border:1px solid #E6DECF;border-radius:8px;padding:8px 14px;text-align:center;}
-.stat-val{font-size:20px;font-weight:700;color:#0C769E;}
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FFF3CD;--red-soft:#F8DEDA;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{max-width:820px;margin:0 auto;padding:16px;}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}.btn.sm{padding:4px 9px;font-size:12px;}
+input{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+.hero{border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:15px;font-weight:600;}.hero.ok{background:var(--green-soft);color:var(--green);}.hero.todo{background:var(--amber-soft);color:var(--amber);}
+.item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;}
+.dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.dot.ok{background:var(--green-soft);color:var(--green);}.dot.todo{background:var(--amber-soft);color:var(--amber);}.dot.bad{background:var(--red-soft);color:var(--warm);}.dot.na{background:#eee;color:#999;}
+.t{flex:1;}.t b{display:block;}.t span{font-size:12px;color:var(--ink-soft);}
+a.go{color:var(--accent);font-size:13px;text-decoration:none;white-space:nowrap;border:1px solid var(--accent);border-radius:8px;padding:5px 10px;}
+.sec{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:16px 0 8px;}
+.note{font-size:12px;color:var(--ink-soft);margin-top:14px;}
 </style>
 </head>
 <body>
-<h1>Driver Data Update</h1>
-<p style="color:#6B6256;font-size:13px;">Updates existing driver records with email, phone, hire date and vehicle. Adds new drivers if not found.</p>
-<button class="btn" id="updateBtn">Update All Drivers</button>
-<div class="progress" hidden id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
-<div class="stats" id="statsDiv" hidden>
-  <div class="stat"><div class="stat-val" id="statUpdated">0</div>Updated</div>
-  <div class="stat"><div class="stat-val" id="statAdded">0</div>Added</div>
-  <div class="stat"><div class="stat-val" id="statFailed">0</div>Failed</div>
+<div class="topbar"><h1>Weekly Close</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="bar">
+    <button class="btn ghost sm" id="prev">&larr;</button>
+    <label>Week ending <input type="date" id="we"></label>
+    <button class="btn ghost sm" id="next">&rarr;</button>
+    <button class="btn" id="go">Check</button>
+  </div>
+  <div id="hero"></div>
+  <div id="list"></div>
+  <div class="note">A green tick means nothing needs attention for that check. Each item has a button that opens the place to fix it. Run this before sending pay emails, and again before you pay.</div>
 </div>
-<div class="log" id="log" hidden></div>
-
 <script>
-var DRIVERS = [
-  { hire_date:'2021-12-07', code:'AH',     name:'Adam Hrankowski',    email:'ajhrankowski@gmail.com',      phone:'4038139657', vehicle:'MIDSIZE SUV' },
-  { hire_date:'2024-12-19', code:'ANG',    name:'Angie Szostak',      email:'Angiesdelivery@yahoo.ca',     phone:'5875746774', vehicle:'SEDAN' },
-  { hire_date:'2023-09-08', code:'NV',     name:'Nadia Vaillancourt', email:'Nadia.vaillancourt@gmail.com',phone:'4038525648', vehicle:'COMPACT' },
-  { hire_date:'2024-12-07', code:'Craig',  name:'Craig Langley',      email:'teardropyurt@gmail.com',      phone:'4035609166', vehicle:'SUV' },
-  { hire_date:'2023-02-10', code:'MF',     name:'Miriam Fallon',      email:'mfallon29@gmail.com',         phone:'4035618490', vehicle:'FULLSIZE SUV' },
-  { hire_date:'2023-05-12', code:'ishdorj',name:'Ishdorj Baarai',     email:'Ishdorj.b@yahoo.com',         phone:'5874298627', vehicle:'MINIVAN' },
-  { hire_date:'2025-02-13', code:'TOSIN',  name:'Tosin Oluwunmi',     email:'oluwunmisa@gmail.com',        phone:'8257600470', vehicle:'SEDAN' },
-  { hire_date:'2025-05-05', code:'Emme',   name:'Mariah Szostak',     email:'emszostak2025@gmail.com',     phone:'8259944403', vehicle:'SUV' },
-  { hire_date:'2023-02-11', code:'MFL',    name:'Melody Littel',      email:'Choir_duck@hotmail.com',      phone:'4039739165', vehicle:'SMALL SUV' },
-  { hire_date:'2025-09-01', code:'JUDY',   name:'Judy Tennant',       email:'judytennant1@gmail.com',      phone:'', vehicle:'SEDAN' },
-  { hire_date:'2025-12-18', code:'Rashid', name:'Rashid Yakubu',      email:'rashman207@yahoo.com',        phone:'4034666190', vehicle:'SEDAN' },
-  { hire_date:'2022-09-07', code:'KE',     name:'Kevin Michaud',      email:'kevinmichaud@yahoo.ca',       phone:'4038809822', vehicle:'FULLSIZE SUV' },
-  { hire_date:'2022-09-08', code:'DT',     name:'Dabria Tulak',       email:'dabriatulak@gmail.com',       phone:'', vehicle:'SEDAN' },
-  { hire_date:'2026-05-02', code:'ALEXEI', name:'Alexei Chernekoff',  email:'drumnucks@gmail.com',         phone:'5874349275', vehicle:'SMALL SUV' },
-  { hire_date:'2026-06-09', code:'Ravi',   name:'Ravinder Dhaliwal',  email:'ravidhaliwal1984@gmail.com',  phone:'4037140809', vehicle:'TRUCK' },
-];
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function money(n){var v=Math.round((Number(n)||0)*100)/100;return (v<0?'-':'')+'$'+Math.abs(v).toFixed(2);}
+function shift(n){var v=$('we').value;if(!v)return;var d=new Date(v+'T12:00:00');d.setDate(d.getDate()+7*n);$('we').value=iso(d);run();}
+function lastSunday(){var d=new Date();d.setDate(d.getDate()-d.getDay());return iso(d);}
+function getJson(u){return fetch(u).then(function(r){if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);throw new Error('auth');}if(!r.ok)throw new Error(u+' '+r.status);return r.json();});}
 
-function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+/* same duplicate rules as the Orders page */
+function dupNorm(v){return String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function isWholesale(o){if(o.delivery_type==='wholesale')return true;var z=String(o.zone_code||'').toUpperCase();return z.charAt(0)==='W'&&z!=='WED'&&z!=='WEDO';}
+function dupCount(list){
+  var g={},ph={};
+  list.forEach(function(o){
+    if(isWholesale(o)||o.order_id==='PREMIUM')return;
+    var id=dupNorm(o.order_id),nm=dupNorm(o.name),ad=dupNorm(o.formatted_address||o.address);
+    if(!id||!nm||!ad)return;
+    if(id==='1'){var k=nm+'|'+ad+'|'+dupNorm(o.driver)+'|'+String(o.date||(o.received_at||'').slice(0,10));(ph[k]=ph[k]||[]).push(o);return;}
+    var key=id+'|'+nm+'|'+ad;(g[key]=g[key]||[]).push(o);
+  });
+  var n=Object.keys(g).filter(function(k){return g[k].length>1;}).length;
+  Object.keys(ph).forEach(function(k){
+    var a=ph[k].slice().sort(function(x,y){return new Date(x.received_at)-new Date(y.received_at);}),c=1;
+    for(var i=1;i<a.length;i++){var gap=new Date(a[i].received_at)-new Date(a[i-1].received_at);if(gap<=600000)c++;else{if(c>1)n++;c=1;}}
+    if(c>1)n++;
+  });
+  return n;
+}
 
-document.getElementById('updateBtn').addEventListener('click', async function() {
-  var btn = this;
-  btn.disabled = true;
-  var log = document.getElementById('log');
-  var progressWrap = document.getElementById('progressWrap');
-  var progressBar = document.getElementById('progressBar');
-  var statsDiv = document.getElementById('statsDiv');
-  log.hidden = false;
-  progressWrap.hidden = false;
-  statsDiv.hidden = false;
-  log.textContent = 'Loading drivers from system...\n\n';
+function item(state,title,detail,href,label){
+  var sym={ok:'✓',todo:'!',bad:'✕',na:'–'}[state];
+  return '<div class="item"><div class="dot '+state+'">'+sym+'</div><div class="t"><b>'+esc(title)+'</b><span>'+esc(detail)+'</span></div>'+(href&&state!=='ok'&&state!=='na'?'<a class="go" href="'+href+'">'+esc(label||'Open')+'</a>':'')+'</div>';
+}
 
-  // Load existing drivers
-  var res = await fetch('/api/drivers');
-  var existing = await res.json();
-  log.textContent += 'Found ' + existing.length + ' existing drivers.\n\n';
+async function run(){
+  var we=$('we').value; if(!/^\d{4}-\d{2}-\d{2}$/.test(we))return;
+  $('hero').innerHTML='<div class="hero todo">Checking…</div>'; $('list').innerHTML='';
+  var res=await Promise.all([
+    getJson('/api/orders?week_end='+we).catch(function(e){return {err:e};}),
+    getJson('/api/stops?status=pending').catch(function(e){return {err:e};}),
+    getJson('/api/send-driver-pay?action=week_totals&week_end='+we).catch(function(e){return {err:e};}),
+    getJson('/api/pay-ledger?week_end='+we).catch(function(e){return {err:e};}),
+    getJson('/api/backup').catch(function(e){return {err:e};}),
+    getJson('/api/drivers').catch(function(e){return {err:e};}),
+    getJson('/api/shops').catch(function(e){return {err:e};}),
+    getJson('/api/rates').catch(function(e){return {err:e};})
+  ]);
+  var orders=res[0],stops=res[1],totals=res[2],ledger=res[3],backup=res[4],drivers=res[5],shopsList=res[6],ratesTbl=res[7];
+  var rows=[],todo=0;
+  function add(state,t,d,h,l){if(state==='todo'||state==='bad')todo++;rows.push(item(state,t,d,h,l));}
 
-  var updated = 0, added = 0, failed = 0;
-
-  for (var i = 0; i < DRIVERS.length; i++) {
-    var d = DRIVERS[i];
-    progressBar.style.width = Math.round((i / DRIVERS.length) * 100) + '%';
-
-    // Find match by code (case insensitive)
-    var match = existing.find(function(e) {
-      return e.code && e.code.toUpperCase() === d.code.toUpperCase();
-    });
-
-    try {
-      if (match) {
-        // Update existing driver
-        var updateRes = await fetch('/api/drivers?code=' + encodeURIComponent(match.code), {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            name: d.name,
-            vehicle: d.vehicle,
-            email: d.email,
-            phone: d.phone,
-            hire_date: d.hire_date
-          })
-        });
-        if (updateRes.ok) {
-          updated++;
-          log.textContent += '✓ Updated: ' + d.code + ' ' + d.name + ' (' + d.email + ')\n';
-          document.getElementById('statUpdated').textContent = updated;
-        } else {
-          failed++;
-          log.textContent += '✗ Failed to update: ' + d.code + '\n';
-          document.getElementById('statFailed').textContent = failed;
-        }
-      } else {
-        // Add new driver
-        var addRes = await fetch('/api/drivers', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            code: d.code,
-            name: d.name,
-            vehicle: d.vehicle,
-            email: d.email,
-            phone: d.phone,
-            hire_date: d.hire_date,
-            active: true
-          })
-        });
-        if (addRes.ok) {
-          added++;
-          log.textContent += '+ Added: ' + d.code + ' ' + d.name + '\n';
-          document.getElementById('statAdded').textContent = added;
-        } else {
-          failed++;
-          log.textContent += '✗ Failed to add: ' + d.code + '\n';
-          document.getElementById('statFailed').textContent = failed;
-        }
-      }
-    } catch(e) {
-      failed++;
-      log.textContent += '✗ Error: ' + d.code + ' — ' + e.message + '\n';
-      document.getElementById('statFailed').textContent = failed;
+  rows.push('<div class="sec">Orders</div>');
+  if(orders.err){add('bad','Could not load this week’s orders',String(orders.err.message||orders.err));}
+  else{
+    var real=orders.filter(function(o){return o.order_id!=='PREMIUM';});
+    rows.push(item('na',real.length+' orders this week','','',''));
+    var conflict=real.filter(function(o){return !!o.zone_conflict;}).length;
+    add(conflict?'todo':'ok','Zone conflicts',conflict?conflict+' order(s) where the zone entered and the address disagree':'None','/orders.html?week_end='+we+'&source=conflict','Review');
+    var review=real.filter(function(o){return o.zone_source==='needs_review';}).length;
+    add(review?'todo':'ok','Orders needing review',review?review+' order(s) flagged for review':'None','/orders.html?week_end='+we+'&source=needs_review','Review');
+    var incomplete=real.filter(function(o){return !o.zone_code||!o.driver||!o.shop_code;}).length;
+    add(incomplete?'todo':'ok','Missing shop, zone or driver',incomplete?incomplete+' order(s) are missing one of these':'None','/orders.html?week_end='+we,'Open orders');
+    // A driver code that is filled in but matches no driver in Admin (legacy imports and typos). These
+    // orders would not land on any driver's pay statement, so they are flagged separately from blanks.
+    if(!drivers||drivers.err||!Array.isArray(drivers)){rows.push(item('na','Driver codes','Could not load the driver list, so codes were not checked','',''));}
+    else{
+      var known={};drivers.forEach(function(d){known[String(d.code||'').toUpperCase()]=1;});
+      var bad={},badN=0;
+      real.forEach(function(o){var c=String(o.driver||'').trim().toUpperCase();if(c&&!known[c]){bad[c]=(bad[c]||0)+1;badN++;}});
+      var list=Object.keys(bad).map(function(k){return k+' ('+bad[k]+')';}).join(', ');
+      add(badN?'bad':'ok','Driver codes match a driver',badN?badN+' order(s) have a driver code that is not in Admin: '+list:'All driver codes are valid','/orders.html?week_end='+we,'Fix in Orders (Edit > Driver code)');
     }
-
-    log.scrollTop = log.scrollHeight;
-    await sleep(200);
+    // Billing: an order's shop code must belong to a shop in the shop list (or a wholesaler), otherwise the
+    // order cannot be invoiced to anyone. The wholesaler codes are the fixed list in the driver form (KEEP IN
+    // STEP with driver.html and order-detail.mjs).
+    var WS=['AM','WFW','BA','FC','FS','SV','QF','SB'];
+    if(!Array.isArray(shopsList)){rows.push(item('na','Shop codes','Could not load the shop list, so codes were not checked','',''));}
+    else{
+      var knownShop={};WS.forEach(function(c){knownShop[c]=1;});
+      shopsList.forEach(function(sh){var c=String(sh.name||'').trim().split(/\s+/)[0].toUpperCase();if(c)knownShop[c]=1;});
+      var badShop={},badShopN=0;
+      real.forEach(function(o){var c=String(o.shop_code||'').trim().toUpperCase();if(c&&!knownShop[c]){badShop[c]=(badShop[c]||0)+1;badShopN++;}});
+      var shopList2=Object.keys(badShop).map(function(k){return k+' ('+badShop[k]+')';}).join(', ');
+      add(badShopN?'bad':'ok','Shop codes match a shop',badShopN?badShopN+' order(s) have a shop code that is not in the shop list, so they cannot be invoiced: '+shopList2:'All shop codes match a shop','/orders.html?week_end='+we,'Fix in Orders (Edit > Shop code)');
+    }
+    // Rates: an order whose zone has no rate in the Rate Table and no rate stored on the order itself has no
+    // reliable price or pay behind it.
+    if(!ratesTbl||ratesTbl.err||Array.isArray(ratesTbl)){rows.push(item('na','Zone rates','Could not load the rate table, so zones were not checked','',''));}
+    else{
+      var noRate={},noRateN=0;
+      real.forEach(function(o){var z=String(o.zone_code||'').trim();if(z&&!o.rate_snapshot&&!ratesTbl[z]){noRate[z]=(noRate[z]||0)+1;noRateN++;}});
+      var zl=Object.keys(noRate).map(function(k){return k+' ('+noRate[k]+')';}).join(', ');
+      add(noRateN?'bad':'ok','Zones have a rate',noRateN?noRateN+' order(s) use a zone with no rate in the Rate Table: '+zl:'Every zone used has a rate','/admin.html','Open Admin (Rate Table)');
+    }
+    var zero=real.filter(function(o){return !(parseFloat(o.driver_pay)>0);}).length;
+    add(zero?'todo':'ok','Orders with $0 driver pay',zero?zero+' order(s) would pay the driver nothing':'None','/orders.html?week_end='+we,'Open orders');
+    var dups=dupCount(real);
+    add(dups?'todo':'ok','Possible duplicates',dups?dups+' group(s) to check':'None found','/orders.html?week_end='+we,'Open orders (use Find duplicates)');
   }
 
-  progressBar.style.width = '100%';
-  log.textContent += '\nDone! ' + updated + ' updated, ' + added + ' added, ' + failed + ' failed.';
-  btn.textContent = 'Update Complete';
-  btn.disabled = false;
-});
+  rows.push('<div class="sec">Stops</div>');
+  if(stops.err){add('bad','Could not load stops',String(stops.err.message||stops.err));}
+  else{
+    var stale=stops.filter(function(s){return s.status==='pending'&&(Date.now()-new Date(s.created_at).getTime())/3600000>=4;}).length;
+    add(stale?'todo':'ok','Stale pending stops',stale?stale+' scanned stop(s) never completed or discarded':'None','/reconciliation.html','Reconcile');
+  }
+
+  rows.push('<div class="sec">Driver pay</div>');
+  if(totals.err||ledger.err){add('bad','Could not load pay information',String((totals.err||ledger.err).message||''));}
+  else{
+    var rec={};ledger.records.forEach(function(r){rec[r.driver]=r;});
+    var notEmailed=[],changed=[],unpaid=[],paidFull=0,counted=0;
+    totals.drivers.forEach(function(d){
+      var entries=((rec[d.code]&&rec[d.code].entries)||[]).filter(function(e){return !e.voided;});
+      var em=null,adj=0,paid=0;
+      entries.forEach(function(e){if(e.type==='statement_emailed')em=e;else if(e.type==='adjustment')adj+=e.amount;else paid+=e.amount;});
+      if(d.total_pay>0){counted++;
+        if(!em)notEmailed.push(d.code);
+        else if(Math.abs(em.amount-d.total_pay)>0.005)changed.push(d.code);
+        var bal=Math.round((d.total_pay+adj-paid)*100)/100;
+        if(Math.abs(bal)<=0.005)paidFull++;else unpaid.push(d.code+' '+money(bal));
+      }
+    });
+    add(notEmailed.length?'todo':'ok','Pay statements emailed',notEmailed.length?'Not yet emailed: '+notEmailed.join(', '):(counted?'All '+counted+' drivers emailed':'No drivers with pay this week'),'/orders.html','Send Pay Emails (Orders page)');
+    add(changed.length?'bad':'ok','Changed since emailed',changed.length?'Orders changed after the statement went out: '+changed.join(', '):'None','/pay-ledger.html?week_end='+we,'Open ledger');
+    add(unpaid.length?'todo':'ok','Paid in full',unpaid.length?paidFull+' of '+counted+' paid in full. Balance: '+unpaid.join(', '):(counted?'All '+counted+' drivers paid in full':'Nothing owed'),'/pay-ledger.html?week_end='+we,'Open ledger');
+  }
+
+  rows.push('<div class="sec">Safety</div>');
+  if(backup.err){add('bad','Could not read backup status',String(backup.err.message||backup.err));}
+  else if(!backup.last){add('todo','No backup has run yet','','/backups.html','Open Backups');}
+  else{
+    var age=(Date.now()-new Date(backup.last.at).getTime())/3600000;
+    var good=backup.last.ok&&age<30;
+    add(good?'ok':'todo','Backup',good?'Last backup OK ('+Math.round(age)+' h ago)':(backup.last.ok?'Last backup is more than a day old':'Last backup had a problem'),'/backups.html','Open Backups');
+  }
+
+  $('list').innerHTML=rows.join('');
+  $('hero').innerHTML=todo?'<div class="hero todo">'+todo+' item'+(todo===1?'':'s')+' need attention before this week is closed</div>':'<div class="hero ok">All clear — this week is ready to close</div>';
+}
+$('go').addEventListener('click',run);$('prev').addEventListener('click',function(){shift(-1);});$('next').addEventListener('click',function(){shift(1);});
+var qp=new URLSearchParams(location.search);
+$('we').value=qp.get('week_end')||lastSunday();
+fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
+  if(!d.authenticated)location.href='/login.html?redirect='+encodeURIComponent(location.pathname);else run();
+}).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
 </script>
 </body>
 </html>
