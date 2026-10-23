@@ -366,7 +366,7 @@ function renderShops() {
         '<td>' + esc(s.name) + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + (aliasCount ? aliasCount + ': ' + esc((s.aliases||[]).join(', ')) : '—') + '</td>' +
-        '<td><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button></td>' +
+        '<td style="white-space:nowrap;"><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button> <button class="btn-danger btn-grey" onclick="deleteShop(\'' + esc(s.id) + '\')">Delete</button></td>' +
         '</tr>';
     }).join('') + '</tbody></table>';
 }
@@ -438,6 +438,21 @@ async function editShop(shopId) {
     shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng; shop.aliases = aliases;
     renderShops(); alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
+}
+
+async function deleteShop(shopId) {
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  if (!shop) return;
+  if (!confirm('Delete shop "' + shop.name + '"?\n\nIt is removed from the shop list. Past orders keep the shop name. You can undo this for 90 days from the Hub: Deleted Shops & Drivers.')) return;
+  try {
+    var res = await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'DELETE' });
+    if (!res.ok && res.status !== 204) {
+      var b = await res.json().catch(function() { return {}; });
+      throw new Error(b.error || ('status ' + res.status));
+    }
+    shops = shops.filter(function(s) { return s.id !== shopId; });
+    renderShops();
+  } catch (e) { alert('Could not delete shop: ' + e.message); }
 }
 
 async function loadShops() {
