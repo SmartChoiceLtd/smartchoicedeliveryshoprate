@@ -296,7 +296,7 @@ async function handle(req) {
     return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
   }
 
-  const key = process.env.GOOGLE_MAPS_KEY;
+  const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
   if (!key) return json({ error: 'GOOGLE_MAPS_KEY not configured.' }, 500);
 
   const url = new URL(req.url);
@@ -556,7 +556,7 @@ export default async (req) => {
   const url = new URL(req.url);
   if (url.searchParams.get('debug') !== '1') return res;
   try {
-    const key = process.env.GOOGLE_MAPS_KEY;
+    const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
     const address = url.searchParams.get('address');
     const shopLat = parseFloat(url.searchParams.get('shop_lat') || SHOP_FALLBACK_LAT);
     const shopLng = parseFloat(url.searchParams.get('shop_lng') || SHOP_FALLBACK_LNG);
