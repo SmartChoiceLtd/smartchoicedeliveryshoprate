@@ -162,6 +162,10 @@
         <label>Recipient Name</label>
         <input type="text" id="fName" placeholder="Name or company">
       </div>
+      <div class="field" id="recipientPhoneField">
+        <label>Recipient Phone (optional)</label>
+        <input type="tel" id="fPhone" inputmode="tel" autocomplete="off" placeholder="403-555-0123">
+      </div>
       <div class="field" id="callRow" hidden>
         <a id="callLink" href="#" style="display:block;text-align:center;padding:12px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);font-weight:700;font-size:15px;text-decoration:none;">&#9742; Call recipient</a>
       </div>
@@ -341,16 +345,22 @@ var currentStopId = null;
 // references don't survive a reload) - if Doorstep was selected, the
 // driver is reminded to retake it.
 var recipientPhone = '';
-// Shows a tap-to-call button for the recipient when the stop carries a phone number (comes from the tag scan).
-function setRecipientPhone(p) {
-  recipientPhone = String(p || '').trim();
-  var row = document.getElementById('callRow'), link = document.getElementById('callLink');
-  if (!row || !link) return;
+// Tap-to-call button for the recipient. The number comes from the tag scan (carried in the link from the
+// route page) or is typed in the Recipient Phone box; either way the button follows what is in the box.
+function updateCallLink() {
+  var inp = document.getElementById('fPhone'), row = document.getElementById('callRow'), link = document.getElementById('callLink');
+  if (!inp || !row || !link) return;
+  recipientPhone = String(inp.value || '').trim();
   var dial = recipientPhone.replace(/[^0-9+]/g, '');
   if (dial.replace(/\D/g, '').length < 7) { row.hidden = true; return; }
   link.href = 'tel:' + dial;
   link.innerHTML = '&#9742; Call recipient &mdash; ' + recipientPhone.replace(/[<>&"]/g, '');
   row.hidden = false;
+}
+function setRecipientPhone(p) {
+  var inp = document.getElementById('fPhone');
+  if (inp) inp.value = String(p || '').trim();
+  updateCallLink();
 }
 
 function draftStorageKey() {
@@ -372,7 +382,7 @@ function saveDraft() {
       recipientPhone: recipientPhone,
       fields: {}
     };
-    ['fDate','fOrderId','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
+    ['fDate','fOrderId','fPhone','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) draft.fields[id] = el.value;
     });
@@ -713,6 +723,7 @@ function trackStop() {
     shop_code: shop ? shop.name.split(' ')[0] : null,
     address: formattedAddress || document.getElementById('fAddress').value.trim(),
     name: document.getElementById('fName').value.trim(),
+    phone: (document.getElementById('fPhone').value || '').replace(/[^0-9+() .-]/g, '').trim() || null,
     order_id: document.getElementById('fOrderId').value.trim() || null,
     delivery_type: deliveryType,
     local_date: now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0')
@@ -1528,6 +1539,9 @@ async function init() {
 
     document.getElementById('fPieces').addEventListener('change', updatePay);
     document.getElementById('fPieces').addEventListener('input', updatePay);
+    document.getElementById('fPhone').addEventListener('input', updateCallLink);
+    // Keep the saved stop in step once the number is entered (best-effort; only after the stop exists).
+    document.getElementById('fPhone').addEventListener('change', function() { if (currentStopId && typeof trackStop === 'function') trackStop(); });
     document.getElementById('fRush').addEventListener('change', updatePay);
 
     document.getElementById('fAcceptedBy').addEventListener('input', function() {
