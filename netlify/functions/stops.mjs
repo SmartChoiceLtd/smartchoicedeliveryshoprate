@@ -90,8 +90,24 @@ export default async (req) => {
   const store = getStore('flower-stops');
 
   if (req.method === 'GET') {
+    // Every stop ever scanned is kept, so reading them all gets slower each week. The route page asks for
+    // only what it needs: ?days=N reads just stops created in the last N days (the id carries its creation
+    // time, so the older ones are never even opened), and ?driver= / ?status= trim what is sent back.
+    // With no parameters it still returns everything (Weekly Close and Reconciliation rely on that).
+    const q = new URL(req.url).searchParams;
+    const days = parseInt(q.get('days'), 10);
+    const wantDriver = (q.get('driver') || '').toUpperCase();
+    const wantStatus = q.get('status') || '';
+    const cutoff = days > 0 ? Date.now() - days * 86400000 : 0;
     const { blobs } = await store.list();
-    const stops = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+    const keys = blobs.map(b => b.key).filter(k => {
+      if (!cutoff) return true;
+      const m = /^stop_(\d+)_/.exec(k);
+      return !m || Number(m[1]) >= cutoff; // keep anything with an unrecognised key
+    });
+    let stops = (await Promise.all(keys.map(k => store.get(k, { type: 'json' })))).filter(Boolean);
+    if (wantDriver) stops = stops.filter(s => String(s.driver || '').toUpperCase() === wantDriver);
+    if (wantStatus) stops = stops.filter(s => s.status === wantStatus);
     return json(stops.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
   }
 
@@ -110,7 +126,9 @@ export default async (req) => {
     // same delivery or one stop would overwrite another.
     if (body.order_id && String(body.order_id).trim() !== '1' && body.shop_code) {
       const { blobs } = await store.list();
-      const existing = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+      const recentCut = Date.now() - 30 * 86400000;
+      const recentKeys = blobs.map(b => b.key).filter(k => { const m = /^stop_(\d+)_/.exec(k); return !m || Number(m[1]) >= recentCut; });
+      const existing = (await Promise.all(recentKeys.map(k => store.get(k, { type: 'json' })))).filter(Boolean);
       const match = existing.find(s =>
         s.status === 'pending' &&
         s.order_id === body.order_id &&
