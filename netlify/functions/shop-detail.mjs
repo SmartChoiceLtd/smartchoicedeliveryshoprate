@@ -61,6 +61,7 @@ export default async (req) => {
   }
 
   if (req.method === 'DELETE') {
+    if ((await whoIs(req)) === 'not signed in') return json({ error: 'Not authenticated - sign in to delete a shop' }, 401);
     const gone = await store.get(id, { type: 'json' }).catch(() => null);
     if (gone) {
       await logShopChange(req, gone, { id, name: gone.name, __deleted: true });
