@@ -47,8 +47,9 @@ export default async (req) => {
     const storeName = TARGET[rec.type];
     if (!storeName) return json({ error: 'Unknown record type' }, 400);
     const target = getStore(storeName);
-    const existing = await target.get(rec.key, { type: 'json' });
-    if (existing) return json({ error: 'A ' + rec.type + ' with this ID/code already exists, so nothing was restored.' }, 409);
+    // A strong read, so a record deleted a moment ago is not still "seen" from a cached copy.
+    const existing = await target.get(rec.key, { type: 'json', consistency: 'strong' });
+    if (existing) return json({ error: 'A ' + rec.type + ' with this ID/code is currently in the live list, so nothing was restored. If you just deleted it, reload the Admin list to check, then try again.' }, 409);
     await target.setJSON(rec.key, rec.record);
     await bin.delete(id);
     return json({ ok: true, restored: rec.label });
