@@ -75,12 +75,13 @@ async function run(){
   $('hero').innerHTML='<div class="hero todo">Checking…</div>'; $('list').innerHTML='';
   var res=await Promise.all([
     getJson('/api/orders?week_end='+we).catch(function(e){return {err:e};}),
-    getJson('/api/stops').catch(function(e){return {err:e};}),
+    getJson('/api/stops?status=pending').catch(function(e){return {err:e};}),
     getJson('/api/send-driver-pay?action=week_totals&week_end='+we).catch(function(e){return {err:e};}),
     getJson('/api/pay-ledger?week_end='+we).catch(function(e){return {err:e};}),
-    getJson('/api/backup').catch(function(e){return {err:e};})
+    getJson('/api/backup').catch(function(e){return {err:e};}),
+    getJson('/api/drivers').catch(function(e){return {err:e};})
   ]);
-  var orders=res[0],stops=res[1],totals=res[2],ledger=res[3],backup=res[4];
+  var orders=res[0],stops=res[1],totals=res[2],ledger=res[3],backup=res[4],drivers=res[5];
   var rows=[],todo=0;
   function add(state,t,d,h,l){if(state==='todo'||state==='bad')todo++;rows.push(item(state,t,d,h,l));}
 
@@ -95,6 +96,16 @@ async function run(){
     add(review?'todo':'ok','Orders needing review',review?review+' order(s) flagged for review':'None','/orders.html?week_end='+we+'&source=needs_review','Review');
     var incomplete=real.filter(function(o){return !o.zone_code||!o.driver||!o.shop_code;}).length;
     add(incomplete?'todo':'ok','Missing shop, zone or driver',incomplete?incomplete+' order(s) are missing one of these':'None','/orders.html?week_end='+we,'Open orders');
+    // A driver code that is filled in but matches no driver in Admin (legacy imports and typos). These
+    // orders would not land on any driver's pay statement, so they are flagged separately from blanks.
+    if(!drivers||drivers.err||!Array.isArray(drivers)){rows.push(item('na','Driver codes','Could not load the driver list, so codes were not checked','',''));}
+    else{
+      var known={};drivers.forEach(function(d){known[String(d.code||'').toUpperCase()]=1;});
+      var bad={},badN=0;
+      real.forEach(function(o){var c=String(o.driver||'').trim().toUpperCase();if(c&&!known[c]){bad[c]=(bad[c]||0)+1;badN++;}});
+      var list=Object.keys(bad).map(function(k){return k+' ('+bad[k]+')';}).join(', ');
+      add(badN?'bad':'ok','Driver codes match a driver',badN?badN+' order(s) have a driver code that is not in Admin: '+list:'All driver codes are valid','/orders.html?week_end='+we,'Fix in Orders (Edit > Driver code)');
+    }
     var zero=real.filter(function(o){return !(parseFloat(o.driver_pay)>0);}).length;
     add(zero?'todo':'ok','Orders with $0 driver pay',zero?zero+' order(s) would pay the driver nothing':'None','/orders.html?week_end='+we,'Open orders');
     var dups=dupCount(real);
