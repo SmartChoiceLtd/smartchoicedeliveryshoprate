@@ -62,7 +62,14 @@ export default async (req) => {
 
   if (req.method === 'DELETE') {
     const gone = await store.get(id, { type: 'json' }).catch(() => null);
-    if (gone) await logShopChange(req, gone, { id, name: gone.name, __deleted: true });
+    if (gone) {
+      await logShopChange(req, gone, { id, name: gone.name, __deleted: true });
+      // Keep a copy in the Deleted bin (Hub > Deleted Shops & Drivers) so a mistaken delete can be undone.
+      try {
+        const at = new Date().toISOString();
+        await getStore('flower-deleted-records').setJSON('shop_' + id + '_' + Date.now(), { bin_id: 'shop_' + id + '_' + Date.now(), type: 'shop', key: id, label: gone.name || id, deleted_at: at, deleted_by: await whoIs(req), record: gone });
+      } catch (e) { console.error('bin copy failed:', e.message); }
+    }
     await store.delete(id);
     return new Response(null, { status: 204 });
   }
