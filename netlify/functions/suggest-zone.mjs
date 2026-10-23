@@ -258,7 +258,7 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type' } });
   }
 
-  const key = process.env.GOOGLE_MAPS_KEY;
+  const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
   if (!key) return json({ error: 'GOOGLE_MAPS_KEY not configured.' }, 500);
 
   const url = new URL(req.url);
