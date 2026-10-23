@@ -35,7 +35,17 @@
 .loading{text-align:center;padding:40px;color:var(--ink-soft);}
 .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-@media print{.topbar .back-btn,.period-toggle,.btn{display:none;}.topbar{border:none;padding:0 0 12px;}.container{padding:0;max-width:100%;}}
+@media print{.topbar .back-btn,.period-toggle,.btn{display:none;}.topbar{border:none;padding:0 0 12px;}.container{padding:0;max-width:100%;}
+/* Deliveries and payments print separately. Print Summary never includes the payments card;
+   Print Payments prints only the payments card (with the driver's name on top). */
+.pay-card{break-inside:avoid;}
+body.print-deliveries .pay-card{display:none !important;}
+body.print-pay .stats-row,body.print-pay .total-bar,body.print-pay #deliveryList,body.print-pay #emptyDiv,body.print-pay .period-toggle,body.print-pay #dayPicker{display:none !important;}
+body.print-pay .pay-card{border:0;padding:0;margin:0;}
+.print-only{display:none;}
+body.print-pay .print-only{display:block;margin-bottom:8px;font-size:13px;color:var(--ink-soft);}
+}
+.print-only{display:none;}
 .pay-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin:18px 0;}.pay-card h2{font-family:Georgia,serif;font-size:16px;margin:0 0 8px;}.pay-wk{border-top:1px solid var(--border);padding:10px 0;font-size:13px;}.pay-wk:first-of-type{border-top:0;}.pay-row{display:flex;justify-content:space-between;gap:10px;color:var(--ink-soft);}.pay-row b{color:var(--ink);}.pay-bal{font-weight:700;margin-top:4px;}.pay-ok{color:var(--green);}.pay-due{color:var(--warm);}
 </style>
 </head>
@@ -87,11 +97,12 @@
 
     <div class="pay-card" id="payCard" hidden>
       <h2>Payments &amp; balance</h2>
+      <div class="print-only" id="payPrintLine"></div>
       <div id="payList"></div>
       <div class="delivery-detail" style="margin-top:8px;">Statement = the pay statement emailed for that week. Balance = statement + adjustments &minus; payments received. Questions? Contact Smart Choice Delivery.</div>
     </div>
 
-    <button class="btn" onclick="window.print()">Print Summary</button>
+    <button class="btn" onclick="printPart('deliveries')">Print Summary</button>
     <button class="btn btn-secondary" id="backBtn2">Back to My Route</button>
   </div>
 </div>
@@ -266,6 +277,20 @@ function startPayTimer(){
 }
 document.addEventListener('visibilitychange', function(){ if (document.hidden && payTimer) closePay('Closed for your privacy. Enter your PIN to view again.'); });
 window.addEventListener('pagehide', function(){ if (payTimer) closePay(''); });
+
+/* Print only one part: 'deliveries' (never includes payments) or 'pay' (payments & balance only). */
+function printPart(which){
+  var cls = which === 'pay' ? 'print-pay' : 'print-deliveries';
+  if (which === 'pay') {
+    var n = document.getElementById('driverBadge').textContent || urlDriverCode;
+    document.getElementById('payPrintLine').textContent = n + ' \u2014 payments & balance, printed ' + new Date().toLocaleDateString('en-CA',{timeZone:'America/Edmonton',month:'short',day:'numeric',year:'numeric'});
+    if (payTimer) payLeft = PAY_SECONDS; // keep it open while the print dialog is up
+  }
+  document.body.classList.add(cls);
+  var done = function(){ document.body.classList.remove('print-pay','print-deliveries'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(function(){ try { window.print(); } catch (e) {} setTimeout(done, 1500); }, 50);
+}
 function submitPin(){var inp=document.getElementById('payPin');var v=(inp.value||'').trim();inp.value='';if(v)loadPayments(v);}
 async function loadPayments(pin) {
   if (!pin) { pinForm(''); return; }
@@ -275,6 +300,7 @@ async function loadPayments(pin) {
     var d = await r.json().catch(function(){ return {}; });
     if (!r.ok) { pinForm(d.error || 'Could not check your PIN.'); return; }
     var closeBar = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;color:var(--ink-soft);">Closes automatically in <b id="payCountdown">' + PAY_SECONDS + '</b>s</span><button class="btn btn-secondary" style="width:auto;padding:6px 12px;display:inline-block;margin:0;" onclick="closePay(\'\')">Close</button></div>';
+    closeBar = closeBar.replace('<button class="btn btn-secondary" style="width:auto;padding:6px 12px;display:inline-block;margin:0;" onclick="closePay', '<button class="btn" style="width:auto;padding:6px 12px;display:inline-block;margin:0 6px 0 0;" onclick="printPart(\'pay\')">Print payments</button><button class="btn btn-secondary" style="width:auto;padding:6px 12px;display:inline-block;margin:0;" onclick="closePay');
     if (!d.weeks || !d.weeks.length) { document.getElementById('payList').innerHTML = closeBar + '<div class="pay-wk">No payments recorded yet.</div>'; document.getElementById('payCard').hidden = false; startPayTimer(); return; }
     document.getElementById('payList').innerHTML = closeBar + d.weeks.map(function(w) {
       var h = '<div class="pay-wk"><div class="pay-row"><b>Week ending ' + esc(pweek(w.week_end)) + '</b><span>' + (w.statement === null ? '' : 'Statement ' + pmoney(w.statement)) + '</span></div>';
