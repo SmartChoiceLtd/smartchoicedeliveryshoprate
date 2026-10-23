@@ -679,30 +679,19 @@ function toggleSkip(stopId, skip) {
 // Falls back to the original order if the API call fails for any reason -
 // an unoptimized but usable list beats no list at all.
 function optimizeOrder(stops, mapsKey, originLatLng) {
-  if (stops.length < 2 || !mapsKey) return Promise.resolve(stops);
-  var hasRealOrigin = !!originLatLng;
-  var origin = hasRealOrigin ? (originLatLng.lat + ',' + originLatLng.lng) : encodeURIComponent(stops[0].address);
-  var destinationIdx = stops.length - 1;
-  // With a real GPS origin, every stop can be treated as an optimizable
-  // waypoint (nothing needs to be "sacrificed" as a fake starting point).
-  // Without one, fall back to the old approach: stop 0 anchors the start
-  // since we have no better reference for where the route begins.
-  var waypointStops = hasRealOrigin ? stops.slice(0, -1) : stops.slice(1, -1);
-  var destination = encodeURIComponent(stops[destinationIdx].address);
-  var waypoints = waypointStops.map(function(s) { return encodeURIComponent(s.address); });
-  var url = 'https://maps.googleapis.com/maps/api/directions/json?origin=' + origin
-    + '&destination=' + destination
-    + (waypoints.length ? '&waypoints=optimize:true|' + waypoints.join('|') : '')
-    + '&key=' + mapsKey;
-  return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-    if (data.status !== 'OK' || !data.routes || !data.routes[0]) return stops;
-    var order = data.routes[0].waypoint_order;
-    if (!order) return stops;
-    var reordered = order.map(function(idx) { return waypointStops[idx]; });
-    return hasRealOrigin
-      ? reordered.concat([stops[destinationIdx]])
-      : [stops[0]].concat(reordered, [stops[destinationIdx]]);
-  }).catch(function() { return stops; });
+  if (stops.length < 2) return Promise.resolve(stops);
+  // The server asks Google (browsers are not allowed to call the Directions service directly).
+  return fetch('/api/route-order', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ origin: originLatLng || null, stops: stops.map(function(s) { return { id: s.id, address: s.address }; }) })
+  }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); }).then(function(x) {
+    if (!x.ok || !x.d.ids) { console.warn('Route ordering unavailable:', x.d && (x.d.google_status || x.d.error), x.d && x.d.google_message); return stops; }
+    var byId = {}; stops.forEach(function(s) { byId[s.id] = s; });
+    var ordered = x.d.ids.map(function(id) { return byId[id]; }).filter(Boolean);
+    stops.forEach(function(s) { if (ordered.indexOf(s) < 0) ordered.push(s); });
+    return ordered;
+  }).catch(function(e) { console.warn('Route ordering failed:', e.message); return stops; });
 }
 
 // Best-effort current location - resolves null (not a rejection) on any
