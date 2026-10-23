@@ -1,5 +1,5 @@
 export default async (req) => {
-  const key = process.env.GOOGLE_MAPS_KEY;
+  const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
   if (!key) return new Response(JSON.stringify({ error: 'Maps key not configured.' }), { status: 500, headers: { 'content-type': 'application/json' } });
   const url = new URL(req.url);
   const oLat = url.searchParams.get('origin_lat'), oLng = url.searchParams.get('origin_lng');
