@@ -44,7 +44,7 @@ fetch('/api/auth?action=check')
       window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
       return;
     }
-    initOrdersPage();
+    try { initOrdersPage(); } catch (e) { console.error(e); var em = document.getElementById('errorMsg'); if (em) { em.textContent = 'Page error: ' + e.message; em.hidden = false; } }
   })
   .catch(function() {
     window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
@@ -428,6 +428,17 @@ function dupGroups(list, counts) {
   });
   return out;
 }
+function dupBannerCheck() {
+  var bar = document.getElementById('dupBanner');
+  if (!bar) return;
+  dupScan(null, function(all, weeks) {
+    var list = all.filter(function(o) { return !isWholesaleOrder(o); });
+    var n = dupGroups(list, { skipped: 0 }).length;
+    if (!n) { bar.hidden = true; return; }
+    bar.innerHTML = '&#9888;&#65039; <strong>' + n + ' possible duplicate group' + (n === 1 ? '' : 's') + '</strong> in the last ' + weeks + ' weeks (same Order ID, name and address). <button class="btn btn-sm" onclick="showDuplicates(window.__dupAll,' + weeks + ')">Review</button>';
+    window.__dupAll = all; bar.hidden = false;
+  }, function() { bar.hidden = true; });
+}
 function showDuplicates(list, weeksChecked) {
   var wsCount = list.filter(isWholesaleOrder).length;
   list = list.filter(function(o) { return !isWholesaleOrder(o); });
@@ -454,10 +465,25 @@ function showDuplicates(list, weeksChecked) {
   document.getElementById('dupBody').innerHTML = html;
   document.getElementById('dupModal').hidden = false;
 }
+/* Closed weeks: the server answers 423 until a reason is given. Ask for it once and retry. */
+function fetchWithLock(url, opts) {
+  return fetch(url, opts).then(function(res) {
+    if (res.status !== 423) return res;
+    return res.clone().json().catch(function() { return {}; }).then(function(b) {
+      if (b.code !== 'week_locked') return res;
+      var reason = prompt((b.error || 'This week is closed.') + '\n\nReason for the change (recorded):');
+      if (!reason || !reason.trim()) return res;
+      var o2 = Object.assign({}, opts);
+      if (o2.method === 'DELETE') { url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'reason=' + encodeURIComponent(reason.trim()); }
+      else { try { var bd = JSON.parse(o2.body); bd.lock_reason = reason.trim(); o2.body = JSON.stringify(bd); } catch (e) {} }
+      return fetch(url, o2);
+    });
+  });
+}
 function deleteDuplicate(id, label) {
   if (!confirm('Delete this copy of order "' + label + '"? It moves to the Deleted bin and can be restored for 30 days.')) return;
-  fetch('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' }).then(function(res) {
-    if (!res.ok && res.status !== 204) throw new Error('Status ' + res.status);
+  fetchWithLock('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' }).then(function(res) {
+    if (!res.ok && res.status !== 204) throw new Error(res.status === 423 ? 'Week is closed - no reason given, nothing changed' : 'Status ' + res.status);
     allOrders = allOrders.filter(function(o) { return o.id !== id; });
     applyFilters();
     var row = document.querySelector('[data-dup="' + id.replace(/"/g, '') + '"]');
@@ -497,9 +523,9 @@ function purgeDeleted(id) {
 }
 function deleteOrder(id, label) {
 if (!confirm('Delete order "' + label + '"? It moves to the Deleted bin and can be restored for 30 days.')) return;
-fetch('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' })
+fetchWithLock('/api/orders/' + encodeURIComponent(id), { method: 'DELETE' })
 .then(function(res) {
-if (!res.ok && res.status !== 204) throw new Error('Status ' + res.status);
+if (!res.ok && res.status !== 204) throw new Error(res.status === 423 ? 'Week is closed - no reason given, nothing changed' : 'Status ' + res.status);
 allOrders = allOrders.filter(function(o){ return o.id !== id; });
 applyFilters();
 })
@@ -581,7 +607,7 @@ try {
   }
   if (qsrc) { var fs0 = document.getElementById('filterSource'); if (fs0) fs0.value = qsrc; }
 } catch (e0) {}
-setTimeout(dupBannerCheck, 2500); // let the week's orders load first, then check quietly
+setTimeout(function() { try { dupBannerCheck(); } catch (e) {} }, 2500); // let the week's orders load first, then check quietly
 document.getElementById('ovSaveBtn').addEventListener('click', function() {
 var newZone = document.getElementById('ovNew').value.trim().toUpperCase();
 var note = document.getElementById('ovNote').value.trim();
@@ -592,7 +618,7 @@ var address = document.getElementById('ovAddress').value.trim();
 if (!newZone) { alert('Enter a zone code.'); return; }
 var btn = document.getElementById('ovSaveBtn');
 btn.disabled = true; btn.textContent = 'Saving...';
-fetch('/api/orders/' + encodeURIComponent(currentOverrideId), {
+fetchWithLock('/api/orders/' + encodeURIComponent(currentOverrideId), {
 method: 'PUT',
 headers: { 'content-type': 'application/json' },
 body: JSON.stringify({ zone_code: newZone, zone_source: 'override', zone_override_note: note, zone_conflict: false, total_pieces: pieces, shop_code: shopCode, name: name, address: address, formatted_address: address })
