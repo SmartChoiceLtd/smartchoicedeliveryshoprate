@@ -156,7 +156,7 @@ export default async (req) => {
   // Handle POST — receive Zoho webhook
   if
    (req.method === 'POST') {
-    const key = process.env.GOOGLE_MAPS_KEY;
+    const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
     const ratesStore = getStore('flower-rates');
     let ratesData = {};
     try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
