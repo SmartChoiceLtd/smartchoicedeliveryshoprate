@@ -59,6 +59,7 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
   <div class="notfound" id="notFoundMsg" hidden>Driver link not found. Check your link or contact your dispatcher.</div>
   <div class="empty" id="emptyMsg" hidden>No pending deliveries right now. Scan a tag on the delivery form to add one.</div>
   <div id="content" hidden>
+  <div id="routeNote" style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;"></div>
     <div class="refresh-row">
       <span id="countLabel" style="font-size:13px;color:var(--ink-soft);"></span>
       <button id="refreshBtn">Refresh</button>
@@ -596,6 +597,7 @@ function completeUrl(stop) {
   if (stop.address) params.set('address', stop.address);
   if (stop.shop_code) params.set('shop_code', stop.shop_code);
   if (stop.delivery_type) params.set('delivery_type', stop.delivery_type);
+  if (stop.phone) params.set('phone', stop.phone);
   params.set('stop_id', stop.id);
   return '/driver/' + driverCode.toLowerCase() + '?' + params.toString();
 }
@@ -678,8 +680,17 @@ function toggleSkip(stopId, skip) {
 // Optimizes stop order via Google's Directions API (waypoint optimization).
 // Falls back to the original order if the API call fails for any reason -
 // an unoptimized but usable list beats no list at all.
+var routeNoteText = '';
+function setRouteNote(t) {
+  routeNoteText = t || '';
+  var el = document.getElementById('routeNote');
+  if (el) el.textContent = routeNoteText;
+}
 function optimizeOrder(stops, mapsKey, originLatLng) {
-  if (stops.length < 2) return Promise.resolve(stops);
+  if (stops.length < 2) { setRouteNote(''); return Promise.resolve(stops); }
+  var hasOrigin = !!originLatLng;
+  // Without the phone's location the first stop stays as the starting point, so with only 2 stops there is nothing to reorder.
+  if (!hasOrigin && stops.length < 3) { setRouteNote('Order kept as scanned: location is off, so the first stop is the start and there is nothing to reorder with 2 stops.'); return Promise.resolve(stops); }
   // The server asks Google (browsers are not allowed to call the Directions service directly).
   var t1 = performance.now();
   return fetch('/api/route-order', {
@@ -688,12 +699,19 @@ function optimizeOrder(stops, mapsKey, originLatLng) {
     body: JSON.stringify({ origin: originLatLng || null, stops: stops.map(function(s) { return { id: s.id, address: s.address }; }) })
   }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); }).then(function(x) {
     console.log('[route timing] ordering answered in ' + Math.round(performance.now() - t1) + ' ms');
-    if (!x.ok || !x.d.ids) { console.warn('Route ordering unavailable:', x.d && (x.d.google_status || x.d.error), x.d && x.d.google_message); return stops; }
+    if (!x.ok || !x.d.ids) {
+      console.warn('Route ordering unavailable:', x.d && (x.d.google_status || x.d.error), x.d && x.d.google_message);
+      setRouteNote('Order kept as scanned: route ordering is unavailable right now' + (x.d && x.d.google_status ? ' (' + x.d.google_status + ')' : '') + '.');
+      return stops;
+    }
     var byId = {}; stops.forEach(function(s) { byId[s.id] = s; });
     var ordered = x.d.ids.map(function(id) { return byId[id]; }).filter(Boolean);
     stops.forEach(function(s) { if (ordered.indexOf(s) < 0) ordered.push(s); });
+    var moved = ordered.some(function(s, i) { return s !== stops[i]; });
+    var mins = x.d.next_minutes ? ' Next stop is about ' + x.d.next_minutes + ' min away.' : '';
+    setRouteNote((hasOrigin ? 'Nearest stop first, from your current location' : 'Location is off: nearest first from your first stop') + (moved ? ' \u2014 order updated.' : ' \u2014 no change.') + mins + ' Tap Refresh after a pickup to re-sort.');
     return ordered;
-  }).catch(function(e) { console.warn('Route ordering failed:', e.message); return stops; });
+  }).catch(function(e) { console.warn('Route ordering failed:', e.message); setRouteNote('Order kept as scanned: could not reach the route service.'); return stops; });
 }
 
 // Best-effort current location - resolves null (not a rejection) on any
