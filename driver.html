@@ -169,6 +169,15 @@
       <div class="field" id="callRow" hidden>
         <a id="callLink" href="#" style="display:block;text-align:center;padding:12px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);font-weight:700;font-size:15px;text-decoration:none;">&#9742; Call recipient</a>
       </div>
+      <div class="field" id="textRow" hidden>
+        <label>Text recipient (opens your messages, you tap Send)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button type="button" data-sms="door" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left at door</button>
+          <button type="button" data-sms="neighbour" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with neighbour</button>
+          <button type="button" data-sms="reception" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with reception</button>
+          <button type="button" data-sms="address" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Need correct address</button>
+        </div>
+      </div>
       <div class="field">
         <label>Delivery Address</label>
         <input type="text" id="fAddress" placeholder="Start typing address...">
@@ -352,7 +361,9 @@ function updateCallLink() {
   if (!inp || !row || !link) return;
   recipientPhone = String(inp.value || '').trim();
   var dial = recipientPhone.replace(/[^0-9+]/g, '');
-  if (dial.replace(/\D/g, '').length < 7) { row.hidden = true; return; }
+  var textRow = document.getElementById('textRow');
+  if (dial.replace(/\D/g, '').length < 7) { row.hidden = true; if (textRow) textRow.hidden = true; return; }
+  if (textRow) textRow.hidden = false;
   link.href = 'tel:' + dial;
   link.innerHTML = '&#9742; Call recipient &mdash; ' + recipientPhone.replace(/[<>&"]/g, '');
   row.hidden = false;
@@ -362,6 +373,39 @@ function setRecipientPhone(p) {
   if (inp) inp.value = String(p || '').trim();
   updateCallLink();
 }
+
+// ---- Text the recipient: opens the driver's own messaging app with a ready-written note; the driver taps Send.
+// (A link cannot attach a photo, so the doorstep note says a photo was taken.)
+function buildSmsUrl(kind) {
+  var dial = String(document.getElementById('fPhone').value || '').replace(/[^0-9+]/g, '');
+  if (dial.replace(/\D/g, '').length < 7) return null;
+  var nm = String(document.getElementById('fName').value || '').trim();
+  var shopTxt = String(document.getElementById('fShopSearch').value || '').trim();
+  var who = (driverName || 'your driver');
+  var intro = 'Hi' + (nm ? ' ' + nm : '') + ', this is ' + who + ' with Smart Choice Delivery' + (shopTxt ? ', delivering your flowers from ' + shopTxt : ', delivering your flowers') + '. ';
+  var addr = String(document.getElementById('fAddress').value || '').trim();
+  var msg;
+  if (kind === 'door') {
+    msg = intro + 'I could not reach you at the door or by phone. As permitted, I left your delivery at your doorstep' + (addr ? ' at ' + addr : '') + ' and took a photo of it there for our records. Please bring it inside soon.';
+  } else if (kind === 'neighbour') {
+    var where = String(document.getElementById('fNeighbouredTo').value || '').trim();
+    if (!where) where = (window.prompt('Which neighbour (house or unit number)?', '') || '').trim();
+    if (!where) return null;
+    msg = intro + 'I could not reach you at the door or by phone, so I left your delivery with your neighbour at ' + where + '. Please collect it from them.';
+  } else if (kind === 'reception') {
+    var by = String(document.getElementById('fAcceptedBy').value || '').trim();
+    msg = intro + 'I left your delivery with the concierge/reception at your building' + (by ? ' (accepted by ' + by + ')' : '') + '. Please pick it up from them.';
+  } else if (kind === 'address') {
+    msg = intro + 'I could not complete your delivery because the address or access details we were given are incorrect or incomplete' + (addr ? ' (' + addr + ')' : '') + '. Please reply with the correct delivery address, unit number and any buzzer or access code so I can bring it to you.';
+  } else return null;
+  return 'sms:' + dial + '?&body=' + encodeURIComponent(msg);
+}
+document.addEventListener('click', function(e) {
+  var b = e.target.closest ? e.target.closest('[data-sms]') : null;
+  if (!b) return;
+  var url = buildSmsUrl(b.getAttribute('data-sms'));
+  if (url) window.location.href = url;
+});
 
 function draftStorageKey() {
   return 'scd_driver_draft_' + (urlDriverCode || 'unknown');
