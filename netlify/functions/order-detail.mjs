@@ -105,7 +105,25 @@ export default async (req) => {
     let body;
     try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
     const lockReason = body.lock_reason; delete body.lock_reason;
+    // A corrected driver must be a real driver code (legacy imports left some wrong ones). Only checked
+    // when the driver is actually being changed, so saving other edits on an order whose old code is
+    // still wrong does not get blocked. Every change is kept in driver_history.
+    let driverChange = null;
+    if (body.driver !== undefined) {
+      const newDriver = String(body.driver || '').trim().toUpperCase();
+      const oldDriver = String(existing.driver || '').trim();
+      if (newDriver === oldDriver.toUpperCase()) { delete body.driver; }
+      else {
+        if (!newDriver) return json({ error: 'Driver cannot be blank' }, 400);
+        const dStore = getStore('flower-drivers');
+        const rec = await dStore.get(newDriver.toLowerCase(), { type: 'json', consistency: 'strong' }).catch(() => null);
+        if (!rec) return json({ error: 'No driver with code ' + newDriver + '. Check the code in Admin > Drivers.' }, 400);
+        body.driver = rec.code || newDriver;
+        driverChange = { from: oldDriver || null, to: body.driver };
+      }
+    }
     let updated = { ...existing, ...body, id };
+    if (driverChange) updated.driver_history = (existing.driver_history || []).concat([{ ...driverChange, at: new Date().toISOString(), by: username }]);
     const lc = await lockCheck([weekEndOf(existing), weekEndOf(updated)], lockReason);
     if (lc.response) return lc.response;
 
