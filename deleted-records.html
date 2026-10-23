@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery — Deleted Shops &amp; Drivers</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber-soft:#FFF3CD;--red-soft:#F8DEDA;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{max-width:820px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:0 0 10px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;}.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}.btn:disabled{opacity:.55;}
+input,select{padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th{text-align:left;color:var(--ink-soft);font-weight:600;padding:5px 6px;}td{padding:6px;border-top:1px solid var(--border);}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;}.ok{background:var(--green-soft);color:var(--green);}.bad{background:var(--red-soft);color:var(--warm);}.warn{background:var(--amber-soft);color:#8A5A00;}
+.msg{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;}.msg.err{background:var(--red-soft);color:var(--warm);}.msg.okm{background:var(--green-soft);color:var(--green);}.msg.info{background:#EEF6FA;color:#0C5A7A;}
+.small{font-size:12px;color:var(--ink-soft);}
+.rec{border-top:1px solid var(--border);padding:7px 0;display:flex;gap:8px;align-items:flex-start;font-size:12px;}.rec code{display:block;color:var(--ink-soft);word-break:break-all;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Deleted Shops &amp; Drivers</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="card">
+    <h2>Deleted bin</h2>
+    <div class="small" id="note">Loading&hellip;</div>
+    <div id="msg"></div>
+    <div id="list" style="margin-top:8px;"></div>
+  </div>
+</div>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmtAt(iso){try{return new Date(iso).toLocaleString('en-CA',{timeZone:'America/Edmonton',dateStyle:'medium',timeStyle:'short'});}catch(e){return iso;}}
+function show(t,cls){document.getElementById('msg').innerHTML=t?'<div class="msg '+cls+'">'+esc(t)+'</div>':'';}
+async function call(opts){
+  var r=await fetch('/api/deleted-records',Object.assign({credentials:'same-origin'},opts||{}));
+  if(r.status===401){location.href='/login.html?redirect=/deleted-records.html';throw new Error('Please sign in');}
+  var j=await r.json();if(!r.ok)throw new Error(j.error||('Error '+r.status));return j;
+}
+async function load(){
+  try{
+    var j=await call();
+    document.getElementById('note').textContent='Deleted shops and drivers are kept for '+j.keep_days+' days, then removed for good. A driver\'s pay ledger and PIN are never deleted with the driver.';
+    var l=document.getElementById('list');
+    if(!j.items.length){l.innerHTML='<div class="small">Nothing in the bin.</div>';return;}
+    l.innerHTML='<table><tr><th>Type</th><th>Name</th><th>Deleted</th><th>By</th><th></th></tr>'+j.items.map(function(i){
+      return '<tr><td><span class="pill '+(i.type==='shop'?'ok':'warn')+'">'+esc(i.type)+'</span></td><td>'+esc(i.label)+'</td><td>'+esc(fmtAt(i.deleted_at))+'</td><td>'+esc(i.deleted_by||'')+'</td><td style="white-space:nowrap;"><button class="btn" data-a="restore" data-id="'+esc(i.bin_id)+'">Restore</button> <button class="btn ghost" data-a="purge" data-id="'+esc(i.bin_id)+'">Delete for good</button></td></tr>';
+    }).join('')+'</table>';
+  }catch(e){show(e.message,'err');document.getElementById('note').textContent='';}
+}
+document.getElementById('list').addEventListener('click',async function(e){
+  var b=e.target.closest('button[data-a]');if(!b)return;
+  var a=b.getAttribute('data-a'),id=b.getAttribute('data-id');
+  if(a==='purge'&&!confirm('Delete this record for good? It cannot be restored afterwards.'))return;
+  b.disabled=true;show('','');
+  try{
+    var j=await call({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:a,id:id})});
+    show(a==='restore'?('Restored '+(j.restored||'')+'. Reload the shop or driver list to see it.'):'Removed for good.','okm');
+    load();
+  }catch(err){show(err.message,'err');b.disabled=false;}
+});
+load();
+</script>
+</body>
+</html>
