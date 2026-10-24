@@ -305,6 +305,44 @@ function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopI
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
+/* Onboarding email: opens a ready-written email in the user's own mail program (nothing is sent from here). */
+const ONBOARD_SIGNATURE='Kevin Michaud\nSmart Choice Delivery';
+const ONBOARD_PHONE=''; // e.g. '403-555-0123' - added under the signature when set
+const ONBOARD_DECK_URL='https://claude.ai/artifact/RPQyqy8srWTP77ysyp68k4';
+function emailShopOnboarding(shopId){
+  const shop=state.shops.find(s=>s.id===shopId);
+  if(!shop)return;
+  const parts=String(shop.name||'').trim().split(/\s+/);
+  const shopName=parts.length>1?parts.slice(1).join(' '):shop.name; // the first word is the shop code
+  const contact=(window.prompt('Contact name at '+shopName+' (optional):','')||'').trim();
+  const link=location.origin+'/shop/'+encodeURIComponent(shop.id);
+  const body=[
+    'Hi'+(contact?' '+contact:'')+',',
+    '',
+    "We've set up a simple online tool so "+shopName+' can see its Smart Choice Delivery price for any address in seconds, without calling or waiting on a quote.',
+    '',
+    'Your personal link:',
+    link,
+    '',
+    'How it works:',
+    '1. Open your link and choose the delivery type (Retail, Wholesale, Wedding, Funeral or Special event).',
+    '2. Type the delivery address and tap Calculate price.',
+    "3. You'll see the price, the delivery zone and the driving distance. You can copy or print the quote for your records.",
+    '',
+    "Your full pricing sheet is on the same page if you'd like to print it for the counter.",
+    '',
+    "A short walkthrough is here if you'd like to see it first:",
+    ONBOARD_DECK_URL,
+    '',
+    'If anything looks off or you have a question, just reply to this email or call me.',
+    '',
+    'Thank you,',
+    ONBOARD_SIGNATURE+(ONBOARD_PHONE?'\n'+ONBOARD_PHONE:'')
+  ].join('\r\n').replace(/\n(?!\r)/g,'\r\n');
+  const subject='Your delivery price lookup from Smart Choice Delivery';
+  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+
 function copyShopLink(shopId,btn){
   const url=location.origin+'/shop/'+encodeURIComponent(shopId);
   const r=btn.textContent;
@@ -539,10 +577,14 @@ async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComp
   el.innerHTML=filtered.map(s=>`
     <div class="shop-item-wrap">
       <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
-      <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="width:100%;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+        <button class="btn btn-sm btn-ghost" data-onboard="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Email onboarding</button>
+      </div>
     </div>`).join('');
   el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+  el.querySelectorAll('[data-onboard]').forEach(b=>b.addEventListener('click',()=>emailShopOnboarding(b.dataset.onboard)));
 }
   function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
