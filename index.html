@@ -305,42 +305,72 @@ function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopI
 async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
 async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
 async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
-/* Onboarding email: opens a ready-written email in the user's own mail program (nothing is sent from here). */
-const ONBOARD_SIGNATURE='Kevin Michaud\nSmart Choice Delivery';
-const ONBOARD_PHONE=''; // e.g. '403-555-0123' - added under the signature when set
-const ONBOARD_DECK_URL='https://claude.ai/artifact/RPQyqy8srWTP77ysyp68k4';
+/* Onboarding email: builds a ready-written email with clickable links. Copy it, then paste into your own mail program (nothing is sent from here). */
+const ONBOARD_SIGNATURE_LINES=['Kevin Michaud','Smart Choice Delivery','403-880-9822'];
+const ONBOARD_DECK_URL='https://quotes.smartchoicedelivery.ca/Shop-Quote-Walkthrough.pdf';
+const ONBOARD_SUBJECT='Your delivery price lookup from Smart Choice Delivery';
+function escHtml(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function buildOnboardEmail(shop,contact,shopName){
+  const link=location.origin+'/shop/'+encodeURIComponent(shop.id);
+  const hi='Hi'+(contact?' '+contact:'')+',';
+  const intro="We've set up a simple online tool so "+shopName+' can see its Smart Choice Delivery price for any address in seconds, without calling or waiting on a quote.';
+  const steps=['Open your link and choose the delivery type (Retail, Wholesale, Wedding, Funeral or Special event).','Type the delivery address and tap Calculate price.',"You'll see the price, the delivery zone and the driving distance. You can copy or print the quote for your records."];
+  const pricing="Your full pricing sheet is on the same page if you'd like to print it for the counter.";
+  const closing='If anything looks off or you have a question, just reply to this email or call me.';
+  const p='margin:0 0 12px';
+  const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">'
+    +'<p style="'+p+'">'+escHtml(hi)+'</p>'
+    +'<p style="'+p+'">'+escHtml(intro)+'</p>'
+    +'<p style="'+p+'"><b>Your personal link:</b><br><a href="'+escHtml(link)+'">Open your '+escHtml(shopName)+' price tool</a></p>'
+    +'<p style="'+p+'"><b>How it works:</b></p>'
+    +'<ol style="margin:0 0 12px 20px;padding:0">'+steps.map(t=>'<li>'+escHtml(t)+'</li>').join('')+'</ol>'
+    +'<p style="'+p+'">'+escHtml(pricing)+'</p>'
+    +'<p style="'+p+'">A short walkthrough is here if you\'d like to see it first:<br><a href="'+escHtml(ONBOARD_DECK_URL)+'">Watch the walkthrough (PDF)</a></p>'
+    +'<p style="'+p+'">'+escHtml(closing)+'</p>'
+    +'<p style="margin:0">Thank you,<br>'+ONBOARD_SIGNATURE_LINES.map(escHtml).join('<br>')+'</p>'
+    +'</div>';
+  const text=[hi,'',intro,'','Your personal link:',link,'','How it works:'].concat(steps.map((t,i)=>(i+1)+'. '+t),['',pricing,'',"A short walkthrough is here if you'd like to see it first:",ONBOARD_DECK_URL,'',closing,'','Thank you,'],ONBOARD_SIGNATURE_LINES).join('\n');
+  return {html,text};
+}
 function emailShopOnboarding(shopId){
   const shop=state.shops.find(s=>s.id===shopId);
   if(!shop)return;
   const parts=String(shop.name||'').trim().split(/\s+/);
   const shopName=parts.length>1?parts.slice(1).join(' '):shop.name; // the first word is the shop code
   const contact=(window.prompt('Contact name at '+shopName+' (optional):','')||'').trim();
-  const link=location.origin+'/shop/'+encodeURIComponent(shop.id);
-  const body=[
-    'Hi'+(contact?' '+contact:'')+',',
-    '',
-    "We've set up a simple online tool so "+shopName+' can see its Smart Choice Delivery price for any address in seconds, without calling or waiting on a quote.',
-    '',
-    'Your personal link:',
-    link,
-    '',
-    'How it works:',
-    '1. Open your link and choose the delivery type (Retail, Wholesale, Wedding, Funeral or Special event).',
-    '2. Type the delivery address and tap Calculate price.',
-    "3. You'll see the price, the delivery zone and the driving distance. You can copy or print the quote for your records.",
-    '',
-    "Your full pricing sheet is on the same page if you'd like to print it for the counter.",
-    '',
-    "A short walkthrough is here if you'd like to see it first:",
-    ONBOARD_DECK_URL,
-    '',
-    'If anything looks off or you have a question, just reply to this email or call me.',
-    '',
-    'Thank you,',
-    ONBOARD_SIGNATURE+(ONBOARD_PHONE?'\n'+ONBOARD_PHONE:'')
-  ].join('\r\n').replace(/\n(?!\r)/g,'\r\n');
-  const subject='Your delivery price lookup from Smart Choice Delivery';
-  window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  const mail=buildOnboardEmail(shop,contact,shopName);
+  const old=document.getElementById('onboardModal');if(old)old.remove();
+  const m=document.createElement('div');
+  m.id='onboardModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b><div style="font-size:13px;color:#555;margin-top:4px">1) Copy subject &nbsp; 2) Copy email &nbsp; 3) Open a new email in your own mail program and paste. Links stay clickable.</div></div>'
+    +'<div id="onboardPreview" style="padding:14px 18px;overflow:auto;flex:1">'+mail.html+'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #ddd;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+    +'<button type="button" id="obSubj" class="btn">Copy subject</button>'
+    +'<button type="button" id="obCopy" class="btn btn-primary">Copy email</button>'
+    +'<button type="button" id="obOpen" class="btn">Open email program</button>'
+    +'<button type="button" id="obClose" class="btn">Close</button></div></div>';
+  document.body.appendChild(m);
+  const flash=(btn,t)=>{const r=btn.dataset.label||(btn.dataset.label=btn.textContent);btn.textContent=t;setTimeout(()=>btn.textContent=r,1800);};
+  const copyText=t=>{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);return Promise.reject();};
+  m.querySelector('#obSubj').onclick=function(){copyText(ONBOARD_SUBJECT).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',ONBOARD_SUBJECT));};
+  m.querySelector('#obCopy').onclick=async function(){
+    const btn=this;
+    try{
+      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([mail.html],{type:'text/html'}),'text/plain':new Blob([mail.text],{type:'text/plain'})})]);
+      flash(btn,'Copied! Now paste');
+    }catch(e){
+      // fallback: select the preview and copy it (keeps the links)
+      const pv=m.querySelector('#onboardPreview');const r=document.createRange();r.selectNodeContents(pv);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+      let ok=false;try{ok=document.execCommand('copy');}catch(_){ }
+      sel.removeAllRanges();
+      flash(btn,ok?'Copied! Now paste':'Select the text and copy');
+    }
+  };
+  m.querySelector('#obOpen').onclick=()=>{window.location.href='mailto:?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
+  m.querySelector('#obClose').onclick=()=>m.remove();
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 }
 
 function copyShopLink(shopId,btn){
