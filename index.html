@@ -337,38 +337,64 @@ function emailShopOnboarding(shopId){
   if(!shop)return;
   const parts=String(shop.name||'').trim().split(/\s+/);
   const shopName=parts.length>1?parts.slice(1).join(' '):shop.name; // the first word is the shop code
-  const contact=(window.prompt('Contact name at '+shopName+' (optional):','')||'').trim();
-  const mail=buildOnboardEmail(shop,contact,shopName);
   const old=document.getElementById('onboardModal');if(old)old.remove();
   const m=document.createElement('div');
   m.id='onboardModal';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
-    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b><div style="font-size:13px;color:#555;margin-top:4px">1) Copy subject &nbsp; 2) Copy email &nbsp; 3) Open a new email in your own mail program and paste. Links stay clickable.</div></div>'
-    +'<div id="onboardPreview" style="padding:14px 18px;overflow:auto;flex:1">'+mail.html+'</div>'
+  const inp='style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #bbb;border-radius:6px;font-size:14px"';
+  m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b>'
+    +'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">'
+    +'<label style="flex:1;min-width:180px;font-size:12px;color:#555">Contact name (optional)<input id="obName" type="text" '+inp+'></label>'
+    +'<label style="flex:1;min-width:220px;font-size:12px;color:#555">Shop email<input id="obEmail" type="email" '+inp+'></label></div>'
+    +'<div id="obSaved" style="font-size:12px;color:#2a7a3b;min-height:16px;margin-top:4px"></div>'
+    +'<div style="font-size:13px;color:#555">1) Copy address &nbsp; 2) Copy subject &nbsp; 3) Copy email &nbsp; then paste each into a new email in your own mail program. Links stay clickable.</div></div>'
+    +'<div id="onboardPreview" style="padding:14px 18px;overflow:auto;flex:1"></div>'
     +'<div style="padding:12px 18px;border-top:1px solid #ddd;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+    +'<button type="button" id="obAddr" class="btn">Copy address</button>'
     +'<button type="button" id="obSubj" class="btn">Copy subject</button>'
     +'<button type="button" id="obCopy" class="btn btn-primary">Copy email</button>'
     +'<button type="button" id="obOpen" class="btn">Open email program</button>'
     +'<button type="button" id="obClose" class="btn">Close</button></div></div>';
   document.body.appendChild(m);
+  const nameEl=m.querySelector('#obName'),emailEl=m.querySelector('#obEmail'),pv=m.querySelector('#onboardPreview');
+  nameEl.value=shop.contactName||'';emailEl.value=shop.contactEmail||'';
+  let mail;
+  const refresh=()=>{mail=buildOnboardEmail(shop,nameEl.value.trim(),shopName);pv.innerHTML=mail.html;};
+  refresh();
+  nameEl.addEventListener('input',refresh);
+  const saveContact=async()=>{
+    const n=nameEl.value.trim(),e=emailEl.value.trim();
+    if(n===(shop.contactName||'')&&e===(shop.contactEmail||''))return;
+    const prevN=shop.contactName,prevE=shop.contactEmail;
+    shop.contactName=n;shop.contactEmail=e;
+    const note=m.querySelector('#obSaved');
+    try{await apiSaveShop(shop);note.style.color='#2a7a3b';note.textContent='Saved for next time';setTimeout(()=>{note.textContent='';},2000);}
+    catch(err){shop.contactName=prevN;shop.contactEmail=prevE;note.style.color='#b00020';note.textContent='Could not save contact: '+err.message;}
+  };
+  nameEl.addEventListener('change',saveContact);emailEl.addEventListener('change',saveContact);
   const flash=(btn,t)=>{const r=btn.dataset.label||(btn.dataset.label=btn.textContent);btn.textContent=t;setTimeout(()=>btn.textContent=r,1800);};
   const copyText=t=>{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);return Promise.reject();};
+  m.querySelector('#obAddr').onclick=function(){
+    const e=emailEl.value.trim();
+    if(!e){emailEl.focus();flash(this,'Enter an email first');return;}
+    saveContact();copyText(e).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this address:',e));
+  };
   m.querySelector('#obSubj').onclick=function(){copyText(ONBOARD_SUBJECT).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',ONBOARD_SUBJECT));};
   m.querySelector('#obCopy').onclick=async function(){
     const btn=this;
+    saveContact();
     try{
       await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([mail.html],{type:'text/html'}),'text/plain':new Blob([mail.text],{type:'text/plain'})})]);
       flash(btn,'Copied! Now paste');
     }catch(e){
-      // fallback: select the preview and copy it (keeps the links)
-      const pv=m.querySelector('#onboardPreview');const r=document.createRange();r.selectNodeContents(pv);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+      const r=document.createRange();r.selectNodeContents(pv);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
       let ok=false;try{ok=document.execCommand('copy');}catch(_){ }
       sel.removeAllRanges();
       flash(btn,ok?'Copied! Now paste':'Select the text and copy');
     }
   };
-  m.querySelector('#obOpen').onclick=()=>{window.location.href='mailto:?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
+  m.querySelector('#obOpen').onclick=()=>{saveContact();const e=emailEl.value.trim();window.location.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
   m.querySelector('#obClose').onclick=()=>m.remove();
   m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 }
