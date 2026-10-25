@@ -41,7 +41,17 @@ async function maybeApplyDailyPremium(driver, localDate) {
     const r = rates['SC2'] || {};
 
     const weekEnd = weekEndingSunday(localDate);
-    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    // One fixed key per driver per day (the number is noon UTC of that date, so
+    // the usual order_<week>_<time>_ key pattern still holds). Two scans that
+    // arrive together both pass the "already" check above; with a fixed key the
+    // second write lands on the same record instead of creating a second premium.
+    const dayMs = Date.parse(localDate + 'T12:00:00Z') || Date.now();
+    const orderId = `order_${weekEnd}_${dayMs}_premium${driver}`;
+    const existingOrder = await getStore('flower-orders').get(orderId, { type: 'json' }).catch(() => null);
+    if (existingOrder) {
+      await premiumsStore.setJSON(key, { given_at: new Date().toISOString(), order_id: orderId });
+      return;
+    }
     const order = {
       id: orderId,
       received_at: new Date().toISOString(),
@@ -52,8 +62,10 @@ async function maybeApplyDailyPremium(driver, localDate) {
       formatted_address: null,
       community: null,
       distance_km: null,
-      shop_code: null,
-      shop_full: null,
+      // The premium belongs to Smart Choice itself, not a customer shop, so it is
+      // filed under shop SCD (which shop billing and QuickBooks export skip).
+      shop_code: 'SCD',
+      shop_full: 'SCD SMART CHOICE DELIVERY',
       driver: driver,
       driver_pay: (r.drate || 0) + (r.gdpi || 0),
       total_pieces: 1,
