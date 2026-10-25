@@ -1,997 +1,180 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Calgary delivery quote tool</title>
-<style>
-  :root{
-    --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
-    --border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;
-        --radius:12px;
-  }
-  *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;}
-  [hidden]{display:none !important;}
-  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;}
-  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
-  .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
-  .topbar h1{font-size:19px;flex-shrink:0;}
-  .topbar span{color:var(--ink-soft);font-size:13px;}
-  .key-gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .key-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:480px;width:100%;}
-  .key-card p{color:var(--ink-soft);font-size:14px;line-height:1.6;}
-  .error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;font-weight:600;}
-  .btn:hover{opacity:0.92;}.btn:disabled{opacity:0.5;cursor:default;}
-  .btn-sm{padding:6px 12px;font-size:13px;}
-  .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
-  .layout{flex:1;display:flex;min-height:0;}
-  .sidebar{width:380px;flex-shrink:0;border-right:1px solid var(--border);background:var(--card);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;}
-  .panel{border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
-  .panel h2{font-size:14px;}
-  .hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:6px;}
-  .shop-item-wrap{margin-bottom:8px;}
-  .shop-item{width:100%;text-align:left;background:none;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;font-size:13px;}
-  .shop-item.active{border-color:var(--accent);background:var(--accent-soft);}
-  .shop-item .addr{display:block;color:var(--ink-soft);font-size:11px;margin-top:2px;}
-  #addShopForm input,#destinationInput{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;}
-  .pricing-section h3{font-size:12px;color:var(--ink-soft);margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
-  .pricing-section h3:first-child{border-top:none;margin-top:0;}
-  .pricing-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;}
-  .pricing-group summary{padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);list-style:none;display:flex;align-items:center;justify-content:space-between;}
-  .pricing-group summary::-webkit-details-marker{display:none;}
-  .pricing-group summary::after{content:'+';font-size:16px;color:var(--ink-soft);}
-  .pricing-group[open] summary::after{content:'\2212';}
-  .pricing-group[open] summary{border-bottom:1px solid var(--border);}
-  .pricing-group>table,.pricing-group>h3{margin:0 12px;}
-  .pricing-group>table{width:calc(100% - 24px);margin-top:8px;margin-bottom:10px;}
-  .pricing-group>div{margin:10px 12px;}
-  table.pricing{width:100%;border-collapse:collapse;font-size:13px;}
-  table.pricing th,table.pricing td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:left;}
-  .swatch-box{width:13px;height:13px;border-radius:3px;display:inline-block;vertical-align:middle;}
-  table.pricing input[type=number]{width:68px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
-  /* quote type toggle */
-  .toggle-row{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-  .toggle-row button{flex:1;padding:7px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);}
-  .toggle-row button.active{background:var(--accent);color:#fff;font-weight:600;}
-  /* piece count row */
-  .piece-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;}
-  .piece-row label{color:var(--ink-soft);white-space:nowrap;}
-  .piece-row input{width:60px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
-  /* wholesale badge */
-  .badge-ws{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#E8F4E8;color:#2C6B2C;margin-right:6px;}
-  .quote-result{margin-top:10px;font-size:13px;}
-  .quote-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg);}
-  .quote-price{font-size:26px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
-  .quote-meta{color:var(--ink-soft);font-size:12px;line-height:1.7;margin-top:4px;}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent);margin-right:6px;}
-  .quote-contact{background:#EAF4EA;border:1px solid #A8CFA8;color:#2C5F2C;padding:12px;border-radius:10px;font-size:13px;line-height:1.6;}
-  .quote-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-  .map-wrap{flex:1;position:relative;}
-  #map{position:absolute;inset:0;}
-  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
-  .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
-  .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
-  .iw{font-size:13px;min-width:180px;}
-  .iw-title{font-weight:700;margin-bottom:4px;}
-  .iw-row{margin-bottom:6px;color:var(--ink-soft);}
-  .iw-row select{padding:4px;border-radius:6px;border:1px solid var(--border);}
-  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
-  .modal{background:var(--card);border-radius:var(--radius);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;}
-  .modal h2{font-size:18px;margin-bottom:4px;}
-  .modal-sub{color:var(--ink-soft);font-size:13px;margin-bottom:16px;}
-  .modal table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
-  .modal table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
-  .modal table td{padding:6px 8px;border-bottom:1px solid var(--border);}
-  .modal-actions{display:flex;gap:8px;margin-top:4px;}
-  .modal h3{font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin:16px 0 6px;}
-  @media print{.modal-actions{display:none;}.topbar,.sidebar,.map-wrap{display:none;}.modal-bg{position:static;background:none;padding:0;}.modal{max-height:none;box-shadow:none;}}
-  @media(max-width:880px){.layout{flex-direction:column;}.sidebar{width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:55vh;}}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <h1>Calgary delivery quote tool</h1>
-  <span id="topbarSubtitle">Community-based zone pricing, per shop</span>
-  <span id="diagStatus" style="margin-left:auto;color:var(--accent);font-weight:600;font-size:12px;"></span>
-</div>
-<div class="key-gate" id="keyGate">
-  <div class="key-card">
-    <h2>Loading&hellip;</h2>
-    <p id="loadingMsg" style="color:var(--ink-soft);">Connecting&hellip;</p>
-    <div class="error" id="keyError" hidden></div>
-  </div>
-</div>
-<div id="lookupNotFound" class="key-gate" hidden>
-  <div class="key-card"><h2>Shop not found</h2><p>This link does not match a shop on file.</p></div>
-</div>
-<div class="layout" id="mainApp" hidden>
-  <aside class="sidebar">
-   <section class="panel" id="lookupBanner" hidden></section>
-   <section class="panel" id="shopsPanel">
-      <h2>Shops</h2>
-      <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
-      <div id="shopList"></div>
-      
-    </section>
-    <section class="panel" id="pricingPanel" hidden>
-      <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
-      <div style="margin-bottom:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
-        <label style="display:block;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Copy zone setup from another shop</label>
-        <div style="display:flex;gap:6px;">
-          <select id="copyFromShopSelect" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;"></select>
-          <button class="btn btn-sm" id="copyFromShopBtn" style="flex-shrink:0;">Copy</button>
-        </div>
-        <p class="hint" style="margin-top:6px;">Copies zone prices, community overrides, and town rates. Overwrites this shop's current setup.</p>
-      </div>
-      <div class="pricing-section" id="pricingBody"></div>
-      <div style="margin-top:10px;display:flex;gap:6px;">
-        <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="flex:1;">View / print pricing sheet</button>
-        <button class="btn btn-sm btn-ghost" id="communityDistancesBtn" style="flex:1;">Community distances</button>
-      </div>
-      <button class="btn btn-sm btn-ghost" id="communityPriceListBtn" style="width:100%;margin-top:6px;">View / print community price list</button>
-      <p class="hint">Click any Calgary community on the map to override its zone.</p>
-    </section>
-    <section class="panel">
-      <h2>Get a quote</h2>
-      <div class="toggle-row" id="quoteTypeToggle">
-        <button class="active" data-type="retail">Retail</button>
-        <button data-type="wholesale">Wholesale</button>
-        <button data-type="wedding">Wedding</button>
-        <button data-type="funeral">Funeral</button>
-        <button data-type="event">Special event</button>
-      </div>
-      <div class="piece-row" id="pieceRow" hidden>
-        <label id="pieceLabel">Number of pieces:</label>
-        <input type="number" id="pieceCount" min="1" value="1">
-      </div>
-      <div class="piece-row" id="funoRow" hidden>
-        <label for="funoPick">Cemetery (FUNO):</label>
-        <select id="funoPick">
-          <option value="">Not listed / use address</option>
-          <option value="edenbrook">Edenbrook (Springbank)</option>
-          <option value="choice">Choice Memorial Garden (Rocky View)</option>
-          <option value="mountainview">Mountain View (Rocky View)</option>
-        </select>
-      </div>
-      <div class="piece-row" id="quotedRow" hidden>
-        <label for="eventQuoted">Quoted price, if agreed ($):</label>
-        <input type="number" id="eventQuoted" min="0" step="0.01" placeholder="Leave blank to use WED / WEDO guidelines">
-      </div>
-      <div class="piece-row" id="setupRow" hidden>
-        <label>Setup crew (people):</label>
-        <input type="number" id="setupPeople" min="0" value="0">
-        <label>Setup hours each:</label>
-        <input type="number" id="setupHours" min="1" step="0.5" value="1">
-      </div>
-      <input id="destinationInput" placeholder="Destination address">
-      <button class="btn btn-sm" id="quoteBtn">Calculate price</button>
-      <div class="quote-result" id="quoteResult"></div>
-    </section>
-  </aside>
-  <main class="map-wrap">
-    <div id="map"></div>
-    <div class="legend" id="legend"></div>
-  </main>
-</div>
-<div class="modal-bg" id="priceSheetModal" hidden>
-  <div class="modal" id="priceSheetContent"></div>
-</div>
-<div class="modal-bg" id="communityDistancesModal" hidden>
-  <div class="modal" id="communityDistancesContent" style="max-width:720px;"></div>
-</div>
-<script>
-function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
-const CALGARY_ZONES=['C1','C2','C3','C4','C5'];
-const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
-// Zones selectable when overriding an individual community's zone (border
-// communities whose delivery radius bleeds into the city need C5 / border
-// zone codes available, not just the standard C1-C4 bands).
-const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN','RVS','BPW','SBK'];
-const ZONE_LABELS={
-  C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',C5:'City limit edge',
-  OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
-};
-const ZONE_COLORS={
-  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',C5:'#8B2500',
-  TSA:'#9B4D00',DEW:'#C9E4CA',HPT:'#88C08A',RVS:'#4A90A4',RVN:'#2C5F8A',
-  EVA:'#6B8E8E',COC:'#5B7FA6',AIR:'#3D6B8A',CHE:'#88A0B8',OKO:'#4A7A6A',
-  BPW:'#8A6D4B',SBK:'#6B8E5A',
-  OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
-};
-// Zone color resolution, in order: a color explicitly set in the Rate
-// Table (admin.html) for this zone, then the hardcoded map above (legacy
-// zones that predate the Rate Table color picker), then a safe grey
-// fallback. This means adding a new zone via admin's Add Zone + color
-// picker never needs a code change here, and an unrecognized zone can
-// never silently render as undefined/blank on the map again.
-function getZoneColor(code){
-  if(state.rates&&state.rates[code]&&state.rates[code].color)return state.rates[code].color;
-  if(ZONE_COLORS[code])return ZONE_COLORS[code];
-  return '#999999';
-}
-// Named towns - each gets a colored pin on the map
-const NAMED_TOWNS=[
-  {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
-  {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
-  {name:'Chestermere',zone:'OUT1',lat:51.0487,lng:-113.8225,radiusKm:7,color:'#4CAF50'},
-  {name:'Okotoks',zone:'OUT1',lat:50.7258,lng:-113.9758,radiusKm:8,color:'#4CAF50'},
-  {name:'Bragg Creek',zone:'BRG',lat:50.9500,lng:-114.5700,radiusKm:7,color:'#6D4C41'},
-  {name:'Harmony',zone:'HAR',lat:51.1130,lng:-114.3930,radiusKm:4,color:'#7B1FA2'},
-  {name:'Strathmore',zone:'OUT1',lat:51.0378,lng:-113.4003,radiusKm:8,color:'#4CAF50'},
-  {name:'High River',zone:'OUT1',lat:50.5808,lng:-113.8747,radiusKm:8,color:'#4CAF50'},
-  {name:'Kananaskis',zone:'OUT2',lat:50.9311,lng:-115.0986,radiusKm:15,color:'#2196F3'},
-  {name:'Canmore',zone:'OUT2',lat:51.0894,lng:-115.3582,radiusKm:8,color:'#2196F3'},
-  {name:'Banff',zone:'OUT3',lat:51.1784,lng:-115.5708,radiusKm:10,color:'#1565C0'},
-  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'}
-];
+import { getStore } from '@netlify/blobs';
 
-// Wholesale config
-const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
-const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
-const WED_INTOWN_BASE=27;   // in-town wedding (WED), includes first case
-const WED_EXTRA_PER_CASE=5; // per additional case (in and out of town); out-of-town base = zone rate (WEDO)
-const WED_SETUP_RATE=35;    // per person per hour, 1 hr minimum
-const FUN_INTOWN_BASE=17;   // in-town funeral, includes first piece
-const FUN_OUT_BASE=27;      // FUNO cemeteries (Edenbrook, Choice Memorial Garden, Mountain View) flat base, includes first piece; other out-of-town funerals = zone rate
-const FUNO_PATTERNS=[/edenbrook/i,/choice\s+memorial/i,/mountain\s*-?\s*view/i];
-const FUN_EXTRA_PER_PIECE=3;
-
-function outerBandForDistance(km){
-  if(km<=20)return'OUT1';
-  if(km<=40)return'OUT2';
-  if(km<=70)return'OUT3';
-  if(km<=100)return'OUT4';
-  return null;
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
 
-const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
-var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail',rates:{}};
-function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
-const ROUTE=parseRoute();
-
-/* geometry */
-function getCommunityName(props){const keys=['name','NAME','comm_name','COMM_NAME'];for(const k of keys)if(props&&props[k])return String(props[k]);if(props){const ks=Object.keys(props);if(ks.length)return String(props[ks[0]]);}return'Unknown';}
-function computeCentroid(g){if(!g)return null;const c=[];const col=rings=>rings.forEach(r=>r.forEach(p=>c.push(p)));if(g.type==='Polygon')col(g.coordinates);else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>col(p));if(!c.length)return null;const s=c.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]);return{lng:s[0]/c.length,lat:s[1]/c.length};}
-function pointInRing(pt,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>pt.lat)!==(yj>pt.lat))&&(pt.lng<(xj-xi)*(pt.lat-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
-function pointInGeometry(pt,g){if(!g)return false;if(g.type==='Polygon')return pointInRing(pt,g.coordinates[0]);if(g.type==='MultiPolygon')return g.coordinates.some(p=>pointInRing(pt,p[0]));return false;}
-function findCommunity(pt){return state.communities.find(c=>c.geometry&&pointInGeometry(pt,c.geometry))||null;}
-function haversineKm(a,b){const R=6371,r=d=>d*Math.PI/180;const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);const x=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
-function bandForDistance(km){if(km<=10)return'C1';if(km<=15)return'C2';if(km<=20)return'C3';return'C4';}
-function findNamedTown(pt){let best=null,bd=Infinity;for(const t of NAMED_TOWNS){const d=haversineKm(pt,{lat:t.lat,lng:t.lng});if(d<=t.radiusKm&&d<bd){best=t;bd=d;}}return best;}
-
-/* wholesale price calc */
-function calcEventPrice(kind,qty,isInTown,zoneRate,people,hours,funo,quoted){
-  const n=Math.max(1,parseInt(qty)||1);
-  if(kind==='funeral'){
-    const useFuno=!!funo&&!isInTown;
-    const base=isInTown?FUN_INTOWN_BASE:useFuno?FUN_OUT_BASE:(Number(zoneRate)||0);
-    const delivery=base+(n-1)*FUN_EXTRA_PER_PIECE;
-    return {kind,qty:n,isInTown,base,baseKind:(isInTown||useFuno)?'base':'zone',extra:FUN_EXTRA_PER_PIECE,unit:'piece',people:0,hours:0,delivery,setup:0,total:delivery,code:isInTown?'Funeral':useFuno?'Funeral (FUNO)':'Funeral (out of town)'};
-  }
-  const base=isInTown?WED_INTOWN_BASE:(Number(zoneRate)||0);
-  const p=Math.max(0,parseInt(people)||0);
-  const h=p>0?Math.max(1,parseFloat(hours)||1):0;
-  const delivery=base+(n-1)*WED_EXTRA_PER_CASE;
-  const setup=p*h*WED_SETUP_RATE;
-  const guide=delivery+setup;const q=parseFloat(quoted);const hasQ=kind==='event'&&q>0;
-  return {kind,qty:n,isInTown,base,baseKind:isInTown?'base':'zone',extra:WED_EXTRA_PER_CASE,unit:'case',people:p,hours:h,delivery,setup,guide,quoted:hasQ?q:null,total:hasQ?q:guide,code:isInTown?'WED':'WEDO'};
-}
-function calcWholesalePrice(basePrice,pieces,isInTown){
-  const p=Math.max(1,parseInt(pieces)||1);
-  if(isInTown){
-    return WS_INTOWN_BASE + (p-1)*WS_EXTRA_PER_PIECE;
-  }else{
-    return basePrice + (p-1)*WS_EXTRA_PER_PIECE;
-  }
+// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
+// the given date - same helper as orders.mjs, kept consistent so order
+// keys can be found via prefix filtering regardless of which function
+// created them.
+function weekEndingSunday(dateStr) {
+  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
+  // An unparseable date must still land on a real Sunday - previously this
+  // returned today's date as-is, which is almost never a Sunday, so the
+  // order got filed under a week key that no weekly report or pay run
+  // would ever look up.
+  if (!d || isNaN(d.getTime())) d = new Date();
+  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const daysToSunday = day === 0 ? 0 : 7 - day;
+  d.setDate(d.getDate() + daysToSunday);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-/* api */
-async function fetchMapsKey(){const r=await fetch('/api/config');if(!r.ok)throw new Error('Could not load configuration.');const d=await r.json();if(d.error)throw new Error(d.error);return d.key;}
-function loadGoogleMaps(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();window.__gmapsReady=()=>res();const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady`;s.onerror=()=>rej(new Error('Could not load Google Maps.'));document.head.appendChild(s);setTimeout(()=>rej(new Error('Timed out.')),10000);});}
-async function loadCommunities(){const r=await fetch(COMMUNITY_GEOJSON_URL);if(!r.ok)throw new Error('Could not load Calgary community data.');const t=await r.text();let g;try{g=JSON.parse(t);}catch(e){throw new Error('Invalid community GeoJSON.');}if(!g.features||!g.features.length)throw new Error('No community features found.');return g.features.map(f=>{const name=getCommunityName(f.properties);f.properties=f.properties||{};f.properties.quoteToolName=name;return{name,raw:f,geometry:f.geometry,centroid:computeCentroid(f.geometry)};});}
-async function geocodeAddress(address){const r=await fetch('/api/geocode?address='+encodeURIComponent(address+', Alberta, Canada'));const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not find that address.');return d;}
-async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
+// Driver NV gets an automatic daily premium (zone SC2) the first time they
+// scan a tag each day - hardcoded to this one driver for now rather than a
+// general per-driver config field, since generalizing this safely needs
+// seeing drivers.mjs's actual structure first, which hasn't been reviewed
+// yet. Uses a small dedicated store for the once-per-day check instead of
+// scanning the whole orders history on every single scan, which would add
+// real latency to a flow that's already been an issue today.
+async function maybeApplyDailyPremium(driver, localDate) {
+  if (driver !== 'NV' || !localDate) return;
+  try {
+    const premiumsStore = getStore('flower-daily-premiums');
+    const key = driver + '_' + localDate;
+    const already = await premiumsStore.get(key, { type: 'json' }).catch(() => null);
+    if (already) return;
 
-/* shop model */
-function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,C5:14.95,TSA:14.95,HPT:14.95,RVN:14.95,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
-// Shop price for a zone; zones a shop has no price for yet (e.g. HAR, BRG) fall back to the Rate Table shop rate.
-function zonePriceFor(shop,zone){const v=shop.zonePrices&&shop.zonePrices[zone];if(v!==undefined&&v!==null)return v;const r=state.rates&&state.rates[zone];return r&&Number(r.srate)>0?Number(r.srate):0;}
-function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
-function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
-function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
+    const ratesStore = getStore('flower-rates');
+    const rates = await ratesStore.get('rates', { type: 'json' }) || {};
+    const r = rates['SC2'] || {};
 
-/* backend */
-async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
-async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
-async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
-/* Onboarding email: builds a ready-written email with clickable links. Copy it, then paste into your own mail program (nothing is sent from here). */
-const ONBOARD_SIGNATURE_LINES=['Kevin Michaud','Smart Choice Delivery','403-880-9822'];
-const ONBOARD_DECK_URL='https://quotes.smartchoicedelivery.ca/Shop-Quote-Walkthrough.pdf';
-const ONBOARD_SUBJECT='Your delivery price lookup from Smart Choice Delivery';
-function escHtml(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function buildOnboardEmail(shop,contact,shopName){
-  const link=location.origin+'/shop/'+encodeURIComponent(shop.id);
-  const hi='Hi'+(contact?' '+contact:'')+',';
-  const intro="We've set up a simple online tool so "+shopName+' can see its Smart Choice Delivery price for any address in seconds, without calling or waiting on a quote.';
-  const steps=['Open your link and choose the delivery type (Retail, Wholesale, Wedding, Funeral or Special event).','Type the delivery address and tap Calculate price.',"You'll see the price, the delivery zone and the driving distance. You can copy or print the quote for your records."];
-  const pricing="Your full pricing sheet is on the same page if you'd like to print it for the counter.";
-  const closing='If anything looks off or you have a question, just reply to this email or call me.';
-  const p='margin:0 0 12px';
-  const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">'
-    +'<p style="'+p+'">'+escHtml(hi)+'</p>'
-    +'<p style="'+p+'">'+escHtml(intro)+'</p>'
-    +'<p style="'+p+'"><b>Your personal link:</b><br><a href="'+escHtml(link)+'">Open your '+escHtml(shopName)+' price tool</a></p>'
-    +'<p style="'+p+'"><b>How it works:</b></p>'
-    +'<ol style="margin:0 0 12px 20px;padding:0">'+steps.map(t=>'<li>'+escHtml(t)+'</li>').join('')+'</ol>'
-    +'<p style="'+p+'">'+escHtml(pricing)+'</p>'
-    +'<p style="'+p+'">A short walkthrough is here if you\'d like to see it first:<br><a href="'+escHtml(ONBOARD_DECK_URL)+'">Watch the walkthrough (PDF)</a></p>'
-    +'<p style="'+p+'">'+escHtml(closing)+'</p>'
-    +'<p style="margin:0">Thank you,<br>'+ONBOARD_SIGNATURE_LINES.map(escHtml).join('<br>')+'</p>'
-    +'</div>';
-  const text=[hi,'',intro,'','Your personal link:',link,'','How it works:'].concat(steps.map((t,i)=>(i+1)+'. '+t),['',pricing,'',"A short walkthrough is here if you'd like to see it first:",ONBOARD_DECK_URL,'',closing,'','Thank you,'],ONBOARD_SIGNATURE_LINES).join('\n');
-  return {html,text};
-}
-function emailShopOnboarding(shopId){
-  const shop=state.shops.find(s=>s.id===shopId);
-  if(!shop)return;
-  const parts=String(shop.name||'').trim().split(/\s+/);
-  const shopName=parts.length>1?parts.slice(1).join(' '):shop.name; // the first word is the shop code
-  const old=document.getElementById('onboardModal');if(old)old.remove();
-  const m=document.createElement('div');
-  m.id='onboardModal';
-  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  const inp='style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #bbb;border-radius:6px;font-size:14px"';
-  m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
-    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b>'
-    +'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">'
-    +'<label style="flex:1;min-width:180px;font-size:12px;color:#555">Contact name (optional)<input id="obName" type="text" '+inp+'></label>'
-    +'<label style="flex:1;min-width:220px;font-size:12px;color:#555">Shop email<input id="obEmail" type="email" '+inp+'></label></div>'
-    +'<div id="obSaved" style="font-size:12px;color:#2a7a3b;min-height:16px;margin-top:4px"></div>'
-    +'<div style="font-size:13px;color:#555">1) Copy address &nbsp; 2) Copy subject &nbsp; 3) Copy email &nbsp; then paste each into a new email in your own mail program. Links stay clickable.</div></div>'
-    +'<div id="onboardPreview" style="padding:14px 18px;overflow:auto;flex:1"></div>'
-    +'<div style="padding:12px 18px;border-top:1px solid #ddd;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
-    +'<button type="button" id="obAddr" class="btn">Copy address</button>'
-    +'<button type="button" id="obSubj" class="btn">Copy subject</button>'
-    +'<button type="button" id="obCopy" class="btn btn-primary">Copy email</button>'
-    +'<button type="button" id="obOpen" class="btn">Open email program</button>'
-    +'<button type="button" id="obClose" class="btn">Close</button></div></div>';
-  document.body.appendChild(m);
-  const nameEl=m.querySelector('#obName'),emailEl=m.querySelector('#obEmail'),pv=m.querySelector('#onboardPreview');
-  nameEl.value=shop.contactName||'';emailEl.value=shop.contactEmail||'';
-  let mail;
-  const refresh=()=>{mail=buildOnboardEmail(shop,nameEl.value.trim(),shopName);pv.innerHTML=mail.html;};
-  refresh();
-  nameEl.addEventListener('input',refresh);
-  const saveContact=async()=>{
-    const n=nameEl.value.trim(),e=emailEl.value.trim();
-    if(n===(shop.contactName||'')&&e===(shop.contactEmail||''))return;
-    const prevN=shop.contactName,prevE=shop.contactEmail;
-    shop.contactName=n;shop.contactEmail=e;
-    const note=m.querySelector('#obSaved');
-    try{await apiSaveShop(shop);note.style.color='#2a7a3b';note.textContent='Saved for next time';setTimeout(()=>{note.textContent='';},2000);}
-    catch(err){shop.contactName=prevN;shop.contactEmail=prevE;note.style.color='#b00020';note.textContent='Could not save contact: '+err.message;}
-  };
-  nameEl.addEventListener('change',saveContact);emailEl.addEventListener('change',saveContact);
-  const flash=(btn,t)=>{const r=btn.dataset.label||(btn.dataset.label=btn.textContent);btn.textContent=t;setTimeout(()=>btn.textContent=r,1800);};
-  const copyText=t=>{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);return Promise.reject();};
-  m.querySelector('#obAddr').onclick=function(){
-    const e=emailEl.value.trim();
-    if(!e){emailEl.focus();flash(this,'Enter an email first');return;}
-    saveContact();copyText(e).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this address:',e));
-  };
-  m.querySelector('#obSubj').onclick=function(){copyText(ONBOARD_SUBJECT).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',ONBOARD_SUBJECT));};
-  m.querySelector('#obCopy').onclick=async function(){
-    const btn=this;
-    saveContact();
-    try{
-      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([mail.html],{type:'text/html'}),'text/plain':new Blob([mail.text],{type:'text/plain'})})]);
-      flash(btn,'Copied! Now paste');
-    }catch(e){
-      const r=document.createRange();r.selectNodeContents(pv);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
-      let ok=false;try{ok=document.execCommand('copy');}catch(_){ }
-      sel.removeAllRanges();
-      flash(btn,ok?'Copied! Now paste':'Select the text and copy');
+    const weekEnd = weekEndingSunday(localDate);
+    // One fixed key per driver per day (the number is noon UTC of that date, so
+    // the usual order_<week>_<time>_ key pattern still holds). Two scans that
+    // arrive together both pass the "already" check above; with a fixed key the
+    // second write lands on the same record instead of creating a second premium.
+    const dayMs = Date.parse(localDate + 'T12:00:00Z') || Date.now();
+    const orderId = `order_${weekEnd}_${dayMs}_premium${driver}`;
+    const existingOrder = await getStore('flower-orders').get(orderId, { type: 'json' }).catch(() => null);
+    if (existingOrder) {
+      await premiumsStore.setJSON(key, { given_at: new Date().toISOString(), order_id: orderId });
+      return;
     }
-  };
-  m.querySelector('#obOpen').onclick=()=>{saveContact();const e=emailEl.value.trim();window.location.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
-  m.querySelector('#obClose').onclick=()=>m.remove();
-  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+    const order = {
+      id: orderId,
+      received_at: new Date().toISOString(),
+      date: localDate,
+      order_id: 'PREMIUM',
+      name: 'Daily Premium (SC2)',
+      address: null,
+      formatted_address: null,
+      community: null,
+      distance_km: null,
+      // The premium belongs to Smart Choice itself, not a customer shop, so it is
+      // filed under shop SCD (which shop billing and QuickBooks export skip).
+      shop_code: 'SCD',
+      shop_full: 'SCD SMART CHOICE DELIVERY',
+      driver: driver,
+      driver_pay: (r.drate || 0) + (r.gdpi || 0),
+      total_pieces: 1,
+      zone_entered: 'SC2',
+      zone_code: 'SC2',
+      zone_source: 'manual',
+      zone_conflict: false,
+      zone_suggestion: null,
+      delivery_status: null,
+      delivery_time: null,
+      contact_method: null,
+      neighboured_to: null,
+      accepted_by: null,
+      comments: 'Automatic daily premium',
+      has_photo: false,
+      rate_snapshot: rates['SC2'] || null,
+    };
+
+    const ordersStore = getStore('flower-orders');
+    await ordersStore.setJSON(orderId, order);
+    await premiumsStore.setJSON(key, { given_at: new Date().toISOString(), order_id: orderId });
+  } catch (e) {
+    // Best-effort - a failure here shouldn't block the driver from
+    // scanning their actual delivery.
+  }
 }
 
-function copyShopLink(shopId,btn){
-  const url=location.origin+'/shop/'+encodeURIComponent(shopId);
-  const r=btn.textContent;
-  const done=()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent=r,1500);};
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(done).catch(()=>window.prompt('Copy this link:',url));
-  else window.prompt('Copy this link:',url);
+// Recipient phone from the scan review card: only phone-number characters, short.
+function cleanPhone(v) {
+  return String(v == null ? '' : v).replace(/[^0-9+()\-.\sx]/gi, '').replace(/\s+/g, ' ').trim().slice(0, 25);
 }
 
-/* copy zone setup between shops */
-function renderCopyFromShopSelect(currentShop){
-  const sel=document.getElementById('copyFromShopSelect');
-  if(!sel)return;
-  const others=state.shops.filter(s=>s.id!==currentShop.id).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!others.length){sel.innerHTML='<option value="">No other shops yet</option>';sel.disabled=true;return;}
-  sel.disabled=false;
-  sel.innerHTML='<option value="">Select a shop&hellip;</option>'+others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-}
+export default async (req) => {
+  const store = getStore('flower-stops');
 
-async function copyZoneSetupFromShop(){
-  const target=getSelectedShop();
-  const sourceId=document.getElementById('copyFromShopSelect').value;
-  if(!target||!sourceId)return;
-  const source=state.shops.find(s=>s.id===sourceId);
-  if(!source)return;
-  if(!window.confirm(`Copy zone prices, community overrides, and town rates from ${source.name} to ${target.name}? This overwrites ${target.name}'s current setup.`))return;
-  const btn=document.getElementById('copyFromShopBtn');
-  const orig=btn.textContent;btn.disabled=true;btn.textContent='Copying...';
-  target.zonePrices={...source.zonePrices};
-  target.communityZones={...source.communityZones};
-  target.townPrices={...source.townPrices};
-  try{
-    await apiSaveShop(target);
-    styleCommunities();renderPricingTable();renderLegend();if(state.map)drawTownPins();
-  }catch(e){alert('Could not copy setup: '+e.message);}
-  finally{btn.disabled=false;btn.textContent=orig;}
-}
-
-/* pricing table */
-function renderPricingTable(){
-  const shop=getSelectedShop();
-  const panel=document.getElementById('pricingPanel');
-  if(!shop){panel.hidden=true;return;}
-  panel.hidden=false;
-  document.getElementById('pricingShopName').textContent=shop.name;
-  renderCopyFromShopSelect(shop);
-  const body=document.getElementById('pricingBody');
-
-  // Border zones = everything in ZONE_COLORS that isn't a core Calgary zone
-  // or a rural/outer band (C5, TSA, HPT, RVN, RVS, and the rest).
-  const BORDER_ZONES=Object.keys(ZONE_COLORS).filter(z=>!CALGARY_ZONES.includes(z)&&!OUTER_ZONES.includes(z));
-
-  const zoneRow=z=>`<tr><td><span class="swatch-box" style="background:${getZoneColor(z)}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]||''}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}"></td></tr>`;
-  const cRows=CALGARY_ZONES.map(zoneRow).join('');
-  const bRows=BORDER_ZONES.map(zoneRow).join('');
-  const oRows=OUTER_ZONES.map(zoneRow).join('');
-  const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${t.color}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
-  const wsNote=`<div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:8px 10px;font-size:12px;color:#2C5F2C;"><strong>Wholesale rates:</strong> In-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece.</div>`;
-
-  body.innerHTML=`
-    <details class="pricing-group" open>
-      <summary>Calgary zones</summary>
-      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${cRows}</tbody></table>
-    </details>
-    <details class="pricing-group">
-      <summary>Border communities</summary>
-      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${bRows}</tbody></table>
-    </details>
-    <details class="pricing-group">
-      <summary>Out of town</summary>
-      <h3 style="margin-top:0;">Rural / outer zones</h3>
-      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${oRows}</tbody></table>
-      <h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3>
-      <table class="pricing"><thead><tr><th></th><th>Town</th><th>Retail price</th></tr></thead><tbody>${tRows}</tbody></table>
-    </details>
-    <details class="pricing-group">
-      <summary>Wholesale</summary>
-      ${wsNote}
-    </details>`;
-  body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
-  body.querySelectorAll('input[data-town]').forEach(i=>{i.addEventListener('change',()=>{if(!shop.townPrices)shop.townPrices={};const t=i.dataset.town,v=parseFloat(i.value);shop.townPrices[t]=isNaN(v)?null:v;apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
-}
-
-/* legend */
-function renderLegend(){
-  const shop=getSelectedShop();
-  const legend=document.getElementById('legend');
-  if(!shop){legend.innerHTML='';return;}
-  const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
-  legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
-}
-
-/* map */
-function initMap(){
-  state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
-  state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
-  const fc={type:'FeatureCollection',features:state.communities.map(c=>c.raw)};
-  state.map.data.addGeoJson(fc);
-  state.map.data.addListener('click',onCommunityClick);
-  drawTownPins();
-}
-
-function makePinSvg(color){
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.27 0 0 6.27 0 14c0 9.625 14 22 14 22S28 23.625 28 14C28 6.27 21.73 0 14 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>`;
-  return'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
-}
-
-function drawTownPins(){
-  state.townMarkers.forEach(m=>m.setMap(null));
-  state.townMarkers=[];
-  const shop=getSelectedShop();
-  NAMED_TOWNS.forEach(town=>{
-    const retailPrice=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:zonePriceFor(shop,town.zone)):null;
-    const marker=new google.maps.Marker({
-      map:state.map,
-      position:{lat:town.lat,lng:town.lng},
-      title:town.name,
-      icon:{url:makePinSvg(town.color),scaledSize:new google.maps.Size(28,36),anchor:new google.maps.Point(14,36)},
-      label:{text:town.name,color:'#1A1A1A',fontSize:'11px',fontWeight:'600',className:'town-label'},
-      zIndex:10
+  if (req.method === 'GET') {
+    // Every stop ever scanned is kept, so reading them all gets slower each week. The route page asks for
+    // only what it needs: ?days=N reads just stops created in the last N days (the id carries its creation
+    // time, so the older ones are never even opened), and ?driver= / ?status= trim what is sent back.
+    // With no parameters it still returns everything (Weekly Close and Reconciliation rely on that).
+    const q = new URL(req.url).searchParams;
+    const days = parseInt(q.get('days'), 10);
+    const wantDriver = (q.get('driver') || '').toUpperCase();
+    const wantStatus = q.get('status') || '';
+    const cutoff = days > 0 ? Date.now() - days * 86400000 : 0;
+    const { blobs } = await store.list();
+    const keys = blobs.map(b => b.key).filter(k => {
+      if (!cutoff) return true;
+      const m = /^stop_(\d+)_/.exec(k);
+      return !m || Number(m[1]) >= cutoff; // keep anything with an unrecognised key
     });
-    marker.addListener('click',()=>{
-      const content=document.createElement('div');
-      content.className='iw';
-      const price=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:zonePriceFor(shop,town.zone)):'-';
-      const wsPrice=shop?calcWholesalePrice(Number(price),1,false):'-';
-      content.innerHTML=`<div class="iw-title">${escapeHtml(town.name)}</div><div class="iw-row">Zone: <strong>${town.zone}</strong></div><div class="iw-row">Retail: <strong>$${Number(price).toFixed(2)}</strong></div><div class="iw-row">Wholesale (1 pc): <strong>$${Number(wsPrice).toFixed(2)}</strong></div>`;
-      if(state.infoWindow)state.infoWindow.close();
-      state.infoWindow=new google.maps.InfoWindow({content,position:{lat:town.lat,lng:town.lng}});
-      state.infoWindow.open(state.map);
-    });
-    state.townMarkers.push(marker);
-  });
-}
-
-function styleCommunities(){
-  const shop=getSelectedShop();
-  if(!state.map)return;
-  state.map.data.setStyle(feature=>{
-    const name=feature.getProperty('quoteToolName');
-    let fill='#E4DDD0';
-    if(shop){const code=shop.communityZones[name]||'C4';fill=getZoneColor(code);}
-    return{fillColor:fill,fillOpacity:0.55,strokeWeight:0.6,strokeColor:'#FFFFFF',zIndex:1};
-  });
-}
-
-function onCommunityClick(e){
-  const shop=getSelectedShop();if(!shop)return;
-  const name=e.feature.getProperty('quoteToolName');
-  const current=shop.communityZones[name]||'C4';
-  if(ROUTE.mode!=='admin'){
-    const content=document.createElement('div');
-    content.className='iw';
-    const wsBase=calcWholesalePrice(shop.zonePrices[current]||0,1,true);
-    content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone ${current} &mdash; Retail $${shop.zonePrices[current]||0}</div><div class="iw-row">Wholesale (1 pc): $${wsBase}</div>`;
-    if(state.infoWindow)state.infoWindow.close();
-    state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
-    state.infoWindow.open(state.map);return;
+    let stops = (await Promise.all(keys.map(k => store.get(k, { type: 'json' })))).filter(Boolean);
+    if (wantDriver) stops = stops.filter(s => String(s.driver || '').toUpperCase() === wantDriver);
+    if (wantStatus) stops = stops.filter(s => s.status === wantStatus);
+    return json(stops.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
   }
-  const content=document.createElement('div');
-  content.className='iw';
-  content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone for ${escapeHtml(shop.name)}:<br><select id="iwZoneSelect" style="margin-top:4px;">${COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===current?'selected':''}>${z} &mdash; $${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}</option>`).join('')}</select></div><button class="btn btn-sm" id="iwApply" style="margin-top:4px;">Set zone</button>`;
-  if(state.infoWindow)state.infoWindow.close();
-  state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
-  state.infoWindow.open(state.map);
-  google.maps.event.addListenerOnce(state.infoWindow,'domready',()=>{
-    document.getElementById('iwApply').addEventListener('click',()=>{
-      shop.communityZones[name]=document.getElementById('iwZoneSelect').value;
-      styleCommunities();renderLegend();state.infoWindow.close();
-      apiSaveShop(shop).catch(e=>alert('Zone not saved: '+e.message));
-    });
-  });
-}
 
-function placeQuoteMarkers(shop,dest){
-  if(state.markers.shop)state.markers.shop.setMap(null);
-  if(state.markers.dest)state.markers.dest.setMap(null);
-  state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
-  state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
-  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
-}
+  if (req.method === 'POST') {
+    let body;
+    try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
 
-function selectShop(id){
-  state.selectedShopId=id;
-  renderShopList();renderPricingTable();styleCommunities();renderLegend();
-  if(state.map) drawTownPins();
-}
-function enterLookupView(shop){
-  seedCommunityZones(shop);
-  state.shops=[shop];state.selectedShopId=shop.id;
-  document.getElementById('shopsPanel').hidden=true;
-  document.getElementById('pricingPanel').hidden=true;
-  document.getElementById('diagStatus').hidden=true;
-  document.getElementById('topbarSubtitle').textContent='Quote lookup';
-  const banner=document.getElementById('lookupBanner');
-  banner.hidden=false;
-  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p><button class="btn btn-sm btn-ghost" id="lookupSheetBtn" style="margin-top:8px;">Print price sheet</button> <button class="btn btn-sm btn-ghost" id="lookupCplBtn" style="margin-top:8px;">Community price list</button>`;
-  document.getElementById('lookupSheetBtn').addEventListener('click',showPricingSheet);
-  document.getElementById('lookupCplBtn').addEventListener('click',showCommunityPriceList);
-  styleCommunities();renderLegend();if(state.map)drawTownPins();
-}
-
-function setupAutocomplete(input){
-  const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'ca'},fields:['formatted_address','geometry']});
-  ac.addListener('place_changed',()=>{const p=ac.getPlace();if(p.geometry)state.lastDestination={address:p.formatted_address,lat:p.geometry.location.lat(),lng:p.geometry.location.lng()};});
-}
-
-/* quote type toggle */
-document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
-  const btn=e.target.closest('button');if(!btn)return;
-  state.quoteType=btn.dataset.type;
-  this.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));
-  document.getElementById('pieceRow').hidden=state.quoteType==='retail';
-  document.getElementById('setupRow').hidden=!['wedding','event'].includes(state.quoteType);
-  document.getElementById('quotedRow').hidden=state.quoteType!=='event';
-  document.getElementById('funoRow').hidden=state.quoteType!=='funeral';
-  document.getElementById('pieceLabel').textContent=['wedding','event'].includes(state.quoteType)?'Number of cases:':'Number of pieces:';
-  document.getElementById('quoteResult').innerHTML='';
-});
-
-function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
-async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
-  function renderShopList(){
-  const el=document.getElementById('shopList');
-  const search=(document.getElementById('shopSearch').value||'').toLowerCase().trim();
-  const words=search?search.split(/\s+/):[];
-  const filtered=state.shops.filter(s=>{
-    if(!words.length)return true;
-    const haystack=(s.name+' '+(s.address||'')).toLowerCase();
-    return words.every(w=>haystack.includes(w));
-  });
-  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
-  el.innerHTML=filtered.map(s=>`
-    <div class="shop-item-wrap">
-      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Copy lookup link</button>
-        <button class="btn btn-sm btn-ghost" data-onboard="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Email onboarding</button>
-      </div>
-    </div>`).join('');
-  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
-  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
-  el.querySelectorAll('[data-onboard]').forEach(b=>b.addEventListener('click',()=>emailShopOnboarding(b.dataset.onboard)));
-}
-  function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
-
-async function generateQuote(){
-  const shop=getSelectedShop();
-  if(!shop){showQuoteError('Select or add a shop first.');return;}
-  const input=document.getElementById('destinationInput');
-  const pieces=parseInt(document.getElementById('pieceCount').value)||1;
-  const isWholesale=state.quoteType==='wholesale';
-  const isWedding=['wedding','funeral','event'].includes(state.quoteType);
-  const evKind=state.quoteType;
-  const evQuoted=document.getElementById('eventQuoted').value;
-  const funoPick=document.getElementById('funoPick').value;
-  const funoName=(input.value||'');
-  const evPeople=document.getElementById('setupPeople').value,evHours=document.getElementById('setupHours').value;
-  let dest=state.lastDestination&&state.lastDestination.address===input.value?state.lastDestination:null;
-  setQuoteLoading(true);
-  try{
-    if(!dest){const g=await geocodeAddress(input.value);dest={address:g.formatted,lat:g.lat,lng:g.lng};}
-
-    // 1. Calgary community?
-    const community=findCommunity(dest);
-    if(community){
-      const zoneCode=shop.communityZones[community.name]||'C4';
-      const retailPrice=shop.zonePrices[zoneCode]||0;
-      let wedding=null;
-      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
-      if(isWedding)wedding=calcEventPrice(evKind,pieces,!funoHit,shop.zonePrices[shop.communityZones[community.name]||'C4']||0,evPeople,evHours,funoHit,evQuoted);
-      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
-      let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
-      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:true,communityName:community.name});
-      placeQuoteMarkers(shop,dest);return;
-    }
-
-    // 2. Named town?
-    const town=findNamedTown(dest);
-    if(town){
-      const flat=shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:null;
-      const retailPrice=flat!==null?flat:(zonePriceFor(shop,town.zone));
-      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
-      const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
-      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
-      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,retailPrice,finalPrice,isWholesale,wedding,pieces,isInTown:false});
-      placeQuoteMarkers(shop,dest);return;
-    }
-
-    // 3. Rural distance fallback
-    const driveKm=await drivingDistanceKm(shop,dest);
-    const zoneCode=outerBandForDistance(driveKm);
-    if(!zoneCode){
-      document.getElementById('quoteResult').innerHTML=`<div class="quote-contact"><strong>Outside standard delivery area</strong><br>${driveKm.toFixed(1)} km driving distance &mdash; beyond standard zones.<br>Please contact the shop directly for a custom quote.</div>`;
-      placeQuoteMarkers(shop,dest);return;
-    }
-    const retailPrice=shop.zonePrices[zoneCode]||0;
-    const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
-    const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
-    const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
-    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:false});
-    placeQuoteMarkers(shop,dest);
-  }catch(err){showQuoteError(err.message);}
-  finally{setQuoteLoading(false);}
-}
-
-function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown,communityName}){
-  const wsDetail=isWholesale?(isInTown
-    ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
-    :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
-  const wedLabel=wedding?(wedding.kind==='funeral'?wedding.code:wedding.kind==='event'?`Special event (${wedding.code})`:`Wedding (${wedding.code})`):'';
-  const wedBaseTxt=wedding?(wedding.baseKind==='base'?`$${wedding.base} base`:`$${wedding.base} zone rate`):'';
-  const wedDetail=wedding?`${wedLabel}: ${wedBaseTxt} + ${wedding.qty-1} extra ${wedding.unit}${wedding.qty-1===1?'':'s'} &times; $${wedding.extra} = $${wedding.delivery.toFixed(2)}`+(wedding.kind!=='funeral'?(wedding.people>0?`<br>Setup: ${wedding.people} ${wedding.people===1?'person':'people'} &times; ${wedding.hours} hr &times; $${WED_SETUP_RATE}/hr = $${wedding.setup.toFixed(2)}`:`<br>Setup not included ($${WED_SETUP_RATE}/hr per person, 1 hr minimum)`)+(wedding.quoted!==null?`<br><strong>As quoted: $${wedding.quoted.toFixed(2)}</strong> (guideline would be $${wedding.guide.toFixed(2)})`:''):''):'';
-  const quoteText=[
-    `Delivery quote - ${shop.name}`,
-    `Type: ${wedding?`${wedLabel} (${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''})`:isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
-    wedding&&wedding.setup>0?`Delivery: $${wedding.delivery.toFixed(2)}`:'',
-    wedding&&wedding.people>0?`Setup (${wedding.people} x ${wedding.hours} hr x $${WED_SETUP_RATE}): $${wedding.setup.toFixed(2)}`:'',
-    `Destination: ${dest.address}`,
-    `Zone: ${zoneCode} (${label} - ${sublabel})`,
-    isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
-    `Delivery price: $${Number(finalPrice).toFixed(2)}`,
-    driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
-    `Generated: ${new Date().toLocaleString()}`
-  ].filter(Boolean).join('\n');
-
-  // Save-as-default is only meaningful when the quote matched an actual
-  // Calgary community polygon (communityName set) - that's the only case
-  // where shop.communityZones has a matching key to override.
-  const showSaveZone = !!communityName;
-
-  document.getElementById('quoteResult').innerHTML=`
-    <div class="quote-card">
-      <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
-      <div class="quote-meta">
-        ${wedding?`<span class="badge-ws">${wedLabel} &mdash; ${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''}</span><br><span style="color:var(--ink-soft)">${wedDetail}</span><br>`:''}
-        ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
-       <span class="badge" style="background:${getZoneColor(zoneCode)};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
-        ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
-        ${escapeHtml(dest.address)}<br>
-        ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
-      </div>
-      <div class="quote-actions">
-        <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
-        <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
-        ${showSaveZone?`<button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>`:''}
-      </div>
-    </div>`;
-
-  document.getElementById('copyQuoteBtn').addEventListener('click',()=>{
-    const btn=document.getElementById('copyQuoteBtn');
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(quoteText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy quote',1500);}).catch(()=>window.prompt('Copy:',quoteText));
-    else window.prompt('Copy:',quoteText);
-  });
-  document.getElementById('printQuoteBtn').addEventListener('click',()=>{
-    const w=window.open('','_blank','width=520,height=460');
-    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}${wedding?`<div class="ws">${wedDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
-    w.document.close();
-  });
-  if(showSaveZone){
-    document.getElementById('saveZoneBtn').addEventListener('click', async function() {
-      var btn = this;
-      var shopId = shop.id;
-      var updatedZones = Object.assign({}, shop.communityZones || {}, { [communityName]: zoneCode });
-      btn.disabled = true; var origText = btn.textContent; btn.textContent = 'Saving...';
-      try {
-        var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ communityZones: updatedZones })
-        });
-        if (!res.ok) { const b = await res.json().catch(()=>({})); throw new Error(b.error || 'Could not save.'); }
-        shop.communityZones = updatedZones;
-        // Re-render the map/legend if this shop is the one currently selected.
-        if (getSelectedShop() && getSelectedShop().id === shopId) { styleCommunities(); renderLegend(); }
-        btn.textContent = 'Saved!';
-        setTimeout(()=>{btn.textContent = origText; btn.disabled = false;}, 1500);
-      } catch(e) {
-        alert('Could not save: ' + e.message);
-        btn.textContent = origText; btn.disabled = false;
+    // Handoff case: another driver may already have scanned this same
+    // delivery (order_id + shop_code both match) and handed the physical
+    // tag off for better routing. Rather than creating a disconnected
+    // duplicate - which would leave the original stop looking falsely
+    // "abandoned" forever even though the delivery genuinely got done -
+    // treat this as the same stop continuing under a new driver.
+    // "1" is the placeholder for a tag with no order number (legacy process + scan default), so many
+    // different deliveries from the same shop legitimately carry it. It must NOT be treated as the
+    // same delivery or one stop would overwrite another.
+    if (body.order_id && String(body.order_id).trim() !== '1' && body.shop_code) {
+      const { blobs } = await store.list();
+      const recentCut = Date.now() - 30 * 86400000;
+      const recentKeys = blobs.map(b => b.key).filter(k => { const m = /^stop_(\d+)_/.exec(k); return !m || Number(m[1]) >= recentCut; });
+      const existing = (await Promise.all(recentKeys.map(k => store.get(k, { type: 'json' })))).filter(Boolean);
+      const match = existing.find(s =>
+        s.status === 'pending' &&
+        s.order_id === body.order_id &&
+        s.shop_code === body.shop_code
+      );
+      if (match) {
+        const updated = { ...match, driver: body.driver || match.driver, address: body.address || match.address, name: body.name || match.name, phone: cleanPhone(body.phone) || match.phone || null, delivery_type: body.delivery_type || match.delivery_type };
+        await store.setJSON(match.id, updated);
+        await maybeApplyDailyPremium(body.driver, body.local_date);
+        return json(updated);
       }
-    });
+    }
+
+    const id = `stop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const stop = {
+      id,
+      created_at: new Date().toISOString(),
+      driver: body.driver || null,
+      shop_code: body.shop_code || null,
+      address: body.address || null,
+      name: body.name || null,
+      order_id: body.order_id || null,
+      phone: cleanPhone(body.phone) || null,
+      delivery_type: body.delivery_type || 'store',
+      skipped: false,
+      status: 'pending', // 'pending' | 'fulfilled' | 'abandoned'
+      fulfilled_at: null,
+    };
+    await store.setJSON(id, stop);
+    await maybeApplyDailyPremium(body.driver, body.local_date);
+    return json(stop, 201);
   }
-}
 
-/* pricing sheet */
-function showCommunityDistances(){
-  const shop=getSelectedShop();if(!shop)return;
-  const modal=document.getElementById('communityDistancesModal');
-  const content=document.getElementById('communityDistancesContent');
+  return json({ error: 'Method not allowed' }, 405);
+};
 
-  const rows=state.communities
-    .filter(c=>c.centroid)
-    .map(c=>{
-      const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);
-      const currentZone=shop.communityZones[c.name]||'C4';
-      return {name:c.name,km,currentZone};
-    })
-    .sort((a,b)=>a.km-b.km);
-
-  const zoneRowHtml=r=>{
-    const opts=COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===r.currentZone?'selected':''}>${z}</option>`).join('');
-    return `<tr>
-      <td>${escapeHtml(r.name)}</td>
-      <td style="text-align:right;">${r.km.toFixed(1)} km</td>
-      <td><select data-community="${escapeHtml(r.name)}" onchange="quickSetCommunityZone(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;">${opts}</select></td>
-    </tr>`;
-  };
-
-  content.innerHTML=`
-    <h2>Community distances &mdash; ${escapeHtml(shop.name)}</h2>
-    <p class="modal-sub">Straight-line distance from the shop, nearest first. Change a zone directly here &mdash; saves immediately, same as clicking the community on the map.</p>
-    <div style="max-height:60vh;overflow-y:auto;">
-      <table><thead><tr><th>Community</th><th style="text-align:right;">Distance</th><th>Zone</th></tr></thead>
-      <tbody>${rows.map(zoneRowHtml).join('')}</tbody></table>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('communityDistancesModal').hidden=true">Close</button>
-    </div>`;
-  modal.hidden=false;
-}
-
-async function quickSetCommunityZone(selectEl){
-  const shop=getSelectedShop();if(!shop)return;
-  const community=selectEl.dataset.community;
-  const newZone=selectEl.value;
-  shop.communityZones[community]=newZone;
-  try{
-    await apiSaveShop(shop);
-    styleCommunities();renderLegend();if(state.map)drawTownPins();
-  }catch(e){alert('Could not save zone: '+e.message);}
-}
-
-function showPricingSheet(){
-  const shop=getSelectedShop();if(!shop)return;
-  const modal=document.getElementById('priceSheetModal');
-  const content=document.getElementById('priceSheetContent');
-  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>$${WS_INTOWN_BASE} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
-  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>Zone rate + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
-  const tRows=NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));const note=flat!==null?'flat':'zone';return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.color};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} (${note})</td><td>$${Number(price).toFixed(2)}</td><td>$${Number(price).toFixed(2)} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`;}).join('');
-
-  content.innerHTML=`
-    <h2>Delivery pricing &mdash; ${escapeHtml(shop.name)}</h2>
-    <p class="modal-sub">${escapeHtml(shop.address)} &bull; As of ${date}</p>
-    <h3>Calgary zones</h3>
-    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${cRows}</tbody></table>
-    <h3>Rural / outer zones</h3>
-    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${oRows}</tbody></table>
-    <h3>Named town rates</h3>
-    <table><thead><tr><th>Town</th><th>Zone / type</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${tRows}</tbody></table>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote - please call for a price.</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Weddings:</strong> in Calgary (WED) $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case. Out of town (WEDO) zone rate + $${WED_EXTRA_PER_CASE} per additional case. Setup, if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum.</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Special events:</strong> follow the wedding guidelines above (WED / WEDO, plus setup) and/or are priced as quoted.</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Funerals:</strong> in Calgary $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. FUNO (Edenbrook, Choice Memorial Garden, Mountain View) $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere and similar): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece.</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community. Extra piece rates apply to all zones. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
-    <div class="modal-actions">
-      <button class="btn btn-sm" onclick="window.print()">Print</button>
-      <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
-      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
-    </div>`;
-
-  const plainText=[
-    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,
-    'There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.',
-    'Extra piece rates apply to all zones.','',
-    'RETAIL PRICES',
-    'Calgary zones:',
-    ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
-    'Rural/outer zones:',
-    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
-    'Named towns:',
-    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));return`  ${t.name} (${t.zone}${flat!==null?' flat':' zone'}): $${Number(price).toFixed(2)}`;}),
-    '','WEDDINGS',`In Calgary (WED): $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case`,`Out of town (WEDO): zone rate + $${WED_EXTRA_PER_CASE} per additional case`,`Setup if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum`,'','SPECIAL EVENTS','Follow the wedding guidelines above (WED / WEDO, plus setup) and/or as quoted','','FUNERALS',`In Calgary: $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`FUNO (Edenbrook, Choice Memorial Garden, Mountain View): $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere, etc.): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece`,
-    '','WHOLESALE PRICES',
-    `In-town: $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece`,
-    `Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece`,
-    'Out-of-town zone rates:',
-    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0} base`),
-    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));return`  ${t.name}: $${Number(price).toFixed(2)} base`;})
-  ].join('\n');
-
-  document.getElementById('copySheetBtn').addEventListener('click',()=>{
-    const btn=document.getElementById('copySheetBtn');
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
-    else window.prompt('Copy:',plainText);
-  });
-  modal.hidden=false;
-}
-
-/* Community price list: every Calgary community A-Z with this shop's zone and retail price.
-   Same data the map is coloured from (shop.communityZones), so the two always agree. */
-function titleCaseCommunity(n){return String(n).toLowerCase().replace(/(^|[\s\-\/'(])([a-z])/g,(m,a,b)=>a+b.toUpperCase()).replace(/\bMc([a-z])/g,(m,c)=>'Mc'+c.toUpperCase());}
-function showCommunityPriceList(){
-  const shop=getSelectedShop();if(!shop)return;
-  seedCommunityZones(shop);
-  const modal=document.getElementById('priceSheetModal');
-  const content=document.getElementById('priceSheetContent');
-  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
-  const rows=state.communities
-    .filter(c=>c&&c.name)
-    .map(c=>{const zone=shop.communityZones[c.name]||'C4';return{name:titleCaseCommunity(c.name),zone,price:Number(shop.zonePrices[zone]||0)};})
-    .filter((r,i,a)=>a.findIndex(x=>x.name===r.name)===i)
-    .sort((a,b)=>a.name.localeCompare(b.name));
-  const note1=`Prices as of ${date}.`;
-  const note2='There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.';
-  const note3='Extra piece rates apply to all zones.';
-  const rowHtml=r=>`<div class="cpl-row" data-name="${escapeHtml(r.name.toLowerCase())}"><span class="cpl-name">${escapeHtml(r.name)}</span><span class="cpl-zone"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${getZoneColor(r.zone)};vertical-align:middle;margin-right:4px;"></span>${r.zone}</span><span class="cpl-price">$${r.price.toFixed(2)}</span></div>`;
-  const zoneSummary=CALGARY_ZONES.map(z=>`${z} $${Number(shop.zonePrices[z]||0).toFixed(2)}`).join(' &bull; ');
-
-  content.innerHTML=`
-    <style>
-      .cpl-list{column-count:2;column-gap:28px;font-size:12px;margin-top:8px;}
-      .cpl-row{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border);break-inside:avoid;}
-      .cpl-name{flex:1;}
-      .cpl-zone{width:52px;color:var(--ink-soft);}
-      .cpl-price{width:60px;text-align:right;font-variant-numeric:tabular-nums;}
-      .cpl-head{font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);}
-      @media(max-width:600px){.cpl-list{column-count:1;}}
-      @media print{.cpl-search{display:none;}.cpl-list{column-count:3;font-size:9.5px;}.cpl-row{padding:1px 0;}}
-    </style>
-    <h2>Community price list &mdash; ${escapeHtml(shop.name)}</h2>
-    <p class="modal-sub">${escapeHtml(shop.address||'')} &bull; As of ${date}</p>
-    <p style="font-size:12px;margin:6px 0;">Calgary retail delivery by community. Zone prices: ${zoneSummary}</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin:6px 0;"><strong>${note1}</strong> ${note2} ${note3} Always confirm the final price for each delivery on your shop quote link.</p>
-    <input class="cpl-search" id="cplSearch" type="search" placeholder="Find a community&hellip;" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-top:6px;">
-    <div class="cpl-list" id="cplList"><div class="cpl-row cpl-head"><span class="cpl-name">Community</span><span class="cpl-zone">Zone</span><span class="cpl-price">Retail</span></div>${rows.map(rowHtml).join('')}</div>
-    <p style="font-size:11px;color:var(--ink-soft);margin-top:8px;">${rows.length} communities. Addresses outside Calgary are priced by rural zone or named town; see the pricing sheet.</p>
-    <div class="modal-actions">
-      <button class="btn btn-sm" onclick="window.print()">Print</button>
-      <button class="btn btn-sm btn-ghost" id="copyCplBtn">Copy as text</button>
-      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
-    </div>`;
-
-  document.getElementById('cplSearch').addEventListener('input',function(){
-    const q=this.value.trim().toLowerCase();
-    document.querySelectorAll('#cplList .cpl-row[data-name]').forEach(el=>{el.hidden=!!q&&!el.dataset.name.includes(q);});
-  });
-  const plainText=[
-    `COMMUNITY PRICE LIST - ${shop.name}`,shop.address||'',`As of ${date}`,'',
-    note2,note3,'Always confirm the final price for each delivery on your shop quote link.','',
-    ...rows.map(r=>`${r.name}: ${r.zone} $${r.price.toFixed(2)}`)
-  ].join('\n');
-  document.getElementById('copyCplBtn').addEventListener('click',()=>{
-    const btn=document.getElementById('copyCplBtn');
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
-    else window.prompt('Copy:',plainText);
-  });
-  modal.hidden=false;
-}
-
-document.getElementById('priceSheetModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
-document.getElementById('communityDistancesModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
-
-/* boot */
-async function boot(){
-  const errEl=document.getElementById('keyError');
-  const loadingMsg=document.getElementById('loadingMsg');
-  try{
-    loadingMsg.textContent='Fetching configuration...';
-    const key=await fetchMapsKey();
-    loadingMsg.textContent='Loading map...';
-    await loadGoogleMaps(key);
-    loadingMsg.textContent='Loading zone colors...';
-    try{const rRes=await fetch('/api/rates');if(rRes.ok)state.rates=await rRes.json();}catch(e){/* fall back to hardcoded ZONE_COLORS if this fails */}
-    loadingMsg.textContent='Loading Calgary communities...';
-    state.communities=await loadCommunities();
-    initMap();
-    document.getElementById('keyGate').hidden=true;
-    document.getElementById('mainApp').hidden=false;
-    setupAutocomplete(document.getElementById('destinationInput'));
-    if(ROUTE.mode==='lookup'){
-      const shop=await apiGetShop(ROUTE.shopId);
-      if(!shop){document.getElementById('mainApp').hidden=true;document.getElementById('lookupNotFound').hidden=false;return;}
-      enterLookupView(shop);
-    }else{
-      state.shops=await apiListShops();
-      state.shops.forEach(seedCommunityZones);
-       renderShopList();
-document.getElementById('shopSearch').addEventListener('input', renderShopList);
-if(state.shops.length)selectShop(state.shops[0].id);
-          }
-  }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
-}
-
-document.getElementById('quoteBtn').addEventListener('click',generateQuote);
-document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
-document.getElementById('copyFromShopBtn').addEventListener('click',copyZoneSetupFromShop);
-document.getElementById('communityDistancesBtn').addEventListener('click',showCommunityDistances);
-document.getElementById('communityPriceListBtn').addEventListener('click',showCommunityPriceList);
-
-boot();
-</script>
-</body>
-</html>
+export const config = { path: '/api/stops' };
