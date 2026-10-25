@@ -130,6 +130,7 @@
         <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="flex:1;">View / print pricing sheet</button>
         <button class="btn btn-sm btn-ghost" id="communityDistancesBtn" style="flex:1;">Community distances</button>
       </div>
+      <button class="btn btn-sm btn-ghost" id="communityPriceListBtn" style="width:100%;margin-top:6px;">View / print community price list</button>
       <p class="hint">Click any Calgary community on the map to override its zone.</p>
     </section>
     <section class="panel">
@@ -595,8 +596,9 @@ function enterLookupView(shop){
   document.getElementById('topbarSubtitle').textContent='Quote lookup';
   const banner=document.getElementById('lookupBanner');
   banner.hidden=false;
-  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p><button class="btn btn-sm btn-ghost" id="lookupSheetBtn" style="margin-top:8px;">Print price sheet</button>`;
+  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p><button class="btn btn-sm btn-ghost" id="lookupSheetBtn" style="margin-top:8px;">Print price sheet</button> <button class="btn btn-sm btn-ghost" id="lookupCplBtn" style="margin-top:8px;">Community price list</button>`;
   document.getElementById('lookupSheetBtn').addEventListener('click',showPricingSheet);
+  document.getElementById('lookupCplBtn').addEventListener('click',showCommunityPriceList);
   styleCommunities();renderLegend();if(state.map)drawTownPins();
 }
 
@@ -853,7 +855,7 @@ function showPricingSheet(){
     <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Weddings:</strong> in Calgary (WED) $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case. Out of town (WEDO) zone rate + $${WED_EXTRA_PER_CASE} per additional case. Setup, if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum.</p>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Special events:</strong> follow the wedding guidelines above (WED / WEDO, plus setup) and/or are priced as quoted.</p>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Funerals:</strong> in Calgary $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. FUNO (Edenbrook, Choice Memorial Garden, Mountain View) $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere and similar): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece.</p>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community. Extra piece rates apply to all zones. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
     <div class="modal-actions">
       <button class="btn btn-sm" onclick="window.print()">Print</button>
       <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
@@ -861,7 +863,9 @@ function showPricingSheet(){
     </div>`;
 
   const plainText=[
-    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,'',
+    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,
+    'There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.',
+    'Extra piece rates apply to all zones.','',
     'RETAIL PRICES',
     'Calgary zones:',
     ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
@@ -880,6 +884,67 @@ function showPricingSheet(){
 
   document.getElementById('copySheetBtn').addEventListener('click',()=>{
     const btn=document.getElementById('copySheetBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
+    else window.prompt('Copy:',plainText);
+  });
+  modal.hidden=false;
+}
+
+/* Community price list: every Calgary community A-Z with this shop's zone and retail price.
+   Same data the map is coloured from (shop.communityZones), so the two always agree. */
+function titleCaseCommunity(n){return String(n).toLowerCase().replace(/(^|[\s\-\/'(])([a-z])/g,(m,a,b)=>a+b.toUpperCase()).replace(/\bMc([a-z])/g,(m,c)=>'Mc'+c.toUpperCase());}
+function showCommunityPriceList(){
+  const shop=getSelectedShop();if(!shop)return;
+  seedCommunityZones(shop);
+  const modal=document.getElementById('priceSheetModal');
+  const content=document.getElementById('priceSheetContent');
+  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  const rows=state.communities
+    .filter(c=>c&&c.name)
+    .map(c=>{const zone=shop.communityZones[c.name]||'C4';return{name:titleCaseCommunity(c.name),zone,price:Number(shop.zonePrices[zone]||0)};})
+    .filter((r,i,a)=>a.findIndex(x=>x.name===r.name)===i)
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const note1=`Prices as of ${date}.`;
+  const note2='There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.';
+  const note3='Extra piece rates apply to all zones.';
+  const rowHtml=r=>`<div class="cpl-row" data-name="${escapeHtml(r.name.toLowerCase())}"><span class="cpl-name">${escapeHtml(r.name)}</span><span class="cpl-zone"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${getZoneColor(r.zone)};vertical-align:middle;margin-right:4px;"></span>${r.zone}</span><span class="cpl-price">$${r.price.toFixed(2)}</span></div>`;
+  const zoneSummary=CALGARY_ZONES.map(z=>`${z} $${Number(shop.zonePrices[z]||0).toFixed(2)}`).join(' &bull; ');
+
+  content.innerHTML=`
+    <style>
+      .cpl-list{column-count:2;column-gap:28px;font-size:12px;margin-top:8px;}
+      .cpl-row{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border);break-inside:avoid;}
+      .cpl-name{flex:1;}
+      .cpl-zone{width:52px;color:var(--ink-soft);}
+      .cpl-price{width:60px;text-align:right;font-variant-numeric:tabular-nums;}
+      .cpl-head{font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);}
+      @media(max-width:600px){.cpl-list{column-count:1;}}
+      @media print{.cpl-search{display:none;}.cpl-list{column-count:3;font-size:9.5px;}.cpl-row{padding:1px 0;}}
+    </style>
+    <h2>Community price list &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">${escapeHtml(shop.address||'')} &bull; As of ${date}</p>
+    <p style="font-size:12px;margin:6px 0;">Calgary retail delivery by community. Zone prices: ${zoneSummary}</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin:6px 0;"><strong>${note1}</strong> ${note2} ${note3} Always confirm the final price for each delivery on your shop quote link.</p>
+    <input class="cpl-search" id="cplSearch" type="search" placeholder="Find a community&hellip;" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-top:6px;">
+    <div class="cpl-list" id="cplList"><div class="cpl-row cpl-head"><span class="cpl-name">Community</span><span class="cpl-zone">Zone</span><span class="cpl-price">Retail</span></div>${rows.map(rowHtml).join('')}</div>
+    <p style="font-size:11px;color:var(--ink-soft);margin-top:8px;">${rows.length} communities. Addresses outside Calgary are priced by rural zone or named town; see the pricing sheet.</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="window.print()">Print</button>
+      <button class="btn btn-sm btn-ghost" id="copyCplBtn">Copy as text</button>
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
+    </div>`;
+
+  document.getElementById('cplSearch').addEventListener('input',function(){
+    const q=this.value.trim().toLowerCase();
+    document.querySelectorAll('#cplList .cpl-row[data-name]').forEach(el=>{el.hidden=!!q&&!el.dataset.name.includes(q);});
+  });
+  const plainText=[
+    `COMMUNITY PRICE LIST - ${shop.name}`,shop.address||'',`As of ${date}`,'',
+    note2,note3,'Always confirm the final price for each delivery on your shop quote link.','',
+    ...rows.map(r=>`${r.name}: ${r.zone} $${r.price.toFixed(2)}`)
+  ].join('\n');
+  document.getElementById('copyCplBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copyCplBtn');
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
     else window.prompt('Copy:',plainText);
   });
@@ -924,6 +989,7 @@ document.getElementById('quoteBtn').addEventListener('click',generateQuote);
 document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
 document.getElementById('copyFromShopBtn').addEventListener('click',copyZoneSetupFromShop);
 document.getElementById('communityDistancesBtn').addEventListener('click',showCommunityDistances);
+document.getElementById('communityPriceListBtn').addEventListener('click',showCommunityPriceList);
 
 boot();
 </script>
