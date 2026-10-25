@@ -1436,6 +1436,7 @@ async function submitDelivery() {
     }
     if (!res.ok) throw new Error('Status ' + res.status);
     clearDraft();
+    reportDelivered(payload.formatted_address || payload.address || '');
     await fulfillStop(resData.order_id);
     showSuccessPhotoStatus(photoBase64, resData);
     document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
@@ -1447,6 +1448,28 @@ async function submitDelivery() {
   } finally {
     btn.disabled = false; btn.textContent = 'Submit Delivery';
   }
+}
+
+/* Dispatch status: after a delivery is submitted, tell the office where it was (and where the phone is, if it will say).
+   Best-effort and silent - it must never slow down or break a submit. */
+function reportDelivered(addr) {
+  try {
+    if (!driverCode) return;
+    var send = function(lat, lng) {
+      fetch('/api/driver-status', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ driver: driverCode, kind: 'delivered', address: addr || '', lat: lat, lng: lng })
+      }).catch(function() {});
+    };
+    if (!navigator.geolocation) { send(null, null); return; }
+    var done = false;
+    var t = setTimeout(function() { if (!done) { done = true; send(null, null); } }, 3500);
+    navigator.geolocation.getCurrentPosition(
+      function(p) { if (done) return; done = true; clearTimeout(t); send(p.coords.latitude, p.coords.longitude); },
+      function() { if (done) return; done = true; clearTimeout(t); send(null, null); },
+      { timeout: 3000, maximumAge: 120000 }
+    );
+  } catch (e) { /* ignore */ }
 }
 
 async function init() {
