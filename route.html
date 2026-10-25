@@ -60,6 +60,14 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
   <div class="empty" id="emptyMsg" hidden>No pending deliveries right now. Scan a tag on the delivery form to add one.</div>
   <div id="content" hidden>
   <div id="routeNote" style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;"></div>
+    <div id="headingBox" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:0 0 10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;">Let dispatch know where you are heading next</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="headingNextBtn" style="flex:2;font-size:13px;padding:9px 8px;" disabled>Heading to next stop</button>
+        <button class="btn btn-ghost" id="headingOtherBtn" style="flex:1;font-size:13px;padding:9px 8px;">Other address</button>
+      </div>
+      <div id="headingStatus" style="font-size:12px;color:var(--ink-soft);margin-top:6px;"></div>
+    </div>
     <div class="refresh-row">
       <span id="countLabel" style="font-size:13px;color:var(--ink-soft);"></span>
       <button id="refreshBtn">Refresh</button>
@@ -657,6 +665,7 @@ var activeHtml = active.map(function(s, i) {
   }).join('');
 
   document.getElementById('stopsList').innerHTML = fullRouteBtn + activeHtml + skippedHtml;
+  updateHeadingBtn();
 }
 
 function toggleSkip(stopId, skip) {
@@ -728,6 +737,54 @@ function getCurrentLocation() {
   });
 }
 
+/* Dispatch status: tell the office where this driver is heading, and where the phone is. Both are best-effort and
+   silent - the route works the same if they fail. */
+var lastSeenSentAt = 0;
+function postDriverStatus(payload) {
+  payload.driver = driverCode;
+  return fetch('/api/driver-status', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+  }).then(function(r) { return r.ok; }).catch(function() { return false; });
+}
+function postSeen(loc) {
+  if (!loc || Date.now() - lastSeenSentAt < 120000) return;
+  lastSeenSentAt = Date.now();
+  postDriverStatus({ kind: 'seen', lat: loc.lat, lng: loc.lng });
+}
+function nextStopAddress() {
+  return (lastActiveStops && lastActiveStops[0] && lastActiveStops[0].address) || '';
+}
+function updateHeadingBtn() {
+  var btn = document.getElementById('headingNextBtn');
+  if (!btn) return;
+  var a = nextStopAddress();
+  btn.disabled = !a;
+  btn.textContent = a ? 'Heading to ' + (a.length > 34 ? a.slice(0, 32) + '\u2026' : a) : 'Heading to next stop';
+}
+function sendHeading(addr) {
+  var st = document.getElementById('headingStatus');
+  addr = String(addr || '').trim();
+  if (!addr) return;
+  st.style.color = 'var(--ink-soft)';
+  st.textContent = 'Sending\u2026';
+  postDriverStatus({ kind: 'heading', address: addr }).then(function(ok) {
+    if (ok) {
+      var t = new Date().toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+      st.style.color = 'var(--green)';
+      st.textContent = 'Dispatch knows you are heading to ' + addr + ' (sent ' + t + ').';
+    } else {
+      st.style.color = 'var(--warm)';
+      st.textContent = 'Could not send. Check your signal and tap again.';
+    }
+  });
+}
+document.getElementById('headingNextBtn').addEventListener('click', function() { sendHeading(nextStopAddress()); });
+document.getElementById('headingOtherBtn').addEventListener('click', function() {
+  var a = window.prompt('Address you are heading to:', '');
+  if (a) sendHeading(a);
+});
+
+
 function removeStop(stopId, btn) {
   if (!confirm('Remove this delivery from your route? This doesn\'t submit it - use this for wrong scans or cancelled deliveries.')) return;
   btn.disabled = true;
@@ -793,6 +850,7 @@ function loadRoute() {
     // slow, stuck, or denied, the driver already has a fully usable route
     // and never notices anything was waiting on it.
     getCurrentLocation().then(function(currentLocation) {
+      postSeen(currentLocation);
       return optimizeOrder(active, mapsKey, currentLocation);
     }).then(function(ordered) {
       // This order was worked out from the list as it stood when the page opened. The driver may
