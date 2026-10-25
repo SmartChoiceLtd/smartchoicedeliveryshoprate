@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Choice Delivery - Dispatch Board</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FBF0D6;--grey-soft:#EFEBE3;--radius:12px;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;flex:1;}
+.topbar a{color:var(--accent);text-decoration:none;font-size:13px;}
+.main{padding:16px;max-width:900px;margin:0 auto;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
+.card h2{font-family:Georgia,serif;font-size:16px;margin:0 0 4px;font-weight:600;}
+.hint{font-size:12px;color:var(--ink-soft);margin:0 0 10px;}
+.row{display:flex;gap:8px;flex-wrap:wrap;}
+input{padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fff;flex:1;min-width:220px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer;font-weight:600;}
+.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}
+.btn:disabled{opacity:.6;cursor:default;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);padding:6px 8px;border-bottom:1px solid var(--border);}
+td{padding:9px 8px;border-top:1px solid var(--border);vertical-align:top;}
+td.n,th.n{text-align:right;white-space:nowrap;}
+.min{font-size:18px;font-weight:700;color:var(--accent);}
+.age{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;}
+.a-new{background:var(--green-soft);color:var(--green);}.a-mid{background:var(--amber-soft);color:var(--amber);}.a-old{background:var(--grey-soft);color:var(--ink-soft);}
+.name{font-weight:700;}.sub{font-size:12px;color:var(--ink-soft);}
+.err{color:var(--warm);font-size:13px;margin-top:8px;}
+.links a{color:var(--accent);text-decoration:none;font-size:12px;margin-right:10px;font-weight:600;}
+details summary{cursor:pointer;font-size:12px;color:var(--accent);margin-top:4px;}
+.hist{font-size:12px;color:var(--ink-soft);margin:4px 0 0 14px;padding:0;}
+.top1 td{background:#F2FAF2;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Dispatch Board</h1><span id="updated" class="sub"></span><button class="btn ghost" id="refreshBtn" style="padding:6px 12px;font-size:13px;">Refresh</button><a href="/hub.html">&larr; Back to hub</a></div>
+<div class="main">
+
+<div class="card">
+  <h2>Offer a job</h2>
+  <p class="hint">Pick a shop or type the pickup address. Add how many deliveries and the area if you like, and the text to the driver is written for you. If a driver would collect from 2 or 3 shops, add each one. Drivers are ranked by driving time to the <b>first</b> pickup, from where they will be free: the address they said they are heading to, otherwise their last delivery. Drivers with an old update are listed after current ones.</p>
+  <div id="jobRows"></div>
+  <div class="row" style="margin-top:8px;">
+    <button class="btn ghost" id="addShopBtn" type="button" style="padding:6px 12px;font-size:13px;">+ Add another shop</button>
+    <button class="btn" id="rankBtn">Rank drivers</button>
+  </div>
+  <datalist id="shopList"></datalist>
+  <div class="sub" id="pickupNote" style="margin-top:6px;"></div>
+  <div class="err" id="rankErr" hidden></div>
+  <div id="rankOut" style="margin-top:10px;" hidden></div>
+</div>
+
+<div class="card">
+  <h2>Where drivers are</h2>
+  <p class="hint">Updates arrive automatically when a driver submits a delivery or taps Heading to on their route page. Refreshes every 30 seconds.</p>
+  <div id="board">Loading&hellip;</div>
+</div>
+
+</div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function ageText(min){
+  if(min==null) return 'no update';
+  if(min<1) return 'just now';
+  if(min<60) return min+' min ago';
+  var h=Math.floor(min/60), m=min%60;
+  if(h<24) return h+' h'+(m?' '+m+' min':'')+' ago';
+  return Math.floor(h/24)+' d ago';
+}
+function ageClass(min){ return min==null||min>180?'a-old':(min>60?'a-mid':'a-new'); }
+function ageBadge(min){ return '<span class="age '+ageClass(min)+'">'+esc(ageText(min))+'</span>'; }
+function minsSince(iso,now){ var t=Date.parse(iso); return isFinite(t)?Math.max(0,Math.round((now-t)/60000)):null; }
+function phoneLinks(p,body,extras){
+  var d=String(p||'').replace(/[^0-9+]/g,'');
+  if(d.replace(/\D/g,'').length<7) return '';
+  var sms=function(t){ return 'sms:'+d+(t?'?&body='+encodeURIComponent(t):''); };
+  var h='<a href="tel:'+d+'">Call</a><a href="'+sms(body)+'">'+(body?'Text job':'Text')+'</a>';
+  (extras||[]).forEach(function(x){ h+='<a href="'+sms(x.body)+'">'+esc(x.label)+'</a>'; });
+  return '<span class="links">'+h+'</span>';
+}
+
+/* Shops for the pickup box: the code is the first word of the shop name. */
+var shopsByLabel={};
+function shopCode(sh){ return String(sh.name||'').trim().split(/\s+/)[0].toUpperCase(); }
+function loadShops(){
+  fetch('/api/shops').then(function(r){return r.json();}).then(function(list){
+    var dl=document.getElementById('shopList');
+    dl.innerHTML=list.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(sh){
+      shopsByLabel[sh.name.toLowerCase()]=sh; shopsByLabel[shopCode(sh).toLowerCase()]=sh;
+      return '<option value="'+esc(sh.name)+'"></option>';
+    }).join('');
+  }).catch(function(){});
+}
+function resolvePickup(txt){
+  txt=String(txt||'').trim();
+  var sh=shopsByLabel[txt.toLowerCase()];
+  return sh?{code:shopCode(sh),address:sh.address||'',shop:sh}:{code:'',address:txt,shop:null};
+}
+/* The text to a driver: who has how many, where, and how far from them. 1 to 3 pickups. */
+var CHECKIN_TEXT='Where are you headed after this? You can also tap Heading to on your route page.';
+function jobWhat(j){
+  var n=j.count, area=j.area?j.area+' ':'';
+  return n?(n+' '+area+(n===1?'delivery':'deliveries')):('a '+area+'delivery');
+}
+function jobText(jobs,minutes){
+  var many=jobs.length>1, total=jobs.reduce(function(t,j){return t+(j.count||1);},0);
+  var head, j0=jobs[0];
+  if(!many){
+    head=j0.code?(j0.code+' has '+jobWhat(j0)+' for you.'):('There is '+jobWhat(j0)+' for you.');
+    return head+(j0.address?' Pickup: '+j0.address+'.':'')+(minutes?' About '+minutes+' min from you.':'')+' Can you take '+(j0.count&&j0.count>1?'them':'it')+'?';
+  }
+  head=jobs.map(function(j){ return (j.code||('Pickup at '+j.address))+' has '+jobWhat(j); }).join(' and ')+' for you.';
+  var places=jobs.map(function(j){ return (j.code?j.code+' ':'')+j.address; }).join('; ');
+  return head+' Pickups: '+places+'.'+(minutes?' About '+minutes+' min from you to the first pickup.':'')+' Can you take them?';
+}
+
+/* The pickup rows (1 to 3). */
+function addJobRow(){
+  var host=document.getElementById('jobRows');
+  if(host.children.length>=3) return;
+  var div=document.createElement('div');
+  div.className='row jr'; div.style.marginTop=host.children.length?'6px':'0';
+  div.innerHTML='<input class="jr-shop" list="shopList" placeholder="Shop (e.g. KF) or pickup address" autocomplete="off">'
+    +'<input class="jr-count" type="number" min="1" max="99" placeholder="How many" style="flex:0 0 100px;min-width:90px;">'
+    +'<input class="jr-area" placeholder="Area, e.g. NW" maxlength="20" style="flex:0 0 130px;min-width:110px;">';
+  host.appendChild(div);
+  document.getElementById('addShopBtn').hidden=host.children.length>=3;
+  div.querySelector('.jr-shop').addEventListener('keydown',function(e){ if(e.key==='Enter') rank(); });
+}
+function readJobs(){
+  return Array.prototype.map.call(document.querySelectorAll('#jobRows .jr'),function(r){
+    var txt=r.querySelector('.jr-shop').value.trim();
+    if(!txt) return null;
+    var pk=resolvePickup(txt), cnt=parseInt(r.querySelector('.jr-count').value,10);
+    return {code:pk.code,address:pk.address,shop:pk.shop,count:(cnt>0?cnt:0),area:r.querySelector('.jr-area').value.trim().toUpperCase()};
+  }).filter(Boolean);
+}
+
+function describe(st,now){
+  // The most useful one-line summary of where a driver is, with how fresh it is.
+  if(!st) return {line:'No update yet', age:null};
+  var h=st.heading, d=st.delivered, s=st.seen;
+  var hAt=h?Date.parse(h.at):0, dAt=d?Date.parse(d.at):0;
+  if(h&&h.address&&hAt>=dAt) return {line:'Heading to <b>'+esc(h.address)+'</b>', age:minsSince(h.at,now)};
+  if(d) return {line:'Last delivery: <b>'+esc(d.address||'(position only)')+'</b>', age:minsSince(d.at,now)};
+  if(s) return {line:'Phone position only', age:minsSince(s.at,now)};
+  return {line:'No update yet', age:null};
+}
+function histHtml(st,now){
+  var h=(st&&st.history)||[];
+  if(!h.length) return '';
+  var L={delivered:'Delivered',heading:'Heading to',clear_heading:'Cancelled heading'};
+  return '<details><summary>Recent</summary><ul class="hist">'+h.slice(0,6).map(function(e){
+    return '<li>'+esc(L[e.kind]||e.kind)+(e.address?': '+esc(e.address):'')+' &middot; '+esc(ageText(minsSince(e.at,now)))+'</li>';
+  }).join('')+'</ul></details>';
+}
+
+async function loadBoard(){
+  try{
+    var r=await fetch('/api/driver-status');
+    if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+    var d=await r.json();
+    var now=Date.parse(d.now)||Date.now();
+    var rows=d.drivers.map(function(x){ return {x:x, info:describe(x.status,now)}; });
+    var recent=rows.filter(function(r){ return r.info.age!=null && r.info.age<24*60; }).sort(function(a,b){return a.info.age-b.info.age;});
+    var quiet=rows.filter(function(r){ return !(r.info.age!=null && r.info.age<24*60); });
+    var html='';
+    if(recent.length){
+      html+='<table><thead><tr><th>Driver</th><th>Right now</th><th class="n">Updated</th></tr></thead><tbody>'+recent.map(function(r){
+        return '<tr><td><div class="name">'+esc(r.x.name)+'</div><div class="sub">'+esc(r.x.code)+'</div>'+phoneLinks(r.x.phone,null,[{label:'Ask where headed',body:CHECKIN_TEXT}])+'</td><td>'+r.info.line+histHtml(r.x.status,now)+'</td><td class="n">'+ageBadge(r.info.age)+'</td></tr>';
+      }).join('')+'</tbody></table>';
+    } else html+='<div class="sub">No driver has sent an update in the last 24 hours.</div>';
+    if(quiet.length){
+      html+='<details style="margin-top:10px;"><summary>No update in 24 hours ('+quiet.length+')</summary><div class="sub" style="margin-top:6px;">'+quiet.map(function(r){return esc(r.x.name);}).join(', ')+'</div></details>';
+    }
+    document.getElementById('board').innerHTML=html;
+    document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});
+  }catch(e){
+    document.getElementById('board').innerHTML='<div class="err">Could not load: '+esc(e.message)+'</div>';
+  }
+}
+
+async function rank(){
+  var jobs=readJobs(); var job=jobs[0]||{address:''}; var addr=job.address;
+  var err=document.getElementById('rankErr'), out=document.getElementById('rankOut'), btn=document.getElementById('rankBtn');
+  err.hidden=true;
+  if(!jobs.length||addr.length<5){ err.textContent=job.shop?'That shop has no address saved. Type the pickup address instead.':'Enter a shop or the pickup address.'; err.hidden=false; return; }
+  var bad=jobs.filter(function(j){return String(j.address||'').length<5;})[0];
+  if(bad){ err.textContent='A shop on the list has no address saved. Type the pickup address instead.'; err.hidden=false; return; }
+  btn.disabled=true; btn.textContent='Ranking…';
+  try{
+    var r=await fetch('/api/dispatch-rank',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({address:addr})});
+    if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not rank drivers.');
+    var FROM={heading:'heading to',delivered:'last delivery',seen:'phone position'};
+    var first=true;
+    out.innerHTML='<table><thead><tr><th>Driver</th><th class="n">Drive</th><th>Based on</th></tr></thead><tbody>'+d.drivers.map(function(x){
+      var cls=''; if(first&&x.minutes!=null&&!x.stale){cls=' class="top1"'; first=false;}
+      var basis=x.origin?(esc(FROM[x.origin.from]||'')+': '+esc(x.origin.label)+' '+ageBadge(x.age_min)):'<span class="sub">no update</span>';
+      var mins=x.minutes==null?'<span class="sub">&ndash;</span>':'<span class="min">'+x.minutes+'</span> <span class="sub">min</span>';
+      return '<tr'+cls+'><td><div class="name">'+esc(x.name)+'</div>'+phoneLinks(x.phone,jobText(jobs,x.minutes))+'</td><td class="n">'+mins+'</td><td>'+basis+(x.stale&&x.origin?'<div class="sub">Older update: may have moved</div>':'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+    document.getElementById('pickupNote').textContent='Text preview: '+jobText(jobs,3).replace(/About 3 min from you( to the first pickup)?\./,'About [x] min from you$1.');
+    out.hidden=false;
+  }catch(e){ err.textContent=e.message; err.hidden=false; out.hidden=true; }
+  finally{ btn.disabled=false; btn.textContent='Rank drivers'; }
+}
+
+document.getElementById('rankBtn').addEventListener('click',rank);
+document.getElementById('addShopBtn').addEventListener('click',addJobRow);
+addJobRow();
+document.getElementById('refreshBtn').addEventListener('click',loadBoard);
+
+fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
+  if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+  loadShops(); loadBoard(); setInterval(function(){ if(!document.hidden) loadBoard(); },30000);
+}).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
+</script>
+</body>
+</html>
