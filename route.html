@@ -55,19 +55,19 @@ h1{font-family:Georgia,serif;font-weight:600;font-size:18px;margin:0;}
   <!-- The scan review card lives here, outside the stop list: the list is redrawn by the route
        loading and by the background location step, and anything inside it gets wiped. -->
   <div id="scanReviewHost"></div>
+  <div id="headingBox" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:0 0 10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;">Let dispatch know where you are heading next</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="headingNextBtn" style="flex:2;font-size:13px;padding:9px 8px;" disabled>No stops yet</button>
+        <button class="btn btn-ghost" id="headingOtherBtn" style="flex:1;font-size:13px;padding:9px 8px;">Other address</button>
+      </div>
+      <div id="headingStatus" style="font-size:12px;color:var(--ink-soft);margin-top:6px;"></div>
+    </div>
   <div class="loading" id="loadingMsg">Loading your route&hellip;</div>
   <div class="notfound" id="notFoundMsg" hidden>Driver link not found. Check your link or contact your dispatcher.</div>
   <div class="empty" id="emptyMsg" hidden>No pending deliveries right now. Scan a tag on the delivery form to add one.</div>
   <div id="content" hidden>
   <div id="routeNote" style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;"></div>
-    <div id="headingBox" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:0 0 10px;">
-      <div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;">Let dispatch know where you are heading next</div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn" id="headingNextBtn" style="flex:2;font-size:13px;padding:9px 8px;" disabled>Heading to next stop</button>
-        <button class="btn btn-ghost" id="headingOtherBtn" style="flex:1;font-size:13px;padding:9px 8px;">Other address</button>
-      </div>
-      <div id="headingStatus" style="font-size:12px;color:var(--ink-soft);margin-top:6px;"></div>
-    </div>
     <div class="refresh-row">
       <span id="countLabel" style="font-size:13px;color:var(--ink-soft);"></span>
       <button id="refreshBtn">Refresh</button>
@@ -759,7 +759,7 @@ function updateHeadingBtn() {
   if (!btn) return;
   var a = nextStopAddress();
   btn.disabled = !a;
-  btn.textContent = a ? 'Heading to ' + (a.length > 34 ? a.slice(0, 32) + '\u2026' : a) : 'Heading to next stop';
+  btn.textContent = a ? 'Heading to ' + (a.length > 34 ? a.slice(0, 32) + '\u2026' : a) : 'No stops yet';
 }
 function sendHeading(addr) {
   var st = document.getElementById('headingStatus');
@@ -871,6 +871,7 @@ function loadRoute() {
 if (!driverCode) {
   document.getElementById('loadingMsg').hidden = true;
   document.getElementById('notFoundMsg').hidden = false;
+  document.getElementById('headingBox').hidden = true;
 } else {
   document.getElementById('refreshBtn').addEventListener('click', loadRoute);
   loadRoute();
