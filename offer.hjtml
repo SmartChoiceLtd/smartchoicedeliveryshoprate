@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0C769E">
+<title>Smart Choice Delivery - Job offer</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:12px;}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
+.badge{background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}
+.wrap{max-width:540px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+.pick{border-top:1px solid var(--border);padding:12px 0;}.pick:first-of-type{border-top:0;padding-top:0;}
+.who{font-size:20px;font-weight:700;font-family:Georgia,serif;}
+.addr{font-size:15px;margin:4px 0 6px;}
+.nav{color:var(--accent);font-weight:700;font-size:14px;text-decoration:none;}
+.timer{font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:16px;font-size:18px;font-weight:800;cursor:pointer;}
+.accept{background:var(--green);color:#fff;margin-bottom:10px;}
+.decline{background:#fff;color:var(--ink-soft);border:1px solid var(--border);font-size:15px;font-weight:600;padding:12px;}
+.btn:disabled{opacity:.6;}
+.msg{border-radius:var(--radius);padding:18px;font-size:16px;line-height:1.45;}
+.win{background:var(--green-soft);color:var(--green);border:2px solid var(--green);}
+.lost{background:var(--warm-soft);color:var(--warm);}
+.info{background:#fff;border:1px solid var(--border);}
+.big{font-size:22px;font-weight:800;margin-bottom:6px;}
+.link{display:block;text-align:center;margin-top:12px;color:var(--accent);font-weight:700;text-decoration:none;}
+.err{color:var(--warm);font-size:14px;margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Job offer</h1><span class="badge" id="who" hidden></span></div>
+<div class="wrap">
+  <div id="loading" class="msg info">Loading&hellip;</div>
+  <div id="bad" class="msg lost" hidden>This offer link is not valid. Contact your dispatcher.</div>
+  <div id="job" hidden>
+    <div class="card" id="picks"></div>
+    <div id="open" hidden>
+      <div class="timer" id="timer"></div>
+      <button class="btn accept" id="acceptBtn">Accept this job</button>
+      <button class="btn decline" id="declineBtn">Not this time</button>
+      <div class="err" id="err" hidden></div>
+    </div>
+    <div id="result" class="msg" hidden></div>
+    <a class="link" id="routeLink" href="#" hidden>Open my route &rarr;</a>
+  </div>
+</div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+var qs=new URLSearchParams(location.search), OID=qs.get('id')||'', DRV=(qs.get('d')||'').toUpperCase();
+var offer=null, timerId=null, pollId=null, busy=false;
+
+function whatText(j){
+  var n=j.count, a=j.area?j.area+' ':'';
+  return n?(n+' '+a+(n===1?'delivery':'deliveries')):('a '+a+'delivery');
+}
+function renderPicks(jobs){
+  document.getElementById('picks').innerHTML=jobs.map(function(j){
+    var nav='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(j.address)+'&travelmode=driving';
+    return '<div class="pick"><div class="who">'+esc(j.code?j.code+' has ':'')+esc(whatText(j))+'</div>'
+      +'<div class="addr">Pickup: '+esc(j.address)+'</div><a class="nav" href="'+nav+'" target="_blank" rel="noopener">Navigate to pickup</a></div>';
+  }).join('');
+}
+function fmtTime(iso){ try{ return new Date(iso).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function tick(){
+  if(!offer) return;
+  var left=Math.max(0,Math.round((Date.parse(offer.expires_at)-Date.now())/1000));
+  var m=Math.floor(left/60), s=left%60;
+  document.getElementById('timer').textContent='Open for '+m+':'+String(s).padStart(2,'0')+'. First to accept gets it.';
+  if(left<=0 && offer.state==='open'){ offer.state='expired'; show(); }
+}
+function show(){
+  var st=offer.state, mine=offer.mine;
+  var open=document.getElementById('open'), res=document.getElementById('result'), rl=document.getElementById('routeLink');
+  open.hidden=true; res.hidden=true; rl.hidden=true;
+  if(st==='open' && mine!=='decline'){ open.hidden=false; tick(); return; }
+  res.hidden=false;
+  if(st==='taken' && offer.i_won){
+    res.className='msg win';
+    res.innerHTML='<div class="big">It is yours.</div>Collect it at the pickup'+(offer.jobs.length>1?'s':'')+' above and scan the tags on your route page.';
+    rl.href='/route/'+encodeURIComponent(DRV.toLowerCase()); rl.hidden=false;
+  } else if(st==='taken'){
+    res.className='msg lost';
+    res.innerHTML='<div class="big">Taken</div>'+esc(offer.winner_name||'Another driver')+' accepted this job ('+esc(fmtTime(offer.taken_at))+'). Nothing for you to do.';
+  } else if(st==='expired'){
+    res.className='msg info'; res.innerHTML='<div class="big">Closed</div>This offer has expired.';
+  } else if(mine==='decline'){
+    res.className='msg info'; res.innerHTML='<div class="big">Declined</div>Thanks for letting us know.';
+  }
+}
+async function load(first){
+  try{
+    var r=await fetch('/api/offers?id='+encodeURIComponent(OID)+'&d='+encodeURIComponent(DRV));
+    if(r.status===404){ document.getElementById('loading').hidden=true; document.getElementById('bad').hidden=false; return false; }
+    var d=await r.json();
+    if(busy) return true; // do not overwrite an answer that is being sent
+    offer=d;
+    document.getElementById('loading').hidden=true; document.getElementById('job').hidden=false;
+    var w=document.getElementById('who'); w.textContent=d.driver; w.hidden=false;
+    if(first) renderPicks(d.jobs);
+    show();
+    return true;
+  }catch(e){
+    if(first){ document.getElementById('loading').textContent='Could not load this offer. Check your signal and reload.'; }
+    return true;
+  }
+}
+async function respond(kind){
+  var err=document.getElementById('err'); err.hidden=true; busy=true;
+  var a=document.getElementById('acceptBtn'), dcl=document.getElementById('declineBtn');
+  a.disabled=true; dcl.disabled=true; if(kind==='accept') a.textContent='Checking…';
+  try{
+    var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'respond',id:OID,d:DRV,response:kind})});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not send your answer.');
+    offer=Object.assign({},offer,d);
+  }catch(e){
+    err.textContent=e.message+' Tap again.'; err.hidden=false;
+  }finally{
+    busy=false; a.disabled=false; dcl.disabled=false; a.textContent='Accept this job'; show();
+  }
+}
+document.getElementById('acceptBtn').addEventListener('click',function(){ respond('accept'); });
+document.getElementById('declineBtn').addEventListener('click',function(){ respond('decline'); });
+load(true).then(function(ok){
+  if(!ok) return;
+  timerId=setInterval(tick,1000);
+  pollId=setInterval(function(){ if(!document.hidden && offer && offer.state==='open') load(false); },8000);
+});
+</script>
+</body>
+</html>
