@@ -20,6 +20,9 @@ async function whoIs(req) {
   if (!s || new Date(s.expires_at) < new Date()) return null;
   return s.username;
 }
+function calgaryDate(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
 const withCity = a => /calgary|alberta|, ab\b/i.test(a) ? a : a + ', Calgary, Alberta, Canada';
 const ms = t => (t ? Date.parse(t) : 0) || 0;
 
@@ -49,7 +52,10 @@ export default async (req) => {
 
   const dStore = getStore('flower-drivers'), sStore = getStore('flower-driver-status');
   const { blobs } = await dStore.list();
-  const drivers = (await Promise.all(blobs.map(b => dStore.get(b.key, { type: 'json' }).catch(() => null)))).filter(d => d && d.active !== false);
+  let drivers = (await Promise.all(blobs.map(b => dStore.get(b.key, { type: 'json' }).catch(() => null)))).filter(d => d && d.active !== false);
+  // If the office has marked who is working today, only those drivers are ranked. No list yet = everyone.
+  const roster = await getStore('flower-driver-roster').get(calgaryDate(), { type: 'json', consistency: 'strong' }).catch(() => null);
+  if (roster) { const on = new Set(roster.codes); drivers = drivers.filter(d => on.has(String(d.code).toUpperCase())); }
   const now = Date.now();
   const rows = await Promise.all(drivers.map(async d => {
     const st = await sStore.get(String(d.code).toLowerCase(), { type: 'json' }).catch(() => null);
@@ -81,7 +87,7 @@ export default async (req) => {
   const tier = r => (r.minutes === null ? 2 : r.stale ? 1 : 0);
   rows.sort((a, b) => tier(a) - tier(b) || (a.minutes ?? 0) - (b.minutes ?? 0) || a.name.localeCompare(b.name));
   rows.forEach(r => { if (r.origin) delete r.origin.query; });
-  return json({ pickup: address, stale_after_min: STALE_MIN, drivers: rows });
+  return json({ pickup: address, stale_after_min: STALE_MIN, roster: roster ? 'set' : 'none', drivers: rows });
 };
 
 export const config = { path: '/api/dispatch-rank' };
