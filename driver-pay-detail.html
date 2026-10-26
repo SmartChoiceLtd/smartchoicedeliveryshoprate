@@ -54,7 +54,7 @@ tr.void td{color:#999;}tr.void .amt{text-decoration:line-through;}
   </div>
   <div id="msg" class="msg err" hidden></div>
   <div id="out"></div>
-  <div class="note">Shows what is recorded in the pay ledger: each pay statement emailed, e-transfers, advances, other payments and adjustments. <b>Owed</b> is the statement plus adjustments; <b>Paid</b> is money sent. Voided entries are kept for the audit trail, struck through, and are not counted. When a statement was emailed more than once for a week, the latest one is used.</div>
+  <div class="note">Shows what is recorded in the pay ledger: each pay statement emailed, e-transfers, advances, other payments and adjustments. <b>Pay</b> is the driver's current pay for the week, worked out from the orders as they stand now (the same figure as the Pay Ledger page). <b>Statement emailed</b> is what the driver was sent; a warning shows when the two differ. <b>Still owing</b> = current pay + adjustments - paid. Voided entries are kept for the audit trail, struck through, and are not counted. When a statement was emailed more than once for a week, the latest one is shown.</div>
 </div>
 <script>
 function $(i){return document.getElementById(i);}
@@ -78,31 +78,71 @@ function range(){
   var d=new Date(); d.setDate(d.getDate()-7*parseInt(v,10)); return {from:ymd(d),to:''};
 }
 
-// One week's numbers, from the live (not voided) entries.
-function weekCalc(rec){
-  var live=(rec.entries||[]).filter(function(e){return !e.voided;});
-  var st=live.filter(function(e){return e.type==='statement_emailed';});
-  var statement=st.length?st[st.length-1].amount:null;
-  var adj=r2(live.filter(function(e){return e.type==='adjustment';}).reduce(function(s,e){return s+e.amount;},0));
-  var paid=r2(live.filter(function(e){return PAY[e.type];}).reduce(function(s,e){return s+e.amount;},0));
-  var bal=statement===null?null:r2(statement+adj-paid);
-  return {statement:statement,adj:adj,paid:paid,bal:bal};
+// Current pay for the driver, per week, from the live orders (same figure the Pay Ledger page uses).
+var LIVE={};            // week_end -> {pay, deliveries} or null when it could not be read
+var LIVE_CODE='';
+var MAX_LIVE_WEEKS=26;
+
+function sundays(fromIso){
+  // week-ending Sundays from the one on/before today back to fromIso (or 8 weeks), newest first
+  var d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-d.getDay());
+  var out=[], stop=fromIso||'';
+  for(var i=0;i<60;i++){ var w=ymd(d); if(stop&&w<stop) break; out.push(w); d.setDate(d.getDate()-7); if(!stop&&out.length>=8) break; }
+  return out;
+}
+async function loadLive(weeks,code,onProgress){
+  if(LIVE_CODE!==code){ LIVE={}; LIVE_CODE=code; }
+  var todo=weeks.filter(function(w){return !(w in LIVE);}), done=0;
+  async function one(w){
+    try{
+      var r=await fetch('/api/send-driver-pay?action=week_totals&week_end='+w);
+      if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+      if(!r.ok) throw new Error('x');
+      var d=await r.json();
+      var me=(d.drivers||[]).filter(function(x){return String(x.code).toUpperCase()===code;})[0];
+      LIVE[w]=me?{pay:me.total_pay,deliveries:me.deliveries}:{pay:0,deliveries:0};
+    }catch(e){ LIVE[w]=null; }
+    done++; if(onProgress) onProgress(done,todo.length);
+  }
+  var i=0; await Promise.all([0,1,2].map(async function(){ while(i<todo.length){ await one(todo[i++]); } }));
+}
+
+// One week's numbers. The basis is the driver's CURRENT pay for the week; the emailed statement is shown beside it.
+function weekCalc(rec,live){
+  var entries=(rec&&rec.entries)||[];
+  var ok=entries.filter(function(e){return !e.voided;});
+  var st=ok.filter(function(e){return e.type==='statement_emailed';});
+  var emailed=st.length?st[st.length-1].amount:null;
+  var adj=r2(ok.filter(function(e){return e.type==='adjustment';}).reduce(function(s,e){return s+e.amount;},0));
+  var paid=r2(ok.filter(function(e){return PAY[e.type];}).reduce(function(s,e){return s+e.amount;},0));
+  var pay=live?live.pay:null;               // null = could not read current pay
+  var basis=pay!==null?pay:emailed;         // fall back to the emailed figure
+  var bal=basis===null?null:r2(basis+adj-paid);
+  var flags=[];
+  if(pay===null&&emailed!==null) flags.push('Current pay could not be read, using the emailed statement.');
+  if(emailed===null&&pay!==null&&pay>0.005) flags.push('Statement not emailed.');
+  if(emailed!==null&&pay!==null&&Math.abs(emailed-pay)>0.005) flags.push('Pay changed since the statement was emailed: '+money(emailed)+' then, '+money(pay)+' now.');
+  return {pay:pay,emailed:emailed,adj:adj,paid:paid,bal:bal,flags:flags,basis:basis};
 }
 function balBadge(c){
-  if(c.bal===null) return '<span class="badge b-na">No statement emailed</span>';
-  if(Math.abs(c.bal)<0.005) return '<span class="badge b-ok">Paid in full</span>';
+  if(c.bal===null) return '<span class="badge b-na">No pay</span>';
+  if(Math.abs(c.bal)<0.005) return c.paid<0.005&&c.basis<0.005?'<span class="badge b-na">Nothing owed</span>':'<span class="badge b-ok">Paid in full</span>';
   return '<span class="badge b-due">'+(c.bal>0?'Owing '+money(c.bal):'Overpaid '+money(-c.bal))+'</span>';
 }
 
 function render(){
-  var showVoid=$('showVoid').checked, rows=[];
-  var recs=CUR.records.filter(function(r){var x=range(); return (!x.from||r.week_end>=x.from)&&(!x.to||r.week_end<=x.to);});
-  recs.sort(function(a,b){return b.week_end.localeCompare(a.week_end);});
-  var T={statements:0,adj:0,paid:0,owing:0,weeks:recs.length};
-  var html='';
-  recs.forEach(function(rec){
-    var c=weekCalc(rec);
-    if(c.statement!==null) T.statements=r2(T.statements+c.statement);
+  var showVoid=$('showVoid').checked, rows=[], x=range();
+  var inRange=function(w){return (!x.from||w>=x.from)&&(!x.to||w<=x.to);};
+  var byWeek={}; CUR.records.forEach(function(r){ if(inRange(r.week_end)) byWeek[r.week_end]=r; });
+  var weeks=Object.keys(byWeek);
+  Object.keys(LIVE).forEach(function(w){ if(inRange(w)&&LIVE[w]&&LIVE[w].pay>0.005&&weeks.indexOf(w)<0) weeks.push(w); });
+  weeks.sort(function(a,b){return b.localeCompare(a);});
+  var T={pay:0,adj:0,paid:0,owing:0,weeks:0}, html='';
+  weeks.forEach(function(w){
+    var rec=byWeek[w]||{week_end:w,entries:[]}, c=weekCalc(rec,LIVE[w]);
+    if(c.basis===null&&!(rec.entries||[]).length) return;
+    T.weeks++;
+    if(c.basis!==null) T.pay=r2(T.pay+c.basis);
     T.adj=r2(T.adj+c.adj); T.paid=r2(T.paid+c.paid); if(c.bal!==null) T.owing=r2(T.owing+c.bal);
     var es=(rec.entries||[]).slice().sort(function(a,b){return String(a.occurred_at||a.recorded_at).localeCompare(String(b.occurred_at||b.recorded_at));});
     var body='';
@@ -111,35 +151,45 @@ function render(){
       var isPay=!!PAY[e.type], when=e.occurred_at||e.recorded_at;
       var detail=[e.reference?'Ref '+e.reference:'',e.note||''].filter(Boolean).join(' - ');
       var owed=isPay?'':money(e.amount), paid=isPay?money(e.amount):'';
-      body+='<tr class="'+(e.voided?'void':'')+'"><td>'+esc(fdate(when))+'</td><td>'+esc(TYPE[e.type]||e.type)+(e.voided?'<div class="vnote">VOIDED: '+esc(e.voided.reason||'')+' ('+esc(fdate(e.voided.at))+')</div>':'')+'</td><td>'+esc(detail)+'</td><td class="n amt">'+owed+'</td><td class="n amt">'+paid+'</td><td class="sub">'+esc(e.by||'')+'</td></tr>';
-      rows.push([rec.week_end,fdate(when),TYPE[e.type]||e.type,detail,isPay?'':e.amount.toFixed(2),isPay?e.amount.toFixed(2):'',e.voided?'VOIDED: '+(e.voided.reason||''):'',e.by||'']);
+      body+='<tr class="'+(e.voided?'void':'')+'"><td>'+esc(fdate(when))+'</td><td>'+esc(TYPE[e.type]||e.type)+(e.type==='statement_emailed'?' <span class="sub">(information only)</span>':'')+(e.voided?'<div class="vnote">VOIDED: '+esc(e.voided.reason||'')+' ('+esc(fdate(e.voided.at))+')</div>':'')+'</td><td>'+esc(detail)+'</td><td class="n amt">'+(e.type==='statement_emailed'?'<span class="sub">'+owed+'</span>':owed)+'</td><td class="n amt">'+paid+'</td><td class="sub">'+esc(e.by||'')+'</td></tr>';
+      rows.push([w,fdate(when),TYPE[e.type]||e.type,detail,isPay?'':e.amount.toFixed(2),isPay?e.amount.toFixed(2):'',e.voided?'VOIDED: '+(e.voided.reason||''):'',e.by||'']);
     });
-    html+='<div class="wk"><div class="wkh"><div class="t">Week ending '+esc(fweek(rec.week_end))+'</div>'
-      +'<div class="k">Statement<br><b>'+(c.statement===null?'&ndash;':money(c.statement))+'</b></div>'
+    var flagHtml=c.flags.length?'<div style="padding:8px 14px;background:#FBF0D6;color:#8A5A00;font-size:12px;border-bottom:1px solid var(--border);">&#9888; '+c.flags.map(esc).join(' ')+'</div>':'';
+    html+='<div class="wk"><div class="wkh"><div class="t">Week ending '+esc(fweek(w))+'</div>'
+      +'<div class="k">Pay<br><b>'+(c.pay===null?'&ndash;':money(c.pay))+'</b></div>'
+      +'<div class="k">Statement emailed<br><b>'+(c.emailed===null?'&ndash;':money(c.emailed))+'</b></div>'
       +'<div class="k">Adjustments<br><b>'+money(c.adj)+'</b></div>'
       +'<div class="k">Paid<br><b>'+money(c.paid)+'</b></div>'
-      +'<div>'+balBadge(c)+'</div></div>'
-      +(body?'<table><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th class="n">Owed</th><th class="n">Paid</th><th>By</th></tr></thead><tbody>'+body+'</tbody></table>':'<div class="sub" style="padding:10px 14px;">No entries.</div>')+'</div>';
+      +'<div>'+balBadge(c)+'</div></div>'+flagHtml
+      +(body?'<table><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th class="n">Owed</th><th class="n">Paid</th><th>By</th></tr></thead><tbody>'+body+'</tbody></table>':'<div class="sub" style="padding:10px 14px;">No payments or adjustments recorded.</div>')+'</div>';
   });
   var head='<div class="sum"><div class="who">'+esc(CUR.name)+' ('+esc(CUR.code)+')</div>'
-    +'<div><span>Weeks shown</span><b>'+T.weeks+'</b></div><div><span>Statements</span><b>'+money(T.statements)+'</b></div>'
+    +'<div><span>Weeks shown</span><b>'+T.weeks+'</b></div><div><span>Pay</span><b>'+money(T.pay)+'</b></div>'
     +'<div><span>Adjustments</span><b>'+money(T.adj)+'</b></div><div><span>Paid</span><b>'+money(T.paid)+'</b></div>'
-    +'<div><span>Still owing</span><b style="color:'+(Math.abs(T.owing)<0.005?'var(--green)':'var(--warm)')+'">'+money(T.owing)+'</b></div></div>';
-  $('out').innerHTML=recs.length?head+html:head+'<div class="sub">No pay ledger entries for this driver in that period.</div>';
-  CUR.rows=rows; $('csv').disabled=!rows.length; $('print').disabled=!recs.length;
+    +'<div><span>Still owing</span><b style="color:'+(Math.abs(T.owing)<0.005?'var(--green)':'var(--warm)')+'">'+money(T.owing)+'</b></div></div>'
+    +(CUR.note?'<div class="msg" style="background:#FBF0D6;color:#8A5A00;">'+esc(CUR.note)+'</div>':'');
+  $('out').innerHTML=T.weeks?head+html:head+'<div class="sub">No pay or ledger entries for this driver in that period.</div>';
+  CUR.rows=rows; $('csv').disabled=!rows.length; $('print').disabled=!T.weeks;
 }
 
 async function go(){
   var code=$('drv').value; showErr('');
   if(!code){ showErr('Choose a driver.'); return; }
-  $('go').disabled=true; $('go').textContent='Loading…';
+  $('go').disabled=true; $('go').textContent='Loading…'; $('out').innerHTML='';
   try{
     var r=await fetch('/api/pay-ledger?driver='+encodeURIComponent(code));
     if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
     var d=await r.json();
     if(!r.ok) throw new Error(d.error||'Could not load the pay ledger.');
     var opt=$('drv').options[$('drv').selectedIndex];
-    CUR.records=d.records||[]; CUR.code=code; CUR.name=opt.dataset.name||code;
+    CUR.records=d.records||[]; CUR.code=code; CUR.name=opt.dataset.name||code; CUR.note='';
+    // Current pay for each week in the period (so a statement that is out of date shows up).
+    var x=range(), weeks=sundays(x.from);
+    if(x.to) weeks=weeks.filter(function(w){return w<=x.to;});
+    if(weeks.length>MAX_LIVE_WEEKS){ weeks=weeks.slice(0,MAX_LIVE_WEEKS); CUR.note='Current pay was checked for the latest '+MAX_LIVE_WEEKS+' weeks only. Older weeks show the emailed statement.'; }
+    if(!x.from&&$('range').value==='all'){ weeks=sundays('').slice(0,0); CUR.note='For "All", only weeks with ledger entries are shown, using the emailed statement. Choose a shorter period to check current pay.'; }
+    var recWeeks=CUR.records.map(function(r){return r.week_end;}).filter(function(w){return weeks.indexOf(w)>=0;});
+    await loadLive(weeks.slice(),code,function(n,t){ $('go').textContent='Checking pay '+n+' of '+t+'…'; });
     render();
   }catch(e){ showErr(e.message); }
   finally{ $('go').disabled=false; $('go').textContent='Show'; }
@@ -154,9 +204,9 @@ $('csv').addEventListener('click',function(){
 $('print').addEventListener('click',function(){ window.print(); });
 $('go').addEventListener('click',go);
 $('drv').addEventListener('change',function(){ if($('drv').value) go(); });
-$('range').addEventListener('change',function(){ var c=$('range').value==='custom'; $('cust').hidden=!c; $('cust').style.display=c?'flex':'none'; if(CUR.records) render(); });
-$('from').addEventListener('change',function(){ if(CUR.records) render(); });
-$('to').addEventListener('change',function(){ if(CUR.records) render(); });
+$('range').addEventListener('change',function(){ var c=$('range').value==='custom'; $('cust').hidden=!c; $('cust').style.display=c?'flex':'none'; if(CUR.records&&!c) go(); });
+$('from').addEventListener('change',function(){ if(CUR.records) go(); });
+$('to').addEventListener('change',function(){ if(CUR.records) go(); });
 $('showVoid').addEventListener('change',function(){ if(CUR.records) render(); });
 
 fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
