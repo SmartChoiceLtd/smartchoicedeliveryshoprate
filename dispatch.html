@@ -33,6 +33,11 @@ td.n,th.n{text-align:right;white-space:nowrap;}
 details summary{cursor:pointer;font-size:12px;color:var(--accent);margin-top:4px;}
 .hist{font-size:12px;color:var(--ink-soft);margin:4px 0 0 14px;padding:0;}
 .top1 td{background:#F2FAF2;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+.chip{border:2px solid var(--accent);background:#fff;color:var(--accent);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:700;cursor:pointer;}
+.chip.on{background:var(--accent);color:#fff;}
+.chip .tick{display:inline-block;width:1em;}
+.mini{background:#fff;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -40,8 +45,19 @@ details summary{cursor:pointer;font-size:12px;color:var(--accent);margin-top:4px
 <div class="main">
 
 <div class="card">
+  <h2>Working today <span class="sub" id="rosterCount"></span></h2>
+  <p class="hint">Tap a driver to add or remove them for today. You can change it any time during the day. Ranking and offers only include drivers who are on. The list starts fresh each day.</p>
+  <div class="chips" id="rosterChips">Loading&hellip;</div>
+  <div class="row" style="gap:8px;">
+    <button class="mini" id="rosterCopy" type="button">Same as last time</button>
+    <button class="mini" id="rosterAll" type="button">All on</button>
+    <button class="mini" id="rosterNone" type="button">Clear</button>
+  </div>
+</div>
+
+<div class="card">
   <h2>Offer a job</h2>
-  <p class="hint">Pick a shop or type the pickup address. Add how many deliveries and the area if you like, and the text to the driver is written for you. If a driver would collect from 2 or 3 shops, add each one. Drivers are ranked by driving time to the <b>first</b> pickup, from where they will be free: the address they said they are heading to, otherwise their last delivery. Drivers with an old update are listed after current ones.</p>
+  <p class="hint">Pick a shop or type the pickup address. Add how many deliveries and the area if you like, and the text to the driver is written for you. If a driver would collect from 2 or 3 shops, add each one. Drivers are ranked by driving time to the <b>first</b> pickup, from where they will be free: the address they said they are heading to, otherwise their last delivery. Drivers with an old update are listed after current ones. Only drivers marked as working today are included.</p>
   <div id="jobRows"></div>
   <div class="row" style="margin-top:8px;">
     <button class="btn ghost" id="addShopBtn" type="button" style="padding:6px 12px;font-size:13px;">+ Add another shop</button>
@@ -51,6 +67,12 @@ details summary{cursor:pointer;font-size:12px;color:var(--accent);margin-top:4px
   <div class="sub" id="pickupNote" style="margin-top:6px;"></div>
   <div class="err" id="rankErr" hidden></div>
   <div id="rankOut" style="margin-top:10px;" hidden></div>
+</div>
+
+<div class="card">
+  <h2>Offers</h2>
+  <p class="hint">Jobs you have offered in the last 24 hours, and who answered.</p>
+  <div id="offersList">Loading&hellip;</div>
 </div>
 
 <div class="card">
@@ -117,6 +139,14 @@ function jobText(jobs,minutes){
   return head+' Pickups: '+places+'.'+(minutes?' About '+minutes+' min from you to the first pickup.':'')+' Can you take them?';
 }
 
+/* The same text, ending with the accept link instead of a question. */
+var OFFER_LINK_MIN=15;
+function offerText(jobs,minutes,link){
+  var t=jobText(jobs,minutes);
+  t=t.replace(/ Can you take (them|it)\?$/,'');
+  return t+' First to accept gets it (open '+OFFER_LINK_MIN+' min): '+link;
+}
+
 /* The pickup rows (1 to 3). */
 function addJobRow(){
   var host=document.getElementById('jobRows');
@@ -158,29 +188,123 @@ function histHtml(st,now){
   }).join('')+'</ul></details>';
 }
 
+/* Who is working today */
+var roster={set:false,codes:{},drivers:[]};
+function isOn(code){ return roster.set ? !!roster.codes[code] : true; }
+async function rosterCall(body){
+  var r=await fetch('/api/roster',body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:undefined);
+  if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return false;}
+  var d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Could not update today’s list.');
+  roster={set:d.set,codes:{},drivers:d.drivers};
+  d.codes.forEach(function(c){ roster.codes[c]=true; });
+  renderRoster();
+  return true;
+}
+function renderRoster(){
+  var host=document.getElementById('rosterChips');
+  if(!roster.drivers.length){ host.innerHTML='<span class="sub">No active drivers.</span>'; return; }
+  host.innerHTML=roster.drivers.map(function(x){
+    var on=roster.set&&roster.codes[x.code];
+    return '<button type="button" class="chip'+(on?' on':'')+'" data-code="'+esc(x.code)+'" data-on="'+(on?'1':'0')+'"><span class="tick">'+(on?'✓':'')+'</span>'+esc(x.name)+'</button>';
+  }).join('');
+  var n=roster.set?Object.keys(roster.codes).length:0;
+  document.getElementById('rosterCount').textContent=roster.set?'· '+n+' on':'· not set yet, everyone is treated as available';
+}
+async function toggleDriver(code,turnOn){
+  try{ await rosterCall({code:code,on:turnOn}); loadBoard(); }catch(e){ alert(e.message); }
+}
+function wireRoster(){
+  document.getElementById('rosterChips').addEventListener('click',function(e){
+    var b=e.target.closest('.chip'); if(!b) return;
+    toggleDriver(b.dataset.code,b.dataset.on!=='1');
+  });
+  document.getElementById('rosterCopy').addEventListener('click',function(){ rosterCall({action:'copy_last'}).then(loadBoard).catch(function(e){alert(e.message);}); });
+  document.getElementById('rosterAll').addEventListener('click',function(){ rosterCall({action:'all'}).then(loadBoard).catch(function(e){alert(e.message);}); });
+  document.getElementById('rosterNone').addEventListener('click',function(){ rosterCall({action:'none'}).then(loadBoard).catch(function(e){alert(e.message);}); });
+  document.getElementById('board').addEventListener('click',function(e){
+    var b=e.target.closest('[data-add]'); if(b) toggleDriver(b.dataset.add,true);
+  });
+}
+
 async function loadBoard(){
   try{
     var r=await fetch('/api/driver-status');
     if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
     var d=await r.json();
     var now=Date.parse(d.now)||Date.now();
-    var rows=d.drivers.map(function(x){ return {x:x, info:describe(x.status,now)}; });
-    var recent=rows.filter(function(r){ return r.info.age!=null && r.info.age<24*60; }).sort(function(a,b){return a.info.age-b.info.age;});
-    var quiet=rows.filter(function(r){ return !(r.info.age!=null && r.info.age<24*60); });
+    var rows=d.drivers.map(function(x){ return {x:x, info:describe(x.status,now), on:isOn(x.code)}; });
+    var onRows=rows.filter(function(r){return r.on;}).sort(function(a,b){
+      var aa=a.info.age==null?1e9:a.info.age, bb=b.info.age==null?1e9:b.info.age; return aa-bb||a.x.name.localeCompare(b.x.name); });
+    var offRows=rows.filter(function(r){return !r.on;});
+    var activeOff=offRows.filter(function(r){ return r.info.age!=null && r.info.age<180; });
+    var quietOff=offRows.filter(function(r){ return activeOff.indexOf(r)<0; });
     var html='';
-    if(recent.length){
-      html+='<table><thead><tr><th>Driver</th><th>Right now</th><th class="n">Updated</th></tr></thead><tbody>'+recent.map(function(r){
-        return '<tr><td><div class="name">'+esc(r.x.name)+'</div><div class="sub">'+esc(r.x.code)+'</div>'+phoneLinks(r.x.phone,null,[{label:'Ask where headed',body:CHECKIN_TEXT}])+'</td><td>'+r.info.line+histHtml(r.x.status,now)+'</td><td class="n">'+ageBadge(r.info.age)+'</td></tr>';
+    if(!roster.set) html+='<div class="sub" style="margin-bottom:8px;">Today’s list is not set, so everyone is shown. Mark who is working above.</div>';
+    if(onRows.length){
+      html+='<table><thead><tr><th>Driver</th><th>Right now</th><th class="n">Updated</th></tr></thead><tbody>'+onRows.map(function(r){
+        var stale=r.info.age==null||r.info.age>=24*60;
+        var line=stale?'<span class="sub">No update yet today</span>':r.info.line+histHtml(r.x.status,now);
+        return '<tr><td><div class="name">'+esc(r.x.name)+'</div><div class="sub">'+esc(r.x.code)+'</div>'+phoneLinks(r.x.phone,null,[{label:'Ask where headed',body:CHECKIN_TEXT}])+'</td><td>'+line+'</td><td class="n">'+(stale?'':ageBadge(r.info.age))+'</td></tr>';
       }).join('')+'</tbody></table>';
-    } else html+='<div class="sub">No driver has sent an update in the last 24 hours.</div>';
-    if(quiet.length){
-      html+='<details style="margin-top:10px;"><summary>No update in 24 hours ('+quiet.length+')</summary><div class="sub" style="margin-top:6px;">'+quiet.map(function(r){return esc(r.x.name);}).join(', ')+'</div></details>';
+    } else html+='<div class="sub">No drivers are marked as working today.</div>';
+    if(activeOff.length){
+      html+='<div style="margin-top:10px;padding:8px 10px;background:#FBF0D6;border-radius:8px;font-size:13px;"><b>Active but not marked on:</b> '+activeOff.map(function(r){
+        return esc(r.x.name)+' ('+esc(ageText(r.info.age))+') <button class="mini" data-add="'+esc(r.x.code)+'" type="button">Add to today</button>';
+      }).join(' &nbsp; ')+'</div>';
+    }
+    if(quietOff.length){
+      html+='<details style="margin-top:10px;"><summary>Not on today ('+quietOff.length+')</summary><div class="sub" style="margin-top:6px;">'+quietOff.map(function(r){return esc(r.x.name);}).join(', ')+'</div></details>';
     }
     document.getElementById('board').innerHTML=html;
     document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'});
   }catch(e){
     document.getElementById('board').innerHTML='<div class="err">Could not load: '+esc(e.message)+'</div>';
   }
+}
+
+async function createOffer(jobs){
+  var boxes=Array.prototype.filter.call(document.querySelectorAll('#rankOut .pickDrv'),function(b){return b.checked;});
+  var out=document.getElementById('offerOut'), btn=document.getElementById('offerBtn');
+  if(!boxes.length){ out.innerHTML='<div class="err">Tick at least one driver.</div>'; return; }
+  btn.disabled=true; btn.textContent='Creating\u2026';
+  try{
+    var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
+      jobs:jobs.map(function(j){return {code:j.code,address:j.address,count:j.count,area:j.area};}),
+      drivers:boxes.map(function(b){return b.dataset.code;})})});
+    if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not create the offer.');
+    var byCode={}; boxes.forEach(function(b){ byCode[b.dataset.code]=b; });
+    out.innerHTML='<div class="sub" style="margin-bottom:6px;">Offer created. Tap each driver\u2019s <b>Text offer</b>, read the message and send it.</div><table><tbody>'+d.links.map(function(l){
+      var b=byCode[l.code]||{dataset:{}}, link=location.origin+l.path;
+      var body=offerText(jobs,b.dataset.min?parseInt(b.dataset.min,10):0,link);
+      var ph=String(b.dataset.phone||'').replace(/[^0-9+]/g,'');
+      var tl=ph.replace(/\D/g,'').length>=7?'<a class="links" style="color:var(--accent);font-weight:700;text-decoration:none;" href="sms:'+ph+'?&body='+encodeURIComponent(body)+'">Text offer</a>':'<span class="sub">no phone on file</span>';
+      return '<tr><td><div class="name">'+esc(l.name)+'</div></td><td>'+tl+'</td></tr>';
+    }).join('')+'</tbody></table>';
+    loadOffers();
+  }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
+  finally{ btn.disabled=false; btn.textContent='Create offer for ticked drivers'; }
+}
+
+async function loadOffers(){
+  var host=document.getElementById('offersList');
+  try{
+    var r=await fetch('/api/offers');
+    if(r.status===401) return;
+    var d=await r.json(), now=Date.parse(d.now)||Date.now();
+    if(!d.offers.length){ host.innerHTML='<div class="sub">No offers in the last 24 hours.</div>'; return; }
+    host.innerHTML='<table><thead><tr><th>Job</th><th>Status</th><th>Drivers</th></tr></thead><tbody>'+d.offers.map(function(o){
+      var job=o.jobs.map(function(j){ return esc((j.code||j.address)+(j.count?' '+j.count:'')+(j.area?' '+j.area:'')); }).join(' + ');
+      var st;
+      if(o.state==='taken') st='<span class="age a-new">Taken by '+esc(o.winner_name)+'</span><div class="sub">'+esc(new Date(o.taken_at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</div>';
+      else if(o.state==='open'){ var left=Math.max(0,Math.ceil((Date.parse(o.expires_at)-now)/60000)); st='<span class="age a-mid">Open</span><div class="sub">'+left+' min left</div>'; }
+      else st='<span class="age a-old">Expired</span><div class="sub">no one accepted</div>';
+      var drv=o.drivers.map(function(x){ return esc(x.name)+': '+(x.response==='accept'?'accepted':x.response==='decline'?'declined':'no reply'); }).join('<br>');
+      return '<tr><td>'+job+'<div class="sub">'+esc(new Date(o.created_at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</div></td><td>'+st+'</td><td class="sub">'+drv+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  }catch(e){ host.innerHTML='<div class="err">Could not load offers.</div>'; }
 }
 
 async function rank(){
@@ -198,13 +322,19 @@ async function rank(){
     if(!r.ok) throw new Error(d.error||'Could not rank drivers.');
     var FROM={heading:'heading to',delivered:'last delivery',seen:'phone position'};
     var first=true;
-    out.innerHTML='<table><thead><tr><th>Driver</th><th class="n">Drive</th><th>Based on</th></tr></thead><tbody>'+d.drivers.map(function(x){
+    var preset=0;
+    out.innerHTML='<table><thead><tr><th></th><th>Driver</th><th class="n">Drive</th><th>Based on</th></tr></thead><tbody>'+d.drivers.map(function(x){
       var cls=''; if(first&&x.minutes!=null&&!x.stale){cls=' class="top1"'; first=false;}
+      var chk=(x.minutes!=null&&!x.stale&&preset<3)?(preset++,' checked'):'';
       var basis=x.origin?(esc(FROM[x.origin.from]||'')+': '+esc(x.origin.label)+' '+ageBadge(x.age_min)):'<span class="sub">no update</span>';
       var mins=x.minutes==null?'<span class="sub">&ndash;</span>':'<span class="min">'+x.minutes+'</span> <span class="sub">min</span>';
-      return '<tr'+cls+'><td><div class="name">'+esc(x.name)+'</div>'+phoneLinks(x.phone,jobText(jobs,x.minutes))+'</td><td class="n">'+mins+'</td><td>'+basis+(x.stale&&x.origin?'<div class="sub">Older update: may have moved</div>':'')+'</td></tr>';
-    }).join('')+'</tbody></table>';
+      return '<tr'+cls+'><td style="width:28px;"><input type="checkbox" class="pickDrv" style="min-width:0;flex:none;width:18px;height:18px;" data-code="'+esc(x.code)+'" data-name="'+esc(x.name)+'" data-phone="'+esc(x.phone)+'" data-min="'+(x.minutes==null?'':x.minutes)+'"'+chk+'></td><td><div class="name">'+esc(x.name)+'</div>'+phoneLinks(x.phone,jobText(jobs,x.minutes))+'</td><td class="n">'+mins+'</td><td>'+basis+(x.stale&&x.origin?'<div class="sub">Older update: may have moved</div>':'')+'</td></tr>';
+    }).join('')+'</tbody></table>'
+      +'<div class="row" style="margin-top:10px;align-items:center;"><button class="btn" id="offerBtn" type="button">Create offer for ticked drivers</button><span class="sub">Open '+OFFER_LINK_MIN+' min. The first driver to accept gets the job; the others see it is taken.</span></div>'
+      +'<div id="offerOut" style="margin-top:10px;"></div>';
+    document.getElementById('offerBtn').addEventListener('click',function(){ createOffer(jobs); });
     document.getElementById('pickupNote').textContent='Text preview: '+jobText(jobs,3).replace(/About 3 min from you( to the first pickup)?\./,'About [x] min from you$1.');
+    if(d.roster==='none') document.getElementById('pickupNote').textContent+=' (Everyone is shown because today\u2019s list is not set.)';
     out.hidden=false;
   }catch(e){ err.textContent=e.message; err.hidden=false; out.hidden=true; }
   finally{ btn.disabled=false; btn.textContent='Rank drivers'; }
@@ -213,11 +343,12 @@ async function rank(){
 document.getElementById('rankBtn').addEventListener('click',rank);
 document.getElementById('addShopBtn').addEventListener('click',addJobRow);
 addJobRow();
-document.getElementById('refreshBtn').addEventListener('click',loadBoard);
+document.getElementById('refreshBtn').addEventListener('click',function(){ rosterCall().then(loadBoard).catch(function(){ loadBoard(); }); loadOffers(); });
 
 fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
   if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
-  loadShops(); loadBoard(); setInterval(function(){ if(!document.hidden) loadBoard(); },30000);
+  wireRoster(); loadShops(); rosterCall().then(function(){ return loadBoard(); }).catch(function(){ loadBoard(); }); loadOffers();
+  setInterval(function(){ if(!document.hidden){ rosterCall().then(loadBoard).catch(function(){}); loadOffers(); } },30000);
 }).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
 </script>
 </body>
