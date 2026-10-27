@@ -119,6 +119,7 @@ function render(d) {
   var ex = d.by.exif; var exKeys = Object.keys(ex).filter(function(k) { return k.indexOf('phone') === 0; });
   if (exKeys.length) { var only = {}; exKeys.forEach(function(k) { only[k] = ex[k]; }); h += table('iPhones: how the photo was prepared', only, 'iPhone type'); h += '<p class="note">\u201cPhone rotates photos itself\u201d is any recent iPhone; \u201cneeds manual rotation\u201d is an old iPhone (iOS before 13.4).</p>'; }
   h += table('By driver', d.by.driver, 'Driver');
+  if (d.by.driver['(unknown)']) h += '<p class="note"><b>' + d.by.driver['(unknown)'].scans + '</b> scan' + (d.by.driver['(unknown)'].scans === 1 ? '' : 's') + ' have no driver code (the route page was opened without one). <button class="go" id="unkBtn" type="button" style="padding:4px 10px;font-size:13px;">See which scans</button></p><div id="unkOut"></div>';
 
   var f = [['Order number', 'e_order_id'], ['Recipient name', 'e_name'], ['Address', 'e_address'], ['Shop', 'e_shop_code'], ['Recipient phone (not counted in \u201cadded without changes\u201d)', 'e_phone']];
   h += '<h2>Which fields get corrected</h2><div class="tablewrap"><table><thead><tr><th>Field</th><th>Corrected</th><th>Share of scans added</th></tr></thead><tbody>';
@@ -138,6 +139,23 @@ function render(d) {
     });
   }
   out.innerHTML = h;
+  var ub = document.getElementById('unkBtn'); if (ub) ub.addEventListener('click', loadUnknown);
+}
+function loadUnknown() {
+  var from = document.getElementById('fromDate').value, to = document.getElementById('toDate').value, box = document.getElementById('unkOut');
+  box.innerHTML = '<div class="empty">Loading&hellip;</div>';
+  fetch('/api/scan-log?unknown=1&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to)).then(function(r) { if (!r.ok) throw new Error('Status ' + r.status); return r.json(); }).then(function(d) {
+    var days = Object.keys(d.per_day).sort().reverse();
+    var h = '<h2>Scans with no driver</h2><p class="note">Pick one day with the dates at the top (set both to the same day). ' + days.map(function(k) { return esc(k) + ': <b>' + d.per_day[k] + '</b>'; }).join(' &middot; ') + '</p>';
+    h += '<div class="tablewrap"><table><thead><tr><th>When</th><th>Result</th><th>Order #</th><th>Recipient</th><th>Address</th><th>Phone</th></tr></thead><tbody>';
+    d.scans.forEach(function(x) {
+      var when = x.at ? new Date(x.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : x.day;
+      var res = x.status === 'read' ? (x.outcome === 'confirmed' ? 'added' : x.outcome === 'discarded' ? 'discarded' : x.outcome === 'replaced' ? 'replaced' : 'waiting') : (x.status === 'no_address' ? 'couldn\u2019t read' : 'error');
+      h += '<tr><td>' + esc(when) + '</td><td>' + esc(res) + '</td><td>' + esc(x.order_id) + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.address) + '</td><td>' + esc((x.platform || '') + ' ' + (x.os_version || '') + (x.model ? ' \u00b7 ' + x.model : '')) + '</td></tr>';
+    });
+    h += '</tbody></table></div>' + (d.count > d.scans.length ? '<p class="note">Showing the newest ' + d.scans.length + ' of ' + d.count + '.</p>' : '');
+    box.innerHTML = h;
+  }).catch(function(e) { box.innerHTML = '<div class="error">Could not load: ' + esc(e.message) + '</div>'; });
 }
 
 function load() {
