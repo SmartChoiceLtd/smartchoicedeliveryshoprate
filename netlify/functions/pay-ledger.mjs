@@ -148,6 +148,20 @@ export default async (req) => {
     return json({ ok: true, record: rec });
   }
 
+  if (body.action === 'redate') { // correct the date money moved; the old date stays on the entry as an audit trail
+    const e = rec.entries.find(x => x.id === body.entry_id);
+    if (!e) return json({ error: 'Entry not found' }, 404);
+    if (e.voided) return json({ error: 'That entry is voided' }, 400);
+    if (e.type === 'statement_emailed') return json({ error: 'The emailed date is logged automatically and cannot be changed' }, 400);
+    const d = new Date(body.occurred_at);
+    if (!body.occurred_at || isNaN(d.getTime())) return json({ error: 'A valid date is required' }, 400);
+    if (d.getTime() > Date.now() + 36 * 3600e3) return json({ error: 'That date is in the future' }, 400);
+    e.edits = (e.edits || []).concat([{ at: new Date().toISOString(), by: username, field: 'occurred_at', from: e.occurred_at || null, to: d.toISOString() }]);
+    e.occurred_at = d.toISOString();
+    await store.setJSON(key, rec);
+    return json({ ok: true, record: rec });
+  }
+
   const type = body.type;
   if (!ALL_TYPES.includes(type)) return json({ error: 'type must be one of ' + ALL_TYPES.join(', ') }, 400);
   let amount = Math.round((parseFloat(body.amount) || 0) * 100) / 100;
@@ -158,7 +172,7 @@ export default async (req) => {
   // recorded_at is when it was entered here (server clock, cannot be edited). occurred_at is when the
   // money actually moved, if the person entering it says so (e.g. an e-transfer sent yesterday).
   let occurred = null;
-  if (body.occurred_at) { const d = new Date(body.occurred_at); if (!isNaN(d.getTime())) occurred = d.toISOString(); }
+  if (body.occurred_at) { const d = new Date(body.occurred_at); if (!isNaN(d.getTime())) { if (d.getTime() > Date.now() + 36 * 3600e3) return json({ error: 'The date paid is in the future. Check the date and try again.' }, 400); occurred = d.toISOString(); } }
   const entry = {
     id: Math.random().toString(36).slice(2, 10),
     type, amount, note,
