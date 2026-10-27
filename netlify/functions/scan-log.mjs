@@ -174,6 +174,24 @@ export default async (req) => {
     if (addDays(from, MAX_RANGE_DAYS - 1) < to) from = addDays(to, -(MAX_RANGE_DAYS - 1));
     const days = [];
     for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
+    // ?unknown=1 : the individual scans that have no driver code, newest first, so a day can be looked into.
+    if (url.searchParams.get('unknown')) {
+      const list = [], perDayCount = {};
+      for (const d of days) {
+        const { records } = await loadDay(store, d);
+        for (const r of records) {
+          if (r.driver) continue;
+          perDayCount[d] = (perDayCount[d] || 0) + 1;
+          list.push({ at: r.at, day: d, status: r.status || '', outcome: r.outcome || '', platform: r.platform || '', os_version: r.os_version || '',
+            model: r.model || '', ua: String(r.ua || '').slice(0, 120),
+            order_id: clip((r.final && r.final.order_id) || (r.extracted && r.extracted.order_id)),
+            name: clip((r.final && r.final.name) || (r.extracted && r.extracted.name)),
+            address: clip((r.final && r.final.address) || (r.extracted && r.extracted.address)) });
+        }
+      }
+      list.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      return json({ range: { from, to, days: days.length }, count: list.length, per_day: perDayCount, scans: list.slice(0, 300) });
+    }
     const perDay = [];
     for (const d of days) perDay.push(await summaryForDay(store, d, today));
     const merged = mergeSummaries(perDay);
