@@ -2,15 +2,18 @@ import { getStore } from '@netlify/blobs';
 
 // Job offers: the office offers one job (1 to 3 pickups) to several drivers at once; the FIRST driver to accept gets it.
 //
-//   POST /api/offers            (office login)  { jobs:[{code,address,count,area}], drivers:[CODE,...] } -> { id, expires_at, links }
+//   POST /api/offers            (office login)  { jobs:[{code,address,wpu,to,cases,stops[]}], drivers:[CODE,...] } -> { id, expires_at, links }
+//        A shop job (KF) lists the delivery addresses ready for pickup; a wholesale job (FS) is to + cases (FS BV 4 cs).
+//        Every delivery address / wholesale job is one ITEM. A driver takes any of the items, all of them, or none.
 //   GET  /api/offers            (office login)  recent offers with who accepted / declined / has not answered
 //   GET  /api/offers?id=&d=     (driver link)   what this driver sees: the job and its state (open / taken / expired)
-//   POST /api/offers {action:'respond', id, d, response:'accept'|'decline'}   (driver link)
+//   POST /api/offers {action:'respond', id, d, response:'accept'|'decline', items:[itemId,...]}   (driver link)
 //
 // Fairness. Blobs cannot lock a record, so every driver writes their OWN claim record (offer id + driver code) holding a
 // server timestamp. After writing, an accepting driver waits a moment, reads every invited driver's claim with a strong
 // read, and the winner is the EARLIEST accept (ties go to the lower driver code). Every phone works out the same winner, so
-// two drivers tapping in the same instant still get one answer. The winner's status is set to "heading to the first
+// two drivers tapping in the same instant still get one answer. With items, each item goes to the earliest accept that
+// includes it, so two drivers who tick overlapping deliveries split them without a clash. The winner's status is set to "heading to the first
 // pickup" so the dispatch board ranks them from there.
 
 const OFFER_MIN = 15;
@@ -40,25 +43,44 @@ async function readClaims(offer) {
   }));
   return out;
 }
-// A winner is only final once its claim is a moment old: a rival claim with an EARLIER timestamp may still be in flight.
-// A reader that meets a fresh winner waits out that moment and reads again, so every phone settles on the same driver.
-async function settledClaims(offer) {
-  let claims = await readClaims(offer);
-  const w = pickWinner(claims);
-  if (w && Date.now() - Date.parse(w.at) < SETTLE_MS * 2) { await sleep(SETTLE_MS); claims = await readClaims(offer); }
-  return claims;
+// Items: one per delivery address on a shop job, one per wholesale job (or a shop job with no addresses listed).
+function itemIds(offer) {
+  const ids = [];
+  offer.jobs.forEach((j, i) => {
+    if (!j.wpu && Array.isArray(j.stops) && j.stops.length) j.stops.forEach((s, k) => ids.push('j' + i + 's' + k));
+    else ids.push('j' + i);
+  });
+  return ids;
 }
-export function pickWinner(claims) {
+// Earliest accept that includes an item gets it (ties: lower driver code).
+function awardsOf(offer, claims) {
+  const valid = new Set(itemIds(offer));
   const acc = Object.values(claims).filter(c => c.response === 'accept');
   acc.sort((a, b) => (Date.parse(a.at) - Date.parse(b.at)) || String(a.driver).localeCompare(String(b.driver)));
-  return acc[0] || null;
+  const awards = {};
+  for (const c of acc) for (const it of (Array.isArray(c.items) ? c.items : [])) if (valid.has(it) && !awards[it]) awards[it] = { driver: c.driver, at: c.at };
+  return awards;
 }
+// An award is only final once the newest accept is a moment old: an earlier-stamped claim may still be in flight.
+async function settledClaims(offer) {
+  let claims = await readClaims(offer);
+  const newest = Math.max(0, ...Object.values(claims).filter(c => c.response === 'accept').map(c => Date.parse(c.at)));
+  if (newest && Date.now() - newest < SETTLE_MS * 2) { await sleep(SETTLE_MS); claims = await readClaims(offer); }
+  return claims;
+}
+function nameOf(offer, code) { return (offer.drivers.find(d => d.code === code) || {}).name || code; }
 function state(offer, claims, now) {
-  const w = pickWinner(claims);
-  if (w) return { state: 'taken', winner: w.driver, winner_name: (offer.drivers.find(d => d.code === w.driver) || {}).name || w.driver, taken_at: w.at };
-  if (now > Date.parse(offer.expires_at)) return { state: 'expired' };
-  return { state: 'open' };
+  const awards = awardsOf(offer, claims), total = itemIds(offer).length, got = Object.keys(awards).length;
+  const byDriver = {};
+  Object.values(awards).forEach(a => { byDriver[a.driver] = (byDriver[a.driver] || 0) + 1; });
+  const assigned = Object.keys(byDriver).map(c => ({ driver: c, name: nameOf(offer, c), count: byDriver[c] }));
+  const first = Object.values(awards).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
+  const base = { total, unclaimed: total - got, assigned, awards: Object.fromEntries(Object.entries(awards).map(([k, v]) => [k, { driver: v.driver, name: nameOf(offer, v.driver) }])) };
+  if (got === total) return { ...base, state: 'taken', winner: first.driver, winner_name: nameOf(offer, first.driver), taken_at: first.at };
+  if (now > Date.parse(offer.expires_at)) return { ...base, state: 'expired' };
+  return { ...base, state: 'open' };
 }
+const myItems = (st, d) => Object.entries(st.awards).filter(([, v]) => v.driver === d).map(([k]) => k);
 
 export default async (req) => {
   const offers = getStore('flower-offers');
@@ -76,7 +98,7 @@ export default async (req) => {
       const st = state(offer, claims, Date.now());
       return json({
         id: offer.id, jobs: offer.jobs, expires_at: offer.expires_at, driver: me.name,
-        ...st, mine: claims[d] ? claims[d].response : null, i_won: st.state === 'taken' && st.winner === d
+        ...st, mine: claims[d] ? claims[d].response : null, my_items: myItems(st, d)
       });
     }
     if (!(await whoIs(req))) return json({ error: 'Not authenticated' }, 401);
@@ -104,35 +126,40 @@ export default async (req) => {
     const offer = await offers.get(clean(body.id, 40), { type: 'json', consistency: 'strong' }).catch(() => null);
     const me = offer && offer.drivers.find(x => x.code === d);
     if (!offer || !me) return json({ error: 'This offer link is not valid.' }, 404);
+    const valid = new Set(itemIds(offer));
+    const items = [...new Set((Array.isArray(body.items) ? body.items : itemIds(offer)).map(x => clean(x, 12)).filter(x => valid.has(x)))];
+    if (response === 'accept' && !items.length) return json({ error: 'Choose at least one delivery.' }, 400);
     let claims = await settledClaims(offer);
     let st = state(offer, claims, Date.now());
-    if (st.state !== 'open') return json({ ...st, i_won: st.state === 'taken' && st.winner === d, mine: claims[d] ? claims[d].response : null });
+    const mineNow = claims[d] ? claims[d].response : null;
+    if (st.state !== 'open' || mineNow === 'accept') return json({ ...st, my_items: myItems(st, d), mine: mineNow }); // closed, or already answered
     const cs = getStore('flower-offer-claims');
-    if (claims[d] && claims[d].response === 'accept') return json({ ...st, mine: 'accept' }); // already theirs, nothing to do
     const at = new Date().toISOString();
-    await cs.setJSON(claimKey(offer.id, d), { offer: offer.id, driver: d, response, at });
-    if (response === 'decline') return json({ state: 'open', mine: 'decline' });
+    await cs.setJSON(claimKey(offer.id, d), { offer: offer.id, driver: d, response, items: response === 'accept' ? items : [], at });
+    if (response === 'decline') return json({ ...st, mine: 'decline', my_items: [] });
     await sleep(SETTLE_MS); // let a claim written at the same moment by another phone land
     claims = await readClaims(offer);
     st = state(offer, claims, Date.now());
-    const iWon = st.state === 'taken' && st.winner === d;
-    if (iWon) {
-      try { // the board and the nearest-driver ranking now see this driver as heading to the first pickup
+    const won = myItems(st, d);
+    if (won.length) {
+      try { // the board and the nearest-driver ranking now see this driver as heading to the first pickup they won
         const ds = getStore('flower-driver-status'), key = d.toLowerCase();
         const cur = (await ds.get(key, { type: 'json' }).catch(() => null)) || { code: d, name: me.name, history: [] };
-        const first = offer.jobs[0] && offer.jobs[0].address;
+        const idx = Math.min(...won.map(x => parseInt(x.slice(1), 10)));
+        const first = offer.jobs[idx] && offer.jobs[idx].address;
         if (first) { cur.heading = { address: first, at }; cur.history = [{ kind: 'heading', address: first, at }].concat(cur.history || []).slice(0, 15); cur.updated_at = at; await ds.setJSON(key, cur); }
       } catch (e) { console.error('offer winner status failed:', e.message); }
     }
-    return json({ ...st, i_won: iWon, mine: 'accept' });
+    return json({ ...st, my_items: won, mine: 'accept' });
   }
 
   // ---- the office creates an offer
   const user = await whoIs(req);
   if (!user) return json({ error: 'Not authenticated' }, 401);
   const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, 3).map(j => ({
-    code: clean(j.code, 10).toUpperCase(), address: clean(j.address, 200),
-    count: Number.isFinite(j.count) && j.count > 0 ? Math.min(99, Math.floor(j.count)) : 0, area: clean(j.area, 20).toUpperCase()
+    code: clean(j.code, 10).toUpperCase(), address: clean(j.address, 200), wpu: j.wpu === true, to: clean(j.to, 80),
+    cases: Number.isFinite(j.cases) && j.cases > 0 ? Math.min(999, Math.floor(j.cases)) : 0,
+    stops: j.wpu === true ? [] : (Array.isArray(j.stops) ? j.stops : []).map(s => clean(s, 120)).filter(s => s.length >= 3).slice(0, 40)
   })).filter(j => j.address.length >= 5);
   if (!jobs.length) return json({ error: 'At least one pickup address is required' }, 400);
   const codes = [...new Set((Array.isArray(body.drivers) ? body.drivers : []).map(c => clean(c, 12).toUpperCase()).filter(Boolean))].slice(0, 30);
