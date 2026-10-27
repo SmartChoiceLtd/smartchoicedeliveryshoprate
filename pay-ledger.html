@@ -124,8 +124,8 @@ function detailHtml(r){
   h+='<table class="log"><thead><tr><th>Recorded</th><th>Type</th><th class="n">Amount</th><th>Paid/occurred</th><th>Ref</th><th>Note</th><th>By</th><th></th></tr></thead><tbody>';
   if(!k.entries.length)h+='<tr><td colspan="8" style="color:#888">No entries yet.</td></tr>';
   k.entries.forEach(function(e){
-    h+='<tr class="'+(e.voided?'void':'')+'"><td>'+esc(fdt(e.recorded_at))+'</td><td>'+esc(TYPE_LABEL[e.type]||e.type)+'</td><td class="n">'+money(e.amount)+'</td><td>'+esc(e.occurred_at?fdt(e.occurred_at):'')+'</td><td>'+esc(e.reference||'')+'</td><td>'+esc(e.note||'')+(e.voided?' <i>(voided '+esc(fdt(e.voided.at))+': '+esc(e.voided.reason)+')</i>':'')+'</td><td>'+esc(e.by||'')+'</td>'
-      +'<td>'+((!e.voided&&e.type!=='statement_emailed')?'<button class="btn danger sm" data-void="'+esc(e.id)+'" data-c="'+esc(r.code)+'">Void</button>':'')+'</td></tr>';
+    h+='<tr class="'+(e.voided?'void':'')+'"><td>'+esc(fdt(e.recorded_at))+'</td><td>'+esc(TYPE_LABEL[e.type]||e.type)+'</td><td class="n">'+money(e.amount)+'</td><td>'+esc(e.occurred_at?fdt(e.occurred_at):'')+'</td><td>'+esc(e.reference||'')+'</td><td>'+esc(e.note||'')+((e.edits&&e.edits.length)?' <i>(date changed '+esc(fdt(e.edits[e.edits.length-1].at))+', was '+esc(e.edits[e.edits.length-1].from?fdt(e.edits[e.edits.length-1].from):'blank')+')</i>':'')+(e.voided?' <i>(voided '+esc(fdt(e.voided.at))+': '+esc(e.voided.reason)+')</i>':'')+'</td><td>'+esc(e.by||'')+'</td>'
+      +'<td>'+((!e.voided&&e.type!=='statement_emailed')?'<button class="btn ghost sm" data-redate="'+esc(e.id)+'" data-c="'+esc(r.code)+'">Change date</button> <button class="btn danger sm" data-void="'+esc(e.id)+'" data-c="'+esc(r.code)+'">Void</button>':'')+'</td></tr>';
   });
   h+='</tbody></table>';
   var rem=Math.max(0,k.bal);
@@ -149,7 +149,7 @@ async function post(body){
 }
 
 $('body').addEventListener('click',async function(e){
-  var add=e.target.closest('[data-add]'), vd=e.target.closest('[data-void]'), pn=e.target.closest('[data-pin]');
+  var add=e.target.closest('[data-add]'), vd=e.target.closest('[data-void]'), rd=e.target.closest('[data-redate]'), pn=e.target.closest('[data-pin]');
   if(pn){
     var pc=pn.dataset.pin;
     if(!confirm((PINS[pc]?'Reset the PIN for ':'Create a PIN for ')+pc+'? '+(PINS[pc]?'Their old PIN will stop working.':''))) return;
@@ -164,6 +164,13 @@ $('body').addEventListener('click',async function(e){
         occurred_at:when?new Date(when).toISOString():null,reference:f.querySelector('.f-ref').value,note:f.querySelector('.f-note').value});
       DATA.drivers[c].record=d.record; showMsg('Recorded for '+c+'.','ok'); render();
     }catch(x){showMsg(x.message,'err');}
+    return;
+  }
+  if(rd){
+    var nd=prompt('Date the money was actually sent (YYYY-MM-DD), e.g. 2026-10-06:'); if(!nd)return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(nd.trim())){ showMsg('Use the form YYYY-MM-DD, e.g. 2026-10-06.','err'); return; }
+    try{ var d3=await post({action:'redate',week_end:DATA.week,driver:rd.dataset.c,entry_id:rd.dataset.redate,occurred_at:nd.trim()+'T18:00:00Z'});
+      DATA.drivers[rd.dataset.c].record=d3.record; showMsg('Date changed.','ok'); render(); }catch(x){showMsg(x.message,'err');}
     return;
   }
   if(vd){
