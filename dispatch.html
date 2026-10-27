@@ -57,7 +57,7 @@ details summary{cursor:pointer;font-size:12px;color:var(--accent);margin-top:4px
 
 <div class="card">
   <h2>Offer a job</h2>
-  <p class="hint">Pick a shop or type the pickup address. Add how many deliveries and the area if you like, and the text to the driver is written for you. If a driver would collect from 2 or 3 shops, add each one. Drivers are ranked by driving time to the <b>first</b> pickup, from where they will be free: the address they said they are heading to, otherwise their last delivery. Drivers with an old update are listed after current ones. Only drivers marked as working today are included.</p>
+  <p class="hint"><b>Shop:</b> pick the shop (KF) and list the deliveries ready, one address per line; the driver may take any, all or none. <b>Wholesaler:</b> pick it (FS), then the shop it is for and the cases (BV, 4), which reads <b>FS BV 4 cs</b>. For 2 or 3 pickups, add each one. Drivers are ranked by driving time to the <b>first</b> pickup, from where they will be free: the address they said they are heading to, otherwise their last delivery. Drivers with an old update are listed after current ones. Only drivers marked as working today are included.</p>
   <div id="jobRows"></div>
   <div class="row" style="margin-top:8px;">
     <button class="btn ghost" id="addShopBtn" type="button" style="padding:6px 12px;font-size:13px;">+ Add another shop</button>
@@ -121,51 +121,76 @@ function resolvePickup(txt){
   var sh=shopsByLabel[txt.toLowerCase()];
   return sh?{code:shopCode(sh),address:sh.address||'',shop:sh}:{code:'',address:txt,shop:null};
 }
-/* The text to a driver: who has how many, where, and how far from them. 1 to 3 pickups. */
-var CHECKIN_TEXT='Where are you headed after this? You can also tap Heading to on your route page.';
-function jobWhat(j){
-  var n=j.count, area=j.area?j.area+' ':'';
-  return n?(n+' '+area+(n===1?'delivery':'deliveries')):('a '+area+'delivery');
+/* Shorthand, the way dispatch already writes it.
+   Shop job:      KF has ready:  <delivery addresses, one per line>     (the driver goes to KF; takes any, all or none)
+   Wholesale job: FS BV 4 cs     (go to FS, pick up BV's 4 cases)                                              */
+var WHOLESALERS=['AM','WFW','BA','FC','FS','SV','QF','SB'];
+var CHECKIN_TEXT='Where are you headed next?';
+function itemCount(jobs){ return jobs.reduce(function(n,j){ return n+((!j.wpu&&j.stops&&j.stops.length)?j.stops.length:1); },0); }
+function jobBlock(j){
+  if(j.wpu) return [j.code||j.address, j.to||'', j.cases?j.cases+' cs':''].filter(Boolean).join(' ');
+  var head=(j.code||j.address);
+  if(j.stops&&j.stops.length) return head+' has ready:\n'+j.stops.join('\n');
+  return head;
 }
-function jobText(jobs,minutes){
-  var many=jobs.length>1, total=jobs.reduce(function(t,j){return t+(j.count||1);},0);
-  var head, j0=jobs[0];
-  if(!many){
-    head=j0.code?(j0.code+' has '+jobWhat(j0)+' for you.'):('There is '+jobWhat(j0)+' for you.');
-    return head+(j0.address?' Pickup: '+j0.address+'.':'')+(minutes?' About '+minutes+' min from you.':'')+' Can you take '+(j0.count&&j0.count>1?'them':'it')+'?';
-  }
-  head=jobs.map(function(j){ return (j.code||('Pickup at '+j.address))+' has '+jobWhat(j); }).join(' and ')+' for you.';
-  var places=jobs.map(function(j){ return (j.code?j.code+' ':'')+j.address; }).join('; ');
-  return head+' Pickups: '+places+'.'+(minutes?' About '+minutes+' min from you to the first pickup.':'')+' Can you take them?';
+/* One line for lists and the board: KF x 2, FS BV 4 cs */
+function jobBrief(j){
+  if(j.wpu) return jobBlock(j);
+  return (j.code||j.address)+((j.stops&&j.stops.length)?' x '+j.stops.length:'');
 }
-
-/* The same text, ending with the accept link instead of a question. */
+function jobLines(jobs){ return jobs.map(jobBrief).join(' + '); }
+function blocks(jobs){ return jobs.map(jobBlock).join('\n\n'); }
 var OFFER_LINK_MIN=15;
+/* The plain text to a driver (the Text job link) and the same one ending with the accept link. */
+function jobText(jobs,minutes){
+  return blocks(jobs)+'\n'+(minutes?minutes+' min away. ':'')+(itemCount(jobs)>1?'Take any or all?':'Take it?');
+}
 function offerText(jobs,minutes,link){
-  var t=jobText(jobs,minutes);
-  t=t.replace(/ Can you take (them|it)\?$/,'');
-  return t+' First to accept gets it (open '+OFFER_LINK_MIN+' min): '+link;
+  return blocks(jobs)+'\n'+(minutes?minutes+' min away. ':'')+(itemCount(jobs)>1?'Take any or all':'First to accept')+': '+link;
 }
 
-/* The pickup rows (1 to 3). */
+/* The pickup rows (1 to 3): From, then either the deliveries ready (shop) or To + cases (wholesaler). */
 function addJobRow(){
   var host=document.getElementById('jobRows');
   if(host.children.length>=3) return;
   var div=document.createElement('div');
-  div.className='row jr'; div.style.marginTop=host.children.length?'6px':'0';
-  div.innerHTML='<input class="jr-shop" list="shopList" placeholder="Shop (e.g. KF) or pickup address" autocomplete="off">'
-    +'<input class="jr-count" type="number" min="1" max="99" placeholder="How many" style="flex:0 0 100px;min-width:90px;">'
-    +'<input class="jr-area" placeholder="Area, e.g. NW" maxlength="20" style="flex:0 0 130px;min-width:110px;">';
+  div.className='jr'; div.style.marginTop=host.children.length?'10px':'0'; div.style.paddingTop=host.children.length?'10px':'0';
+  if(host.children.length) div.style.borderTop='1px solid var(--border)';
+  div.innerHTML='<div class="row"><input class="jr-shop" list="shopList" placeholder="From: shop or wholesaler (KF, FS)" autocomplete="off">'
+    +'<span class="jr-ws" hidden style="display:contents;"><input class="jr-to" placeholder="To: shop code (BV)" autocomplete="off" style="min-width:140px;">'
+    +'<input class="jr-cases" type="number" min="1" max="999" placeholder="Cases" style="flex:0 0 90px;min-width:80px;"></span></div>'
+    +'<textarea class="jr-stops" rows="3" placeholder="Deliveries ready, one address per line (optional)" style="margin-top:6px;width:100%;font:inherit;padding:9px 10px;border:1px solid var(--border);border-radius:8px;"></textarea>';
   host.appendChild(div);
   document.getElementById('addShopBtn').hidden=host.children.length>=3;
-  div.querySelector('.jr-shop').addEventListener('keydown',function(e){ if(e.key==='Enter') rank(); });
+  var from=div.querySelector('.jr-shop');
+  function sync(){
+    var isWs=WHOLESALERS.indexOf(parseFrom(from.value.trim()).code)>=0;
+    div.querySelector('.jr-ws').hidden=!isWs; div.querySelector('.jr-ws').style.display=isWs?'contents':'none';
+    div.querySelector('.jr-stops').hidden=isWs;
+  }
+  from.addEventListener('input',sync); from.addEventListener('change',sync); sync();
+  from.addEventListener('keydown',function(e){ if(e.key==='Enter') rank(); });
+}
+/* "KF" or "KF Kensington Florist" or "FS 55 Wild Rose Dr SE" or a plain address. */
+function parseFrom(txt){
+  var full=shopsByLabel[txt.toLowerCase()];
+  if(full) return {code:shopCode(full),address:full.address||'',shop:full};
+  var m=txt.match(/^([A-Za-z]{1,4})(?:[\s,]+(.+))?$/);
+  if(m){
+    var tok=m[1].toUpperCase(), sh=shopsByLabel[tok.toLowerCase()];
+    if(sh||WHOLESALERS.indexOf(tok)>=0) return {code:tok,address:m[2]?m[2].trim():(sh&&sh.address)||'',shop:sh||null};
+  }
+  return {code:'',address:txt,shop:null};
 }
 function readJobs(){
   return Array.prototype.map.call(document.querySelectorAll('#jobRows .jr'),function(r){
     var txt=r.querySelector('.jr-shop').value.trim();
     if(!txt) return null;
-    var pk=resolvePickup(txt), cnt=parseInt(r.querySelector('.jr-count').value,10);
-    return {code:pk.code,address:pk.address,shop:pk.shop,count:(cnt>0?cnt:0),area:r.querySelector('.jr-area').value.trim().toUpperCase()};
+    var pk=parseFrom(txt), wpu=WHOLESALERS.indexOf(pk.code)>=0;
+    var to=r.querySelector('.jr-to').value.trim(); if(/^[A-Za-z]{1,4}$/.test(to)) to=to.toUpperCase();
+    var cs=parseInt(r.querySelector('.jr-cases').value,10);
+    var stops=wpu?[]:r.querySelector('.jr-stops').value.split('\n').map(function(x){return x.trim();}).filter(function(x){return x.length>=3;});
+    return {code:pk.code,address:pk.address,shop:pk.shop,wpu:wpu,to:wpu?to:'',cases:(wpu&&cs>0?cs:0),stops:stops};
   }).filter(Boolean);
 }
 
@@ -270,7 +295,7 @@ async function createOffer(jobs){
   btn.disabled=true; btn.textContent='Creating\u2026';
   try{
     var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
-      jobs:jobs.map(function(j){return {code:j.code,address:j.address,count:j.count,area:j.area};}),
+      jobs:jobs.map(function(j){return {code:j.code,address:j.address,to:j.to,cases:j.cases,wpu:j.wpu,stops:j.stops};}),
       drivers:boxes.map(function(b){return b.dataset.code;})})});
     if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
     var d=await r.json();
@@ -296,11 +321,12 @@ async function loadOffers(){
     var d=await r.json(), now=Date.parse(d.now)||Date.now();
     if(!d.offers.length){ host.innerHTML='<div class="sub">No offers in the last 24 hours.</div>'; return; }
     host.innerHTML='<table><thead><tr><th>Job</th><th>Status</th><th>Drivers</th></tr></thead><tbody>'+d.offers.map(function(o){
-      var job=o.jobs.map(function(j){ return esc((j.code||j.address)+(j.count?' '+j.count:'')+(j.area?' '+j.area:'')); }).join(' + ');
+      var job=esc(jobLines(o.jobs));
       var st;
-      if(o.state==='taken') st='<span class="age a-new">Taken by '+esc(o.winner_name)+'</span><div class="sub">'+esc(new Date(o.taken_at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</div>';
-      else if(o.state==='open'){ var left=Math.max(0,Math.ceil((Date.parse(o.expires_at)-now)/60000)); st='<span class="age a-mid">Open</span><div class="sub">'+left+' min left</div>'; }
-      else st='<span class="age a-old">Expired</span><div class="sub">no one accepted</div>';
+      var who=(o.assigned||[]).map(function(a){ return esc(a.name)+(o.total>1?' '+a.count+' of '+o.total:''); }).join(', ');
+      if(o.state==='taken') st='<span class="age a-new">Taken</span><div class="sub">'+who+'</div>';
+      else if(o.state==='open'){ var left=Math.max(0,Math.ceil((Date.parse(o.expires_at)-now)/60000)); st='<span class="age a-mid">Open</span><div class="sub">'+left+' min left'+(who?'<br>'+who+'<br>'+o.unclaimed+' still free':'')+'</div>'; }
+      else st='<span class="age a-old">Expired</span><div class="sub">'+(who?who+'<br>'+o.unclaimed+' not taken':'no one accepted')+'</div>';
       var drv=o.drivers.map(function(x){ return esc(x.name)+': '+(x.response==='accept'?'accepted':x.response==='decline'?'declined':'no reply'); }).join('<br>');
       return '<tr><td>'+job+'<div class="sub">'+esc(new Date(o.created_at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}))+'</div></td><td>'+st+'</td><td class="sub">'+drv+'</td></tr>';
     }).join('')+'</tbody></table>';
@@ -311,9 +337,9 @@ async function rank(){
   var jobs=readJobs(); var job=jobs[0]||{address:''}; var addr=job.address;
   var err=document.getElementById('rankErr'), out=document.getElementById('rankOut'), btn=document.getElementById('rankBtn');
   err.hidden=true;
-  if(!jobs.length||addr.length<5){ err.textContent=job.shop?'That shop has no address saved. Type the pickup address instead.':'Enter a shop or the pickup address.'; err.hidden=false; return; }
+  if(!jobs.length||addr.length<5){ err.textContent=job.code?(job.code+' has no address saved. Type it after the code, e.g. '+job.code+' 55 Wild Rose Dr SE.'):'Enter a shop or the pickup address.'; err.hidden=false; return; }
   var bad=jobs.filter(function(j){return String(j.address||'').length<5;})[0];
-  if(bad){ err.textContent='A shop on the list has no address saved. Type the pickup address instead.'; err.hidden=false; return; }
+  if(bad){ err.textContent=(bad.code||'That pickup')+' has no address saved. Type it after the code, e.g. '+(bad.code||'KF')+' 55 Wild Rose Dr SE.'; err.hidden=false; return; }
   btn.disabled=true; btn.textContent='Ranking…';
   try{
     var r=await fetch('/api/dispatch-rank',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({address:addr})});
@@ -333,7 +359,7 @@ async function rank(){
       +'<div class="row" style="margin-top:10px;align-items:center;"><button class="btn" id="offerBtn" type="button">Create offer for ticked drivers</button><span class="sub">Open '+OFFER_LINK_MIN+' min. The first driver to accept gets the job; the others see it is taken.</span></div>'
       +'<div id="offerOut" style="margin-top:10px;"></div>';
     document.getElementById('offerBtn').addEventListener('click',function(){ createOffer(jobs); });
-    document.getElementById('pickupNote').textContent='Text preview: '+jobText(jobs,3).replace(/About 3 min from you( to the first pickup)?\./,'About [x] min from you$1.');
+    document.getElementById('pickupNote').textContent='Text preview: '+jobText(jobs,3).replace('3 min away','[x] min away').replace(/\n+/g,' / ');
     if(d.roster==='none') document.getElementById('pickupNote').textContent+=' (Everyone is shown because today\u2019s list is not set.)';
     out.hidden=false;
   }catch(e){ err.textContent=e.message; err.hidden=false; out.hidden=true; }
