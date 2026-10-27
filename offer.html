@@ -19,6 +19,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Bl
 .who{font-size:20px;font-weight:700;font-family:Georgia,serif;}
 .addr{font-size:15px;margin:4px 0 6px;}
 .nav{color:var(--accent);font-weight:700;font-size:14px;text-decoration:none;}
+.stop{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);font-size:16px;}
+.stop input{width:22px;height:22px;flex:none;}
+.stop.gone{color:var(--ink-soft);}
+.stop .tag{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink-soft);}
+.stop.mine{color:var(--green);font-weight:700;}
 .timer{font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
 .btn{display:block;width:100%;border:0;border-radius:12px;padding:16px;font-size:18px;font-weight:800;cursor:pointer;}
 .accept{background:var(--green);color:#fff;margin-bottom:10px;}
@@ -42,7 +47,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,Bl
     <div class="card" id="picks"></div>
     <div id="open" hidden>
       <div class="timer" id="timer"></div>
-      <button class="btn accept" id="acceptBtn">Accept this job</button>
+      <button class="btn accept" id="acceptBtn">Accept</button>
       <button class="btn decline" id="declineBtn">Not this time</button>
       <div class="err" id="err" hidden></div>
     </div>
@@ -55,38 +60,90 @@ function esc(s){var d=document.createElement('div');d.textContent=s==null?'':Str
 var qs=new URLSearchParams(location.search), OID=qs.get('id')||'', DRV=(qs.get('d')||'').toUpperCase();
 var offer=null, timerId=null, pollId=null, busy=false;
 
-function whatText(j){
-  var n=j.count, a=j.area?j.area+' ':'';
-  return n?(n+' '+a+(n===1?'delivery':'deliveries')):('a '+a+'delivery');
+/* Same shorthand as dispatch's texts: KF has ready: <addresses> / FS BV 4 cs */
+var sel={}; // item id -> ticked
+function itemsOf(jobs){
+  var out=[];
+  jobs.forEach(function(j,i){
+    if(!j.wpu&&j.stops&&j.stops.length) j.stops.forEach(function(s,k){ out.push({id:'j'+i+'s'+k,job:i,label:s}); });
+    else out.push({id:'j'+i,job:i,label:j.wpu?[j.to||'',j.cases?j.cases+' cs':''].filter(Boolean).join(' '):''});
+  });
+  return out;
 }
-function renderPicks(jobs){
-  document.getElementById('picks').innerHTML=jobs.map(function(j){
+function renderPicks(){
+  var jobs=offer.jobs, items=itemsOf(jobs), multi=items.length>1, aw=offer.awards||{}, mineSet={};
+  (offer.my_items||[]).forEach(function(x){ mineSet[x]=true; });
+  var answered=offer.mine==='accept'||offer.mine==='decline';
+  var html=jobs.map(function(j,i){
     var nav='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(j.address)+'&travelmode=driving';
-    return '<div class="pick"><div class="who">'+esc(j.code?j.code+' has ':'')+esc(whatText(j))+'</div>'
-      +'<div class="addr">Pickup: '+esc(j.address)+'</div><a class="nav" href="'+nav+'" target="_blank" rel="noopener">Navigate to pickup</a></div>';
+    var head=j.wpu?(j.code+' '+(j.to||'')+(j.cases?' '+j.cases+' cs':'')):(j.code||j.address);
+    var rows=items.filter(function(it){return it.job===i;}).map(function(it){
+      var a=aw[it.id], taken=a&&!mineSet[it.id], label=it.label||(j.wpu?'':'');
+      if(!label&&!j.wpu) return '';
+      if(j.wpu&&!multi) return '';
+      if(taken) return '<div class="stop gone"><span>'+esc(label||head)+'</span><span class="tag">Taken: '+esc(a.name)+'</span></div>';
+      if(mineSet[it.id]) return '<div class="stop mine"><span>'+esc(label||head)+'</span><span class="tag">Yours</span></div>';
+      if(answered||offer.state!=='open') return '<div class="stop gone"><span>'+esc(label||head)+'</span></div>';
+      if(!multi) return '<div class="stop"><span>'+esc(label)+'</span></div>';
+      if(!(it.id in sel)) sel[it.id]=true;
+      return '<label class="stop"><input type="checkbox" data-item="'+esc(it.id)+'"'+(sel[it.id]?' checked':'')+'><span>'+esc(label||head)+'</span></label>';
+    }).join('');
+    var sub=j.wpu?'':(rows?'<div class="addr">has ready:</div>':'');
+    return '<div class="pick"><div class="who">'+esc(head)+'</div>'+sub+rows
+      +'<div class="addr" style="margin-top:8px;">Pickup: '+esc((j.code&&j.address?j.code+', ':'')+j.address)+'</div><a class="nav" href="'+nav+'" target="_blank" rel="noopener">Navigate to pickup</a></div>';
   }).join('');
+  document.getElementById('picks').innerHTML=html;
+  updateAccept();
 }
+function chosen(){
+  var items=itemsOf(offer.jobs);
+  if(items.length<2) return items.map(function(i){return i.id;});
+  var aw=offer.awards||{};
+  return items.filter(function(it){ return !aw[it.id] && sel[it.id]!==false; }).map(function(i){return i.id;});
+}
+function updateAccept(){
+  var a=document.getElementById('acceptBtn'), n=chosen().length, total=itemsOf(offer.jobs).length;
+  if(busy) return;
+  a.disabled=n===0;
+  a.textContent=total<2?'Accept':(n===0?'Tick what you can take':(n===total?'Accept all':'Accept '+n+' selected'));
+}
+document.addEventListener('change',function(e){
+  var c=e.target.closest&&e.target.closest('input[data-item]'); if(!c) return;
+  sel[c.dataset.item]=c.checked; updateAccept();
+});
 function fmtTime(iso){ try{ return new Date(iso).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
 function tick(){
   if(!offer) return;
   var left=Math.max(0,Math.round((Date.parse(offer.expires_at)-Date.now())/1000));
   var m=Math.floor(left/60), s=left%60;
-  document.getElementById('timer').textContent='Open for '+m+':'+String(s).padStart(2,'0')+'. First to accept gets it.';
+  document.getElementById('timer').textContent='Open for '+m+':'+String(s).padStart(2,'0')+'. First to accept gets it.'+(itemsOf(offer.jobs).length>1?' Take any, all or none.':'');
   if(left<=0 && offer.state==='open'){ offer.state='expired'; show(); }
 }
+function listMine(){
+  var items=itemsOf(offer.jobs), mine={}; (offer.my_items||[]).forEach(function(x){mine[x]=true;});
+  var lines=items.filter(function(it){return mine[it.id];}).map(function(it){
+    var j=offer.jobs[it.job]; return esc(it.label||[j.code,j.to,j.cases?j.cases+' cs':''].filter(Boolean).join(' '));
+  });
+  return lines.length>1?'<div style="margin-top:6px;font-size:15px;">'+lines.join('<br>')+'</div>':'';
+}
 function show(){
-  var st=offer.state, mine=offer.mine;
+  var st=offer.state, mine=offer.mine, won=(offer.my_items||[]).length;
   var open=document.getElementById('open'), res=document.getElementById('result'), rl=document.getElementById('routeLink');
   open.hidden=true; res.hidden=true; rl.hidden=true;
-  if(st==='open' && mine!=='decline'){ open.hidden=false; tick(); return; }
+  if(!busy) renderPicks();
+  if(st==='open' && !mine){ open.hidden=false; tick(); return; }
   res.hidden=false;
-  if(st==='taken' && offer.i_won){
+  var total=itemsOf(offer.jobs).length;
+  if(won){
     res.className='msg win';
-    res.innerHTML='<div class="big">It is yours.</div>Collect it at the pickup'+(offer.jobs.length>1?'s':'')+' above and scan the tags on your route page.';
+    res.innerHTML='<div class="big">'+(won<total?'Yours: '+won+' of '+total+'.':'It is yours.')+'</div>Collect at the pickup'+(offer.jobs.length>1?'s':'')+' above and scan the tags on your route page.'+listMine();
     rl.href='/route/'+encodeURIComponent(DRV.toLowerCase()); rl.hidden=false;
+  } else if(mine==='accept'){
+    res.className='msg lost';
+    res.innerHTML='<div class="big">Taken</div>Someone else accepted '+(total>1?'those':'this job')+' first ('+esc(fmtTime(offer.taken_at||''))+'). Nothing for you to do.';
   } else if(st==='taken'){
     res.className='msg lost';
-    res.innerHTML='<div class="big">Taken</div>'+esc(offer.winner_name||'Another driver')+' accepted this job ('+esc(fmtTime(offer.taken_at))+'). Nothing for you to do.';
+    res.innerHTML='<div class="big">Taken</div>'+esc((offer.assigned||[]).map(function(a){return a.name;}).join(' and ')||'Another driver')+' accepted this job. Nothing for you to do.';
   } else if(st==='expired'){
     res.className='msg info'; res.innerHTML='<div class="big">Closed</div>This offer has expired.';
   } else if(mine==='decline'){
@@ -102,7 +159,6 @@ async function load(first){
     offer=d;
     document.getElementById('loading').hidden=true; document.getElementById('job').hidden=false;
     var w=document.getElementById('who'); w.textContent=d.driver; w.hidden=false;
-    if(first) renderPicks(d.jobs);
     show();
     return true;
   }catch(e){
@@ -115,14 +171,14 @@ async function respond(kind){
   var a=document.getElementById('acceptBtn'), dcl=document.getElementById('declineBtn');
   a.disabled=true; dcl.disabled=true; if(kind==='accept') a.textContent='Checking…';
   try{
-    var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'respond',id:OID,d:DRV,response:kind})});
+    var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'respond',id:OID,d:DRV,response:kind,items:kind==='accept'?chosen():[]})});
     var d=await r.json();
     if(!r.ok) throw new Error(d.error||'Could not send your answer.');
     offer=Object.assign({},offer,d);
   }catch(e){
     err.textContent=e.message+' Tap again.'; err.hidden=false;
   }finally{
-    busy=false; a.disabled=false; dcl.disabled=false; a.textContent='Accept this job'; show();
+    busy=false; a.disabled=false; dcl.disabled=false; show(); updateAccept();
   }
 }
 document.getElementById('acceptBtn').addEventListener('click',function(){ respond('accept'); });
