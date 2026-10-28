@@ -89,7 +89,7 @@ function groupFile(g,weekEnd){return groupFolder(g)+' WE '+weekEnd+'.pdf';}
 function rootName(){return type==='shop'?'SC26 SHOP':'SC26 DRIVER';}
 
 function showTop(t){var m=document.getElementById('topMsg');m.textContent=t||'';m.hidden=!t;}
-function showMsg(t,cls){var m=document.getElementById('msg');m.style.whiteSpace='pre-line';m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;}
+function showMsg(t,cls){var m=document.getElementById('msg');m.style.whiteSpace='pre-line';m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;if(t){try{m.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}}}
 
 /* ---------- PDF ---------- */
 function buildPdf(g){
@@ -257,6 +257,7 @@ async function findMonthDir(root, we, create){
   return create ? await root.getDirectoryHandle(want,{create:true}) : null;
 }
 async function checkFolder(){
+  showMsg('Checking the folder\u2026','info');
   if(!HAS_FS){showMsg('This browser cannot read the saved folder. Use Edge or Chrome.','err');return;}
   var root; try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError') return; showMsg('Could not open the folder: '+e.message,'err'); return; }
   try{
