@@ -55,6 +55,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
         <button class="btn" id="saveBtn">Save to folder</button>
         <button class="btn btn-ghost" id="zipBtn">Download zip</button>
         <button class="btn btn-ghost" id="folderBtn" title="Pick the folder the PDFs are saved into">Change folder</button>
+        <button class="btn btn-ghost" id="checkBtn" title="Show which folder the PDFs are going into and what is already in it">Where are my PDFs?</button>
       </div>
     </div>
     <table><thead><tr><th><input type="checkbox" id="allChk" checked></th><th>Report</th><th class="num">Deliveries</th><th class="num">Total</th><th></th></tr></thead><tbody id="rows"></tbody></table>
@@ -88,7 +89,7 @@ function groupFile(g,weekEnd){return groupFolder(g)+' WE '+weekEnd+'.pdf';}
 function rootName(){return type==='shop'?'SC26 SHOP':'SC26 DRIVER';}
 
 function showTop(t){var m=document.getElementById('topMsg');m.textContent=t||'';m.hidden=!t;}
-function showMsg(t,cls){var m=document.getElementById('msg');m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;}
+function showMsg(t,cls){var m=document.getElementById('msg');m.style.whiteSpace='pre-line';m.className='msg '+(cls||'info');m.textContent=t;m.hidden=!t;}
 
 /* ---------- PDF ---------- */
 function buildPdf(g){
@@ -241,6 +242,30 @@ async function changeFolder(){
     showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
   }catch(e){ if(!(e&&e.name==='AbortError')) showMsg('Could not open the folder: '+e.message,'err'); }
 }
+async function checkFolder(){
+  if(!HAS_FS){showMsg('This browser cannot read the saved folder. Use Edge or Chrome.','err');return;}
+  var root; try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError') return; showMsg('Could not open the folder: '+e.message,'err'); return; }
+  try{
+    var months=[], loose=0;
+    for await (var ent of root.values()){ if(ent.kind==='directory') months.push(ent.name); else loose++; }
+    months.sort();
+    var we=(document.getElementById('weekEnd').value||''), msg='This page saves into the folder named "'+root.name+'" (in the browser you are using now).\n'
+      +'Inside it: '+(months.length?months.join(', '):'no month folders')+(loose?' (+ '+loose+' loose file'+(loose===1?'':'s')+')':'')+'.\n';
+    if(we){
+      var mf=monthFolder(we), md=null;
+      try{ md=await root.getDirectoryHandle(mf); }catch(e){}
+      if(!md) msg+='\nFor the week ending '+we+' the PDFs go in a folder called "'+mf+'". That folder does not exist yet, so nothing has been saved for that week here.';
+      else{
+        var shops=0, files=0, mine=[];
+        for await (var s of md.values()){ if(s.kind!=='directory') continue; shops++;
+          for await (var f of s.values()){ if(f.kind==='file'){ files++; if(f.name.indexOf(' WE '+we)>=0) mine.push(s.name); } } }
+        msg+='\n"'+mf+'" holds '+shops+' folder'+(shops===1?'':'s')+' and '+files+' PDF'+(files===1?'':'s')+'. For the week ending '+we+': '+(mine.length?mine.length+' PDF'+(mine.length===1?'':'s')+' found (e.g. '+mine.slice(0,3).join(', ')+').':'none found here.');
+      }
+    }
+    msg+='\n\nIf this is not the folder you expected, press Change folder and choose the right one (the one that holds the month folders).';
+    showMsg(msg,'info');
+  }catch(e){ showMsg('Could not read the folder: '+e.message,'err'); }
+}
 async function saveToFolder(){
   var sel=selected(); if(!sel.length){showMsg('Nothing selected.','err');return;}
   var btn=document.getElementById('saveBtn');
@@ -287,6 +312,7 @@ document.getElementById('loadBtn').addEventListener('click',load);
 document.getElementById('saveBtn').addEventListener('click',saveToFolder);
 document.getElementById('zipBtn').addEventListener('click',downloadZip);
 document.getElementById('folderBtn').addEventListener('click',changeFolder);
+document.getElementById('checkBtn').addEventListener('click',checkFolder);
 document.getElementById('allChk').addEventListener('change',function(){var v=this.checked;document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){c.checked=v;});});
 document.getElementById('rows').addEventListener('click',function(e){
   var b=e.target.closest('[data-pdf]'); if(!b) return;
