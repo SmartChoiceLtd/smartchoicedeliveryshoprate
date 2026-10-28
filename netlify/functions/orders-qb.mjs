@@ -165,8 +165,30 @@ export default async (req) => {
     var ordersStore = getStore('flower-orders');
     var ratesStore = getStore('flower-rates');
 
-    var { blobs } = await ordersStore.list();
-    var allOrders = (await Promise.all(blobs.map(b => ordersStore.get(b.key, { type: 'json' })))).filter(Boolean);
+    // Fetch just this week's orders, not every order ever saved (loading them all is what made this
+    // export time out as the order count grew). Keys embed the week-ending Sunday, so most come back from a
+    // fast prefix lookup; older keys, and orders filed under a different week, are recovered by the
+    // timestamp in the key, padded either side. The exact date check below decides what is billed.
+    var DAYMS = 86400000;
+    var wkStartMs = new Date(weekEnd + 'T12:00:00').getTime() - 6 * DAYMS;
+    var wkStartIso = new Date(wkStartMs).toISOString().slice(0, 10);
+    var padStartMs = new Date(wkStartIso + 'T00:00:00').getTime() - DAYMS;
+    var padEndMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAYMS;
+    var { blobs: prefixed } = await ordersStore.list({ prefix: 'order_' + weekEnd + '_' });
+    var { blobs: everyKey } = await ordersStore.list();
+    var nearby = everyKey.filter(b => {
+      if (b.key.startsWith('order_' + weekEnd + '_')) return false;
+      var m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+      if (!m) return false;
+      var ts = parseInt(m[1]);
+      return ts >= padStartMs && ts <= padEndMs;
+    });
+    var allOrders = [];
+    var wanted = prefixed.concat(nearby);
+    for (var i = 0; i < wanted.length; i += 50) {
+      var chunk = await Promise.all(wanted.slice(i, i + 50).map(b => ordersStore.get(b.key, { type: 'json' }).catch(() => null)));
+      chunk.forEach(o => { if (o) allOrders.push(o); });
+    }
 
     // Load rate table
     var rates = {};
