@@ -85,7 +85,10 @@ function lastSunday(){
 }
 function monthFolder(weekEnd){var p=weekEnd.split('-');return MONTHS[parseInt(p[1],10)-1]+' '+p[0].slice(2);}
 function groupFolder(g){return safe(g.code+' '+(g.name||''));}
-function groupFile(g,weekEnd){return groupFolder(g)+' WE '+weekEnd+'.pdf';}
+/* Shop files are named the way the existing ones are: "KF KENSINGTON FLORIST Week Ending Oct-25-26.pdf". */
+var MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function weLabel(weekEnd){var p=weekEnd.split('-');return MON3[parseInt(p[1],10)-1]+'-'+p[2]+'-'+p[0].slice(2);}
+function groupFile(g,weekEnd){return groupFolder(g)+(type==='shop'?' Week Ending '+weLabel(weekEnd):' WE '+weekEnd)+'.pdf';}
 function rootName(){return type==='shop'?'SC26 SHOP':'SC26 DRIVER';}
 
 function showTop(t){var m=document.getElementById('topMsg');m.textContent=t||'';m.hidden=!t;}
@@ -221,8 +224,14 @@ function idb(){return new Promise(function(res,rej){var q=indexedDB.open('scd-pd
 async function getSavedHandle(key){try{var db=await idb();return await new Promise(function(res){var r=db.transaction('h').objectStore('h').get(key);r.onsuccess=function(){res(r.result||null);};r.onerror=function(){res(null);};});}catch(e){return null;}}
 async function putSavedHandle(key,h){try{var db=await idb();db.transaction('h','readwrite').objectStore('h').put(h,key);}catch(e){}}
 
+/* Guard against picking a subfolder (such as a month or shop folder) by mistake: PDFs would be filed inside it. */
+function rootOk(h){
+  if(String(h.name).toUpperCase()===rootName()) return true;
+  return confirm('You chose the folder "'+h.name+'", but the main folder should be "'+rootName()+'" (the one that holds the month folders). PDFs would be saved inside "'+h.name+'".\n\nPress OK to use it anyway, or Cancel to choose again.');
+}
 async function getRoot(){
   var key='root-'+type, h=await getSavedHandle(key);
+  if(h && String(h.name).toUpperCase()!==rootName()) h=null; // a remembered folder that is not the main one (e.g. a shop's subfolder) is ignored
   if(h){
     try{
       var perm=await h.queryPermission({mode:'readwrite'});
@@ -231,6 +240,7 @@ async function getRoot(){
     }catch(e){}
   }
   h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+  if(!rootOk(h)){ var e=new Error('wrong folder'); e.name='AbortError'; throw e; }
   await putSavedHandle(key,h);
   return h;
 }
@@ -238,6 +248,7 @@ async function changeFolder(){
   if(!HAS_FS){showMsg('This browser cannot pick a folder - use Download zip instead (Edge or Chrome can).','err');return;}
   try{
     var h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+    if(!rootOk(h)){ showMsg('Folder not changed. Choose the folder named '+rootName()+'.','err'); return; }
     await putSavedHandle('root-'+type,h);
     showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
   }catch(e){ if(!(e&&e.name==='AbortError')) showMsg('Could not open the folder: '+e.message,'err'); }
@@ -273,7 +284,7 @@ async function checkFolder(){
       else{
         var shops=0, files=0, mine=[];
         for await (var s of md.values()){ if(s.kind!=='directory') continue; shops++;
-          for await (var f of s.values()){ if(f.kind==='file'){ files++; if(f.name.indexOf(' WE '+we)>=0) mine.push(s.name); } } }
+          for await (var f of s.values()){ if(f.kind==='file'){ files++; if(f.name.indexOf(' WE '+we)>=0||f.name.indexOf('Week Ending '+weLabel(we))>=0) mine.push(s.name); } } }
         msg+='\n"'+md.name+'" holds '+shops+' folder'+(shops===1?'':'s')+' and '+files+' PDF'+(files===1?'':'s')+'. For the week ending '+we+': '+(mine.length?mine.length+' PDF'+(mine.length===1?'':'s')+' found (e.g. '+mine.slice(0,3).join(', ')+').':'none found here.');
       }
     }
