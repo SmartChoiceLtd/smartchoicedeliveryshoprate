@@ -242,6 +242,20 @@ async function changeFolder(){
     showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
   }catch(e){ if(!(e&&e.name==='AbortError')) showMsg('Could not open the folder: '+e.message,'err'); }
 }
+/* The month folder: reuse one that already exists (OCT 26, Oct 26, OCT, October...) instead of making a second, near-identical one. */
+async function findMonthDir(root, we, create){
+  var want=monthFolder(we), mon=want.split(' ')[0], yy=want.split(' ')[1], cands=[], exact=null;
+  for await (var e of root.values()){
+    if(e.kind!=='directory') continue;
+    var n=e.name.trim().toUpperCase();
+    if(n===want.toUpperCase()){ exact=e; break; }
+    if(n.slice(0,3)===mon && (n.indexOf(yy)>=0 || !/\d/.test(n))) cands.push(e);
+  }
+  if(exact) return exact;
+  if(cands.length===1) return cands[0];
+  if(cands.length>1){ var pref=cands.filter(function(c){return c.name.toUpperCase().indexOf(yy)>=0;}); if(pref.length===1) return pref[0]; }
+  return create ? await root.getDirectoryHandle(want,{create:true}) : null;
+}
 async function checkFolder(){
   if(!HAS_FS){showMsg('This browser cannot read the saved folder. Use Edge or Chrome.','err');return;}
   var root; try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError') return; showMsg('Could not open the folder: '+e.message,'err'); return; }
@@ -253,13 +267,13 @@ async function checkFolder(){
       +'Inside it: '+(months.length?months.join(', '):'no month folders')+(loose?' (+ '+loose+' loose file'+(loose===1?'':'s')+')':'')+'.\n';
     if(we){
       var mf=monthFolder(we), md=null;
-      try{ md=await root.getDirectoryHandle(mf); }catch(e){}
+      try{ md=await findMonthDir(root,we,false); }catch(e){}
       if(!md) msg+='\nFor the week ending '+we+' the PDFs go in a folder called "'+mf+'". That folder does not exist yet, so nothing has been saved for that week here.';
       else{
         var shops=0, files=0, mine=[];
         for await (var s of md.values()){ if(s.kind!=='directory') continue; shops++;
           for await (var f of s.values()){ if(f.kind==='file'){ files++; if(f.name.indexOf(' WE '+we)>=0) mine.push(s.name); } } }
-        msg+='\n"'+mf+'" holds '+shops+' folder'+(shops===1?'':'s')+' and '+files+' PDF'+(files===1?'':'s')+'. For the week ending '+we+': '+(mine.length?mine.length+' PDF'+(mine.length===1?'':'s')+' found (e.g. '+mine.slice(0,3).join(', ')+').':'none found here.');
+        msg+='\n"'+md.name+'" holds '+shops+' folder'+(shops===1?'':'s')+' and '+files+' PDF'+(files===1?'':'s')+'. For the week ending '+we+': '+(mine.length?mine.length+' PDF'+(mine.length===1?'':'s')+' found (e.g. '+mine.slice(0,3).join(', ')+').':'none found here.');
       }
     }
     msg+='\n\nIf this is not the folder you expected, press Change folder and choose the right one (the one that holds the month folders).';
@@ -274,7 +288,7 @@ async function saveToFolder(){
   try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError'){return;} showMsg('Could not open the folder: '+e.message,'err'); return; }
   btn.disabled=true; var we=data.week_end, done=0, failed=[];
   try{
-    var mDir=await root.getDirectoryHandle(monthFolder(we),{create:true});
+    var mDir=await findMonthDir(root,we,true);
     for(var i=0;i<sel.length;i++){
       var g=sel[i]; showMsg('Saving '+(i+1)+' of '+sel.length+': '+g.code+'\u2026','info');
       try{
@@ -284,7 +298,7 @@ async function saveToFolder(){
         var w=await fh.createWritable(); await w.write(blob); await w.close(); done++;
       }catch(e){failed.push(g.code+' ('+e.message+')');}
     }
-    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+monthFolder(we)+'\\<shop folder>\\  (e.g. '+root.name+'\\'+monthFolder(we)+'\\'+groupFolder(sel[0])+'\\'+groupFile(sel[0],we)+'). Wrong place? Use Change folder.'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
+    showMsg('Saved '+done+' PDF'+(done===1?'':'s')+' into '+root.name+'\\'+mDir.name+'\\<shop folder>\\  (e.g. '+root.name+'\\'+mDir.name+'\\'+groupFolder(sel[0])+'\\'+groupFile(sel[0],we)+'). Wrong place? Use Change folder.'+(failed.length?'\nFAILED: '+failed.join(', '):''),failed.length?'err':'ok');
   }catch(e){showMsg('Could not save: '+e.message,'err');}
   finally{btn.disabled=false;}
 }
