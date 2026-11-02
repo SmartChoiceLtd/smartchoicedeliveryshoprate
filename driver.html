@@ -128,11 +128,6 @@
         </select>
         <p id="eventTypeNote" hidden style="font-size:11px;color:var(--ink-soft);margin:4px 0 0;"></p>
       </div>
-      <div class="field" id="quoteField" hidden>
-        <label>Quote # (only if this job was quoted)</label>
-        <input type="text" id="fQuote" placeholder="Q-2026-0001" autocapitalize="characters" autocomplete="off" maxlength="14">
-        <p id="quoteNote" hidden style="font-size:12px;margin:4px 0 0;"></p>
-      </div>
       <div class="field" id="wholesalerField" hidden>
         <label>Pick Up From (Wholesaler)</label>
         <select id="fWholesaler">
@@ -568,39 +563,6 @@ function getZoneBasePay(zoneCode) {
 
 // Computes {base, extra, gdpi, total} pay for the current selection,
 // applying the event-type overlay if applicable.
-/* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
-var activeQuote = null;
-function clearQuote() {
-  activeQuote = null;
-  var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
-  if (f) f.value = '';
-  if (n) { n.hidden = true; n.textContent = ''; }
-}
-function quoteNote(text, ok) {
-  var n = document.getElementById('quoteNote'); n.hidden = !text; n.textContent = text || '';
-  n.style.color = ok ? 'var(--green)' : 'var(--warm)';
-}
-async function lookupQuote() {
-  var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
-  f.value = id; activeQuote = null;
-  if (!id) { quoteNote(''); if (selectedZone) updatePay(); return; }
-  quoteNote('Checking ' + id + '\u2026', true);
-  try {
-    var r = await fetch('/api/event-quotes?lookup=' + encodeURIComponent(id));
-    var q = await r.json().catch(function() { return {}; });
-    if (!r.ok) { quoteNote(q.error || 'Could not check that quote.', false); if (selectedZone) updatePay(); return; }
-    if (!q.open) { quoteNote('Quote ' + q.id + ' already has all ' + q.trips + ' of its deliveries entered. Ask the office.', false); return; }
-    if (!q.shop_code) { quoteNote('Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.', false); return; }
-    activeQuote = q;
-    var sh = shops.find(function(s) { return String(s.name).split(/\s+/)[0].toUpperCase() === String(q.shop_code).toUpperCase(); });
-    if (sh) { document.getElementById('fShop').value = sh.id; document.getElementById('fShopSearch').value = sh.name; }
-    if (!document.getElementById('fEventType').value) { document.getElementById('fEventType').value = 'SPEC'; document.getElementById('fEventType').dispatchEvent(new Event('change')); }
-    quoteNote(q.id + ': ' + (q.event || 'event') + ' for ' + q.customer + (q.venue ? ', ' + q.venue : '') + '. Delivery ' + (q.used + 1) + ' of ' + q.trips + (q.driver_pay > 0 ? '. Your pay for this delivery: $' + Number(q.driver_pay).toFixed(2) : '. No pay set on the quote, so the usual event pay applies') + '.', true);
-    if (selectedZone) updatePay();
-  } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
-}
-document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fQuote') lookupQuote(); });
-
 function computePay() {
   if (!selectedZone) return null;
   var pieces = parseInt(document.getElementById('fPieces').value) || 1;
@@ -634,9 +596,7 @@ function computePay() {
   if (document.getElementById('fRush').checked) {
     rushPremium = (rates['HOT'] || {}).drate || 0;
   }
-  var res = { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium, pieces: pieces };
-  if (activeQuote && deliveryType === 'events' && activeQuote.driver_pay > 0) { res.total = activeQuote.driver_pay; res.quoteId = activeQuote.id; }
-  return res;
+  return { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium, pieces: pieces };
 }
 
 var pathParts = location.pathname.split('/').filter(Boolean);
@@ -849,11 +809,11 @@ function updatePay() {
   var pay = computePay();
   if (!pay) return;
   document.getElementById('payAmount').textContent = '$' + pay.total.toFixed(2);
-  var breakdown = pay.quoteId ? ('Pay set by quote ' + pay.quoteId) : ('Base $' + pay.base.toFixed(2) +
+  var breakdown = 'Base $' + pay.base.toFixed(2) +
     (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
     ' + fuel $' + pay.gdpi.toFixed(2) +
     (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '') +
-    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : ''));
+    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : '');
   document.getElementById('payBreakdown').textContent = breakdown;
   document.getElementById('payPreview').hidden = false;
 }
@@ -923,7 +883,6 @@ function populateShopDropdown(preserveShop) {
     document.getElementById('statusCard').hidden = true;
     document.getElementById('wholesaleStatusCard').hidden = false;
     document.getElementById('eventTypeField').hidden = true;
-    document.getElementById('quoteField').hidden = true; clearQuote();
   } else {
     document.getElementById('wholesalerField').hidden = true;
     document.getElementById('shopLabel').textContent = 'Shop';
@@ -933,8 +892,6 @@ function populateShopDropdown(preserveShop) {
     document.getElementById('statusCard').hidden = false;
     document.getElementById('wholesaleStatusCard').hidden = true;
     document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
-    document.getElementById('quoteField').hidden = deliveryType !== 'events';
-    if (deliveryType !== 'events') clearQuote();
   }
   if (!preserveShop) {
     document.getElementById('fShopSearch').value = '';
@@ -1019,7 +976,6 @@ function resetForm() {
   selectedZone = ''; selectedStatuses = []; formattedAddress = ''; lastPlaceLat = null; lastPlaceLng = null; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
   document.getElementById('fEventType').value = '';
   document.getElementById('eventTypeNote').hidden = true;
-  clearQuote();
   document.getElementById('fOrderId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fAddress').value = '';
@@ -1378,9 +1334,6 @@ async function submitDelivery() {
   } else if (!shopId) {
     errEl.textContent = 'Select a shop.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
   }
-  if (deliveryType === 'events' && document.getElementById('fQuote').value.trim() && !activeQuote) {
-    errEl.textContent = 'The quote number was not accepted. Fix it or clear the box.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
-  }
   if (deliveryType === 'events' && !eventType) {
     errEl.textContent = 'Select an event type (Special Event, Wedding, or Funeral).';
     errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
@@ -1475,7 +1428,6 @@ async function submitDelivery() {
       return sel ? sel.dataset.contact : '';
     })(),
     billing_party: billingParty,
-    quote_id: (activeQuote && deliveryType === 'events') ? activeQuote.id : '',
     wholesaler: document.getElementById('fWholesaler').value,
     source: 'driver_form',
     photo_base64: photoBase64
