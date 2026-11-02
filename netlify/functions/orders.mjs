@@ -339,9 +339,35 @@ export default async (req) => {
       has_photo: !!body.photo_base64,
     };
 
+    // A delivery entered against an event quote (Q-2026-0001): the quote decides who is billed, what the shop is
+    // charged for this delivery, and the driver's pay. Checked here, on the server, so a phone cannot change them.
+    let linkedQuote = null;
+    const quoteId = String(body.quote_id || '').trim().toUpperCase();
+    if (quoteId) {
+      const q = await getStore('flower-event-quotes').get(quoteId, { type: 'json', consistency: 'strong' }).catch(() => null);
+      if (!q) return json({ error: 'Quote ' + quoteId + ' was not found. Check the number.' }, 400);
+      if (!['sent', 'accepted'].includes(q.status)) return json({ error: 'Quote ' + q.id + ' is ' + q.status + ', not accepted. Ask the office.' }, 400);
+      const trips = Math.max(1, (q.event && q.event.trips) || 1);
+      if ((q.linked || []).length >= trips) return json({ error: 'Quote ' + q.id + ' already has all ' + trips + ' of its deliveries entered. If there is another, ask the office to raise the number of trips on the quote.' }, 409);
+      if (!(q.customer && q.customer.code)) return json({ error: 'Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.' }, 400);
+      linkedQuote = q;
+      order.quote_id = q.id;
+      order.shop_code = String(q.customer.code).toUpperCase();
+      order.shop_pay = Math.round((q.subtotal / trips) * 100) / 100;
+      if (q.driver_pay > 0) { order.driver_pay = q.driver_pay; order.driver_pay_from_quote = true; }
+    }
+
     try {
       const store = getStore('flower-orders');
       await store.setJSON(orderId, order);
+      if (linkedQuote) { // count this delivery against the quote
+        try {
+          const qs = getStore('flower-event-quotes');
+          const fresh = (await qs.get(linkedQuote.id, { type: 'json', consistency: 'strong' })) || linkedQuote;
+          fresh.linked = (fresh.linked || []).concat([{ id: orderId, at: order.received_at, driver: order.driver || '', order_id: order.order_id || '' }]);
+          await qs.setJSON(fresh.id, fresh);
+        } catch (e) { console.error('quote link failed:', e.message); }
+      }
       // Photo is stored in a separate blob store, not embedded in the order
       // record itself - GET /api/orders loads every order's full JSON on
       // every page view, so embedding potentially-large photo data there
