@@ -79,9 +79,11 @@ async function run(){
     getJson('/api/send-driver-pay?action=week_totals&week_end='+we).catch(function(e){return {err:e};}),
     getJson('/api/pay-ledger?week_end='+we).catch(function(e){return {err:e};}),
     getJson('/api/backup').catch(function(e){return {err:e};}),
-    getJson('/api/drivers').catch(function(e){return {err:e};})
+    getJson('/api/drivers').catch(function(e){return {err:e};}),
+    getJson('/api/shops').catch(function(e){return {err:e};}),
+    getJson('/api/rates').catch(function(e){return {err:e};})
   ]);
-  var orders=res[0],stops=res[1],totals=res[2],ledger=res[3],backup=res[4],drivers=res[5];
+  var orders=res[0],stops=res[1],totals=res[2],ledger=res[3],backup=res[4],drivers=res[5],shopsList=res[6],ratesTbl=res[7];
   var rows=[],todo=0;
   function add(state,t,d,h,l){if(state==='todo'||state==='bad')todo++;rows.push(item(state,t,d,h,l));}
 
@@ -105,6 +107,28 @@ async function run(){
       real.forEach(function(o){var c=String(o.driver||'').trim().toUpperCase();if(c&&!known[c]){bad[c]=(bad[c]||0)+1;badN++;}});
       var list=Object.keys(bad).map(function(k){return k+' ('+bad[k]+')';}).join(', ');
       add(badN?'bad':'ok','Driver codes match a driver',badN?badN+' order(s) have a driver code that is not in Admin: '+list:'All driver codes are valid','/orders.html?week_end='+we,'Fix in Orders (Edit > Driver code)');
+    }
+    // Billing: an order's shop code must belong to a shop in the shop list (or a wholesaler), otherwise the
+    // order cannot be invoiced to anyone. The wholesaler codes are the fixed list in the driver form (KEEP IN
+    // STEP with driver.html and order-detail.mjs).
+    var WS=['AM','WFW','BA','FC','FS','SV','QF','SB'];
+    if(!Array.isArray(shopsList)){rows.push(item('na','Shop codes','Could not load the shop list, so codes were not checked','',''));}
+    else{
+      var knownShop={};WS.forEach(function(c){knownShop[c]=1;});
+      shopsList.forEach(function(sh){var c=String(sh.name||'').trim().split(/\s+/)[0].toUpperCase();if(c)knownShop[c]=1;});
+      var badShop={},badShopN=0;
+      real.forEach(function(o){var c=String(o.shop_code||'').trim().toUpperCase();if(c&&!knownShop[c]){badShop[c]=(badShop[c]||0)+1;badShopN++;}});
+      var shopList2=Object.keys(badShop).map(function(k){return k+' ('+badShop[k]+')';}).join(', ');
+      add(badShopN?'bad':'ok','Shop codes match a shop',badShopN?badShopN+' order(s) have a shop code that is not in the shop list, so they cannot be invoiced: '+shopList2:'All shop codes match a shop','/orders.html?week_end='+we,'Fix in Orders (Edit > Shop code)');
+    }
+    // Rates: an order whose zone has no rate in the Rate Table and no rate stored on the order itself has no
+    // reliable price or pay behind it.
+    if(!ratesTbl||ratesTbl.err||Array.isArray(ratesTbl)){rows.push(item('na','Zone rates','Could not load the rate table, so zones were not checked','',''));}
+    else{
+      var noRate={},noRateN=0;
+      real.forEach(function(o){var z=String(o.zone_code||'').trim();if(z&&!o.rate_snapshot&&!ratesTbl[z]){noRate[z]=(noRate[z]||0)+1;noRateN++;}});
+      var zl=Object.keys(noRate).map(function(k){return k+' ('+noRate[k]+')';}).join(', ');
+      add(noRateN?'bad':'ok','Zones have a rate',noRateN?noRateN+' order(s) use a zone with no rate in the Rate Table: '+zl:'Every zone used has a rate','/admin.html','Open Admin (Rate Table)');
     }
     var zero=real.filter(function(o){return !(parseFloat(o.driver_pay)>0);}).length;
     add(zero?'todo':'ok','Orders with $0 driver pay',zero?zero+' order(s) would pay the driver nothing':'None','/orders.html?week_end='+we,'Open orders');
