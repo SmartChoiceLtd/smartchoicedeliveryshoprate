@@ -327,7 +327,8 @@ export default async (req) => {
           : (r.srate||0);
         const hotR = o.hot_rate_snapshot || rates['HOT'] || {};
         const rushPremium = o.rush ? (hotR.srate || 0) : 0;
-        const amount = base + (pieces-1)*(r.sratex||0) + rushPremium;
+        // A delivery entered against an event quote is charged its share of the quote, not the zone rate.
+        const amount = (o.quote_id && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : base + (pieces-1)*(r.sratex||0) + rushPremium;
         return {o, zone, pieces, amount};
       });
 
