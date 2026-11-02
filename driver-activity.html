@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0C769E">
+<title>Smart Choice Delivery - Driver Activity</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FBF0D6;--radius:12px;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-family:Georgia,serif;font-size:18px;font-weight:600;margin:0;flex:1;}
+.topbar a{color:var(--accent);font-weight:600;text-decoration:none;font-size:14px;}
+.main{max-width:860px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+input,select{padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:15px;background:#fff;}
+button{border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:8px;padding:10px 16px;font-size:15px;cursor:pointer;}
+.hint{color:var(--ink-soft);font-size:13px;line-height:1.5;margin:6px 0 0;}
+.verdict{border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;font-size:15px;line-height:1.5;}
+.v-ok{background:var(--green-soft);color:var(--green);}.v-warn{background:var(--amber-soft);color:var(--amber);}.v-bad{background:var(--warm-soft);color:var(--warm);}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.stat{background:var(--bg);border-radius:10px;padding:8px 12px;min-width:84px;}.stat .v{font-size:20px;font-weight:800;}.stat .l{font-size:12px;color:var(--ink-soft);}
+table{width:100%;border-collapse:collapse;font-size:14px;}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top;}th{font-size:12px;color:var(--ink-soft);}
+.tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;}
+.t-ok{background:var(--green-soft);color:var(--green);}.t-warn{background:var(--amber-soft);color:var(--amber);}.t-bad{background:var(--warm-soft);color:var(--warm);}.t-info{background:var(--accent-soft);color:var(--accent);}
+h2{font-family:Georgia,serif;font-size:16px;margin:0 0 8px;}
+.empty{color:var(--ink-soft);padding:8px 0;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Driver Activity</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="card">
+    <div class="controls">
+      <input type="date" id="day">
+      <select id="drv"><option value="">All drivers</option></select>
+      <button id="go">Show</button>
+    </div>
+    <p class="hint">What each driver&rsquo;s phone reported: opening the page, trying to save an entry, and whether the save was confirmed. Use it when a driver says they entered something and you cannot see it. Only activity from after this page was added is recorded, and a phone needs to reload its page once to start reporting.</p>
+  </div>
+  <div id="out"><div class="empty">Loading&hellip;</div></div>
+</div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+var gate=fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){ if(!d.authenticated) location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return !!d.authenticated; }).catch(function(){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return false; });
+function today(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+var LABEL={opened:['Opened the page','t-info'],bad_link:['Link not recognised','t-bad'],submit_try:['Tried to submit','t-info'],submit_ok:['Saved','t-ok'],submit_fail:['Failed','t-bad'],submit_queued:['Held on phone, no signal','t-warn'],submit_blocked:['Form stopped it','t-warn'],add_try:['Tried to add to route','t-info'],add_ok:['Added to route','t-ok'],add_fail:['Failed','t-bad'],add_blocked:['Form stopped it','t-warn']};
+function tm(iso){ try{ return new Date(iso).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',second:'2-digit'}); }catch(e){ return ''; } }
+function summarize(evs){
+  var s={opened:0,tries:0,ok:0,fail:0,blocked:0,queued:0,noanswer:0,first:null,last:null}, open={};
+  evs.forEach(function(e){
+    if(!s.first) s.first=e.at; s.last=e.at;
+    if(e.event==='opened') s.opened++;
+    else if(/_try$/.test(e.event)){ s.tries++; open[e.tid||e.at]=e; }
+    else if(/_ok$/.test(e.event)){ s.ok++; delete open[e.tid]; }
+    else if(/_fail$/.test(e.event)){ s.fail++; delete open[e.tid]; }
+    else if(e.event==='submit_queued'){ s.queued++; delete open[e.tid]; }
+    else if(/_blocked$/.test(e.event)) s.blocked++;
+  });
+  s.noanswer=Object.keys(open).length; s.openTries=open;
+  return s;
+}
+function verdict(code,name,evs,valid){
+  var s=summarize(evs), who=name||code;
+  if(!evs.length) return '<div class="verdict v-warn"><b>Nothing from '+esc(who)+' on this day.</b> No report of the page being opened or an entry being tried. Either the phone never loaded the page after this log was added, or it was not used. Ask them to reload their link once, then try an entry.</div>';
+  if(valid===false) return '<div class="verdict v-bad"><b>'+esc(code)+' is not a driver code on file.</b> The phone is using a link whose code does not match a driver, so entries cannot be filed under a driver. Send them their correct link.</div>';
+  if(s.ok) return '<div class="verdict v-ok"><b>'+esc(who)+' saved '+s.ok+' entr'+(s.ok===1?'y':'ies')+'.</b> Each was confirmed by the server. If you cannot see them, look under another date, or check Deleted Records.'+(s.fail||s.noanswer||s.blocked?' <br>Also: '+[s.fail?s.fail+' failed':'',s.noanswer?s.noanswer+' with no answer':'',s.blocked?s.blocked+' stopped by the form':''].filter(Boolean).join(', ')+'.':'')+'</div>';
+  if(s.fail||s.noanswer||s.queued) return '<div class="verdict v-bad"><b>'+esc(who)+' tried to enter '+s.tries+', but none were confirmed.</b> '+(s.fail?s.fail+' failed with an error. ':'')+(s.noanswer?s.noanswer+' got no answer (usually lost signal; the entry is probably still on the phone). ':'')+(s.queued?s.queued+' held on the phone waiting for signal. ':'')+'Ask them to re-open their link with signal and submit again.</div>';
+  if(s.blocked&&!s.tries) return '<div class="verdict v-warn"><b>'+esc(who)+' pressed submit '+s.blocked+' time'+(s.blocked===1?'':'s')+' but the form stopped it</b> (a required field was missing). See the details below.</div>';
+  return '<div class="verdict v-warn"><b>'+esc(who)+' opened the page '+s.opened+' time'+(s.opened===1?'':'s')+' but has not tried to save an entry.</b> It looks like they have not entered anything yet, or have a draft they have not submitted.</div>';
+}
+function render(d,sel){
+  var out=document.getElementById('out'), h='';
+  var drivers=d.drivers.slice().sort(function(a,b){return (a.name||a.code).localeCompare(b.name||b.code);});
+  var list=sel?drivers.filter(function(x){return x.code===sel;}):drivers;
+  if(sel&&!list.length) h+=verdict(sel,'',[],true);
+  if(!sel&&!drivers.length) h+='<div class="card"><div class="empty">No driver activity recorded for '+esc(d.day)+'.</div></div>';
+  list.forEach(function(x){
+    var evs=d.events.filter(function(e){return e.driver===x.code;}), s=summarize(evs);
+    h+=verdict(x.code,x.name,evs,x.valid);
+    h+='<div class="card"><h2>'+esc(x.name||x.code)+' <span class="hint" style="font-weight:400;">'+esc(x.code)+(x.valid===false?' (not on file)':'')+'</span></h2>'
+      +'<div class="stats"><div class="stat"><div class="v">'+s.opened+'</div><div class="l">page opens</div></div><div class="stat"><div class="v">'+s.tries+'</div><div class="l">entries tried</div></div><div class="stat"><div class="v">'+s.ok+'</div><div class="l">saved</div></div><div class="stat"><div class="v">'+(s.fail+s.noanswer)+'</div><div class="l">failed / no answer</div></div><div class="stat"><div class="v">'+s.blocked+'</div><div class="l">stopped by form</div></div></div>'
+      +'<table><thead><tr><th>Time</th><th>What happened</th><th>Details</th><th>Phone</th></tr></thead><tbody>'+evs.map(function(e){
+        var L=LABEL[e.event]||[e.event,'t-info'], extra=(e.online===false?' <span class="tag t-warn">offline</span>':'');
+        var det=e.detail; if(/_try$/.test(e.event)&&s.openTries[e.tid||e.at]) det=(det?det+' ':'')+'(no answer received)';
+        return '<tr><td>'+esc(tm(e.at))+'</td><td><span class="tag '+L[1]+'">'+esc(L[0])+'</span>'+extra+'</td><td>'+esc(det)+'</td><td>'+esc(e.device||'')+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  });
+  out.innerHTML=h;
+}
+function load(){
+  var day=document.getElementById('day').value||today(), sel=document.getElementById('drv').value;
+  var out=document.getElementById('out'); out.innerHTML='<div class="empty">Loading&hellip;</div>';
+  gate.then(function(ok){ if(!ok) return; return fetch('/api/activity-log?day='+encodeURIComponent(day)); })
+   .then(function(r){ if(!r) return; if(r.status===401){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return; } if(!r.ok) throw new Error('Status '+r.status); return r.json(); })
+   .then(function(d){ if(!d) return; fillDrivers(d); render(d,document.getElementById('drv').value||sel); })
+   .catch(function(e){ out.innerHTML='<div class="verdict v-bad">Could not load: '+esc(e.message)+'</div>'; });
+}
+var roster=[];
+function fillDrivers(d){
+  var sel=document.getElementById('drv'), cur=sel.value, seen={}, opts=[];
+  roster.forEach(function(x){ seen[x.code]=1; opts.push([x.code,x.name+' ('+x.code+')']); });
+  d.drivers.forEach(function(x){ if(!seen[x.code]) opts.push([x.code,(x.name||'Unknown')+' ('+x.code+', not on file)']); });
+  sel.innerHTML='<option value="">All drivers with activity</option>'+opts.map(function(o){return '<option value="'+esc(o[0])+'">'+esc(o[1])+'</option>';}).join('');
+  sel.value=cur;
+}
+document.getElementById('day').value=today();
+gate.then(function(ok){ if(!ok) return; return fetch('/api/drivers').then(function(r){return r.json();}).then(function(l){ roster=(l||[]).filter(function(x){return x.active!==false;}).map(function(x){return {code:String(x.code).toUpperCase(),name:x.name};}); }).catch(function(){}); }).then(load);
+document.getElementById('go').addEventListener('click',load);
+document.getElementById('drv').addEventListener('change',load);
+var q=new URLSearchParams(location.search); if(q.get('driver')) setTimeout(function(){ document.getElementById('drv').value=q.get('driver').toUpperCase(); },0);
+</script>
+</body>
+</html>
