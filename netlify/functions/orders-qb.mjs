@@ -258,8 +258,10 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         amount = srate + (pieces - 1) * sratex;
       }
 
-      if (!shopGroups[shopCode][zone]) shopGroups[shopCode][zone] = 0;
-      shopGroups[shopCode][zone] += amount;
+      // Deliveries on an event quote get their own invoice line, labelled with the quote number.
+      var gKey = o.quote_id ? zone + '|' + o.quote_id : zone;
+      if (!shopGroups[shopCode][gKey]) shopGroups[shopCode][gKey] = 0;
+      shopGroups[shopCode][gKey] += amount;
     });
 
     // Build QB invoice date info
@@ -268,6 +270,13 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
     var weekEndFormatted = `${months[weekEndDate.getMonth()]} ${weekEndDate.getDate()} ${weekEndDate.getFullYear()}`;
     var invoiceDate = formatDateQB(weekEndDate);
     var memo = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`;
+
+    var quoteNames = {};
+    try {
+      var qStore = getStore('flower-event-quotes');
+      var qIds = [...new Set(weekOrders.map(o => o.quote_id).filter(Boolean))];
+      await Promise.all(qIds.map(async id => { var qq = await qStore.get(id, { type: 'json' }).catch(() => null); if (qq && qq.event) quoteNames[id] = qq.event.name || ''; }));
+    } catch (e) {}
 
     var headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo',
       'Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','*ItemAmount','*ItemTaxCode','ItemTaxAmount'];
@@ -294,7 +303,9 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
 
         var amount = parseFloat(zones[zone].toFixed(2));
         if (amount <= 0) return;
-        var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
+        var zn = zone.split('|')[0], qid = zone.split('|')[1] || '';
+        var qb = QB_ZONE_MAP[zn] || { product: zn, desc: zn };
+        if (qid) qb = { product: qb.product, desc: ('QUOTE ' + qid + (quoteNames[qid] ? ' ' + quoteNames[qid] : '')).toUpperCase() };
 
        rows.push(toCSVRow([
           invoiceNo,
