@@ -550,7 +550,7 @@ function getEffectiveZone() {
     return { code: selectedZone, isEventOverride: false, baseZone: selectedZone };
   }
   var ev = EVENT_TYPES[eventType];
-  if (isInTownZone(selectedZone) || !ev.outTownCode) {
+  if (activeQuote || isInTownZone(selectedZone) || !ev.outTownCode) {
     return { code: ev.inTownCode, isEventOverride: true, baseZone: selectedZone };
   }
   return { code: ev.outTownCode, isEventOverride: true, baseZone: selectedZone };
@@ -577,10 +577,18 @@ function quotePrefix() {
 }
 function quoteTyped() { var v = document.getElementById('fQuote').value.trim().toUpperCase(); return v === quotePrefix() ? '' : v; } // the prefix alone is "nothing typed"
 function clearQuote() {
-  activeQuote = null;
+  activeQuote = null; quoteZoneApplied = false;
   var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
   if (f) f.value = quotePrefix();
   if (n) { n.hidden = true; n.textContent = ''; }
+}
+/* A quoted job needs no zone choice: its price and pay come from the quote, and it is filed under the flat event code. */
+var quoteZoneApplied = false;
+function applyQuoteZone() {
+  if (!activeQuote || deliveryType !== 'events') return;
+  var ev = EVENT_TYPES[eventType], code = ev ? ev.inTownCode : 'SPEC';
+  quoteZoneApplied = true;
+  setZone(code, code + ' - from quote ' + activeQuote.id, true, null, null);
 }
 function quoteNote(text, ok) {
   var n = document.getElementById('quoteNote'); n.hidden = !text; n.textContent = text || '';
@@ -589,6 +597,7 @@ function quoteNote(text, ok) {
 async function lookupQuote() {
   var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
   activeQuote = null;
+  if (quoteZoneApplied) { quoteZoneApplied = false; selectedZone = ''; document.getElementById('zoneResult').hidden = true; document.getElementById('payPreview').hidden = true; }
   if (/^\d{1,4}$/.test(id)) id = quotePrefix() + ('0000' + id).slice(-4);          // just the number: 2 or 0002
   else if (/^Q-\d{4}-\d{1,4}$/.test(id)) { var qp = id.split('-'); id = 'Q-' + qp[1] + '-' + ('0000' + qp[2]).slice(-4); }   // Q-2026-2
   f.value = id;
@@ -612,7 +621,7 @@ async function lookupQuote() {
     var addrEl = document.getElementById('fAddress');
     if (!addrEl.value.trim() && q.venue) { addrEl.value = q.venue; formattedAddress = q.venue; lookupZone(q.venue); }
     quoteNote(q.id + ': ' + (q.event || 'event') + ' for ' + q.customer + (q.venue ? ', ' + q.venue : '') + '. Delivery ' + (q.used + 1) + ' of ' + q.trips + (q.driver_pay > 0 ? '. Your pay for this delivery: $' + Number(q.driver_pay).toFixed(2) : '. No pay set on the quote, so the usual event pay applies') + '.', true);
-    if (selectedZone) updatePay();
+    applyQuoteZone();
   } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
 }
 document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fQuote') lookupQuote(); });
@@ -877,6 +886,7 @@ function updatePay() {
 }
 
 function lookupZone(address, placeLat, placeLng) {
+  if (activeQuote && deliveryType === 'events') { document.getElementById('zoneLoading').hidden = true; applyQuoteZone(); return; }
   document.getElementById('zoneResult').hidden = true;
   document.getElementById('zoneLoading').hidden = false;
   document.getElementById('zoneManual').hidden = true;
