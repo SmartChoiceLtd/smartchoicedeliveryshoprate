@@ -219,6 +219,12 @@ export default async (req) => {
     // Soft delete: keep a copy in the Deleted bin (30 days) so a mistaken delete can be undone.
     await getStore('flower-deleted-orders').setJSON(id, { id, deleted_at: new Date().toISOString(), deleted_by: username, order: existing });
     await store.delete(id);
+    if (existing.quote_id) { // free the quote's slot so the delivery can be entered again
+      try {
+        const qs = getStore('flower-event-quotes'), q = await qs.get(existing.quote_id, { type: 'json', consistency: 'strong' });
+        if (q) { q.linked = (q.linked || []).filter(l => l.id !== id); await qs.setJSON(q.id, q); }
+      } catch (e) { console.error('quote unlink failed:', e.message); }
+    }
     return new Response(null, { status: 204 });
   }
 
