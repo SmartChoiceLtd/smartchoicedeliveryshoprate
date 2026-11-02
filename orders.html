@@ -167,6 +167,7 @@ function openFocus(id) {
   if (o.time_request) html += focusFieldRow('Time Request', o.time_request);
   html += focusFieldRow('Shop', (o.shop_code || '') + (o.shop_full || o.shop ? ' \u2014 ' + (o.shop_full || o.shop) : ''));
   html += focusFieldRow('Driver', o.driver);
+  if (o.quote_id) html += focusFieldRow('Event quote', o.quote_id + (o.shop_pay != null ? ' \u2014 shop charged $' + Number(o.shop_pay).toFixed(2) : '') + (o.driver_pay_from_quote ? ', driver pay $' + Number(o.driver_pay).toFixed(2) : ''));
   html += focusFieldRow('Zone', o.zone_code);
   html += focusFieldRow('Pieces', String(o.total_pieces || 1));
   if (statusLine) html += focusFieldRow('Status', statusLine);
@@ -267,7 +268,7 @@ var status = getDeliveryStatus(o);
 var statusFull = getDeliveryStatusFull(o);
 return '<tr>'
 + '<td>' + escapeHtml(o.date || (o.received_at || '').slice(0,10)) + '</td>'
-+ '<td>' + escapeHtml(o.order_id) + '</td>'
++ '<td>' + escapeHtml(o.order_id) + (o.quote_id ? '<div style="font-size:11px;font-weight:700;color:#0C769E;white-space:nowrap;" title="Billed and paid from this event quote">' + escapeHtml(o.quote_id) + '</div>' : '') + '</td>'
 + '<td>' + escapeHtml(o.name) + '</td>'
 + '<td title="' + escapeHtml(o.formatted_address || o.address) + (o.unit ? ' Unit ' + escapeHtml(o.unit) : '') + (o.time_request ? ' Time request: ' + escapeHtml(o.time_request) : '') + '">' + escapeHtml(o.formatted_address || o.address) + (o.unit ? ' <strong>Unit ' + escapeHtml(o.unit) + '</strong>' : '') + (o.time_request ? ' <strong style="color:var(--warm);">&#9200; ' + escapeHtml(o.time_request) + '</strong>' : '') + '</td>'
 + '<td>' + escapeHtml(o.community || '') + '</td>'
