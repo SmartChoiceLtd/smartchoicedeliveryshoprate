@@ -498,10 +498,11 @@ async function confirmScanReview() {
   var phone = document.getElementById('reviewPhone').value.trim();
   var shopCode = reviewSelectedShopCode;
 
-  if (!address) { alert('Address is required.'); return; }
+  if (!address) { logAct('add_blocked', 'address missing'); alert('Address is required.'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Adding...';
+  var tid = newTid(); logAct('add_try', (orderId || '') + ' ' + address.slice(0, 60), tid);
   try {
     var stopRes = await fetch('/api/stops', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -518,6 +519,7 @@ async function confirmScanReview() {
     });
     var stop = await stopRes.json();
     if (!stopRes.ok) throw new Error(stop.error || 'Could not add to route.');
+    logAct('add_ok', stop.id || '', tid);
 
     document.getElementById('scanReviewCard').remove();
     reviewSelectedShopCode = '';
@@ -546,6 +548,7 @@ async function confirmScanReview() {
     document.getElementById('content').hidden = false;
     renderStops(lastActiveStops, lastSkippedStops);
   } catch (e) {
+    logAct('add_fail', e.message, tid);
     alert('Could not add to route: ' + e.message);
     btn.disabled = false;
     btn.textContent = 'Add to Route';
@@ -563,6 +566,17 @@ document.getElementById('fTagPhoto').addEventListener('change', function() {
 
 var pathParts = location.pathname.split('/').filter(Boolean);
 var driverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+/* Activity log: tells the office what happened on this phone (opened, tried to save, saved, failed). Silent and best-effort. */
+function logAct(ev, detail, tid) {
+  try {
+    var code = (typeof driverCode !== 'undefined' && driverCode) || (typeof urlDriverCode !== 'undefined' && urlDriverCode) || '';
+    if (!code) return;
+    fetch('/api/activity-log', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ driver: code, event: ev, page: 'route', tid: tid || '', detail: String(detail || '').slice(0, 160), online: navigator.onLine !== false }) }).catch(function() {});
+  } catch (e) {}
+}
+function newTid() { return Math.random().toString(36).slice(2, 10); }
+
 document.getElementById('manualEntryLink').href = '/driver/' + driverCode.toLowerCase();
 
 function escapeHtml(s) {
@@ -873,6 +887,7 @@ if (!driverCode) {
   document.getElementById('notFoundMsg').hidden = false;
   document.getElementById('headingBox').hidden = true;
 } else {
+  logAct('opened', '');
   document.getElementById('refreshBtn').addEventListener('click', loadRoute);
   loadRoute();
 }
