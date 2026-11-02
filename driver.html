@@ -131,6 +131,7 @@
       <div class="field" id="quoteField" hidden>
         <label>Quote # (only if this job was quoted)</label>
         <input type="text" id="fQuote" placeholder="Q-2026-0001" autocapitalize="characters" autocomplete="off" maxlength="14">
+        <p style="font-size:11px;color:var(--ink-soft);margin:3px 0 0;">The year is filled in. Type just the quote number, e.g. 2 or 0002.</p>
         <p id="quoteNote" hidden style="font-size:12px;margin:4px 0 0;"></p>
       </div>
       <div class="field" id="wholesalerField" hidden>
@@ -570,10 +571,15 @@ function getZoneBasePay(zoneCode) {
 // applying the event-type overlay if applicable.
 /* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
 var activeQuote = null;
+function quotePrefix() {
+  var y; try { y = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric' }).format(new Date()); } catch (e) { y = String(new Date().getFullYear()); }
+  return 'Q-' + y + '-';
+}
+function quoteTyped() { var v = document.getElementById('fQuote').value.trim().toUpperCase(); return v === quotePrefix() ? '' : v; } // the prefix alone is "nothing typed"
 function clearQuote() {
   activeQuote = null;
   var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
-  if (f) f.value = '';
+  if (f) f.value = quotePrefix();
   if (n) { n.hidden = true; n.textContent = ''; }
 }
 function quoteNote(text, ok) {
@@ -582,8 +588,11 @@ function quoteNote(text, ok) {
 }
 async function lookupQuote() {
   var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
-  f.value = id; activeQuote = null;
-  if (!id) { quoteNote(''); if (selectedZone) updatePay(); return; }
+  activeQuote = null;
+  if (/^\d{1,4}$/.test(id)) id = quotePrefix() + ('0000' + id).slice(-4);          // just the number: 2 or 0002
+  else if (/^Q-\d{4}-\d{1,4}$/.test(id)) { var qp = id.split('-'); id = 'Q-' + qp[1] + '-' + ('0000' + qp[2]).slice(-4); }   // Q-2026-2
+  f.value = id;
+  if (!id || id === quotePrefix()) { f.value = quotePrefix(); quoteNote(''); if (selectedZone) updatePay(); return; }
   quoteNote('Checking ' + id + '\u2026', true);
   try {
     var r = await fetch('/api/event-quotes?lookup=' + encodeURIComponent(id));
@@ -600,6 +609,8 @@ async function lookupQuote() {
   } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
 }
 document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fQuote') lookupQuote(); });
+document.addEventListener('focusin', function(e) { if (e.target && e.target.id === 'fQuote' && !e.target.value.trim()) e.target.value = quotePrefix(); });
+(function(){ var f = document.getElementById('fQuote'); if (f && !f.value) f.value = quotePrefix(); })();
 
 function computePay() {
   if (!selectedZone) return null;
@@ -934,7 +945,7 @@ function populateShopDropdown(preserveShop) {
     document.getElementById('wholesaleStatusCard').hidden = true;
     document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
     document.getElementById('quoteField').hidden = deliveryType !== 'events';
-    if (deliveryType !== 'events') clearQuote();
+    if (deliveryType !== 'events') clearQuote(); else if (!quoteTyped()) document.getElementById('fQuote').value = quotePrefix();
   }
   if (!preserveShop) {
     document.getElementById('fShopSearch').value = '';
@@ -1378,7 +1389,7 @@ async function submitDelivery() {
   } else if (!shopId) {
     errEl.textContent = 'Select a shop.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
   }
-  if (deliveryType === 'events' && document.getElementById('fQuote').value.trim() && !activeQuote) {
+  if (deliveryType === 'events' && quoteTyped() && !activeQuote) {
     errEl.textContent = 'The quote number was not accepted. Fix it or clear the box.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
   }
   if (deliveryType === 'events' && !eventType) {
