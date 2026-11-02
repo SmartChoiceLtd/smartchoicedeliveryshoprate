@@ -50,7 +50,7 @@ export default async (req) => {
       if (!['sent', 'accepted'].includes(q.status)) return json({ error: 'Quote ' + q.id + ' is ' + q.status + '. The office needs to mark it as sent or accepted first.' }, 409);
       const trips = Math.max(1, q.event.trips || 1), used = (q.linked || []).length;
       return json({ id: q.id, status: q.status, customer: q.customer.name, shop_code: q.customer.code, event: q.event.name, date: q.event.date, time: q.event.time,
-        venue: q.event.venue, pickup: q.event.pickup, pieces: q.event.pieces, trips, used, open: used < trips, driver_pay: q.driver_pay || 0 });
+        venue: q.event.venue, pickup: q.event.pickup, event_type: q.event.type || '', pieces: q.event.pieces, trips, used, open: used < trips, driver_pay: q.driver_pay || 0 });
     }
   }
   const user = await whoIs(req);
