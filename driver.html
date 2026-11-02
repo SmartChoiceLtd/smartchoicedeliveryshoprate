@@ -603,7 +603,14 @@ async function lookupQuote() {
     activeQuote = q;
     var sh = shops.find(function(s) { return String(s.name).split(/\s+/)[0].toUpperCase() === String(q.shop_code).toUpperCase(); });
     if (sh) { document.getElementById('fShop').value = sh.id; document.getElementById('fShopSearch').value = sh.name; }
-    if (!document.getElementById('fEventType').value) { document.getElementById('fEventType').value = 'SPEC'; document.getElementById('fEventType').dispatchEvent(new Event('change')); }
+    // Fill what the quote already knows: event type, recipient (the event) and delivery address (the venue). Anything already typed is left alone.
+    var evCode = ({ 'Wedding': 'WED', 'Funeral': 'FUN' })[q.event_type] || 'SPEC';
+    var evSel = document.getElementById('fEventType');
+    if (evSel.value !== evCode) { evSel.value = evCode; evSel.dispatchEvent(new Event('change')); }
+    var nameEl = document.getElementById('fName');
+    if (!nameEl.value.trim() && q.event) nameEl.value = q.event;
+    var addrEl = document.getElementById('fAddress');
+    if (!addrEl.value.trim() && q.venue) { addrEl.value = q.venue; formattedAddress = q.venue; lookupZone(q.venue); }
     quoteNote(q.id + ': ' + (q.event || 'event') + ' for ' + q.customer + (q.venue ? ', ' + q.venue : '') + '. Delivery ' + (q.used + 1) + ' of ' + q.trips + (q.driver_pay > 0 ? '. Your pay for this delivery: $' + Number(q.driver_pay).toFixed(2) : '. No pay set on the quote, so the usual event pay applies') + '.', true);
     if (selectedZone) updatePay();
   } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
