@@ -59,6 +59,7 @@ var QB_ZONE_MAP = {
   SET:  { product:'SPECIAL EVENTS:SET',       desc:'EVENT SET UP $35/HR/PERSON or any part thereof' },
   SPEC: { product:'SPECIAL EVENTS:SPEC',      desc:'SPECIAL EVENTS $25 +$5 EACH ADDITIONAL PCE/ OR AS QUOTED' },
   SPL:  { product:'SEASONAL PLANTERS:SPL',    desc:'SEASONAL PLANTERS $20 PLUS $5 EACH ADDITIONAL' },
+  SPLO: { product:'SEASONAL PLANTERS:SPO',    desc:'SEASONAL PLANTERS OUT OF TOWN: ZONE RATE PLUS $5 EACH ADDITIONAL' },
   SPO:  { product:'SEASONAL PLANTERS:SPO',    desc:'SEASONAL PLANTERS OUT OF TOWN: $25 OR AS QUOTED' },
   STR:  { product:'OUT OF TOWN:STR',          desc:'STRATHMORE $35' },
   TSA: { product:'OUT OF TOWN:TSA', desc:'TSUU TINA ADJACENT - ALPINE PARK DISTRICT $23' },
@@ -259,7 +260,7 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
       }
 
       // Christmas greens upcharge (a quoted delivery's price already includes everything).
-      if (!o.quote_id && o.xmas_pieces) amount += o.xmas_pieces * (parseFloat(o.xmas_shop_rate) || 0);
+      if (!o.quote_id && !o.shop_pay_source && o.xmas_pieces) amount += o.xmas_pieces * (parseFloat(o.xmas_shop_rate) || 0);
 
       // Deliveries on an event quote get their own invoice line, labelled with the quote number.
       var gKey = o.quote_id ? zone + '|' + o.quote_id : zone;
