@@ -93,6 +93,45 @@ async function suggestZone(address, shopLat, shopLng, key) {
   }
 }
 
+// ---- Optional delivery notice ------------------------------------------------------------------------------
+// A shop can ask to be emailed when a delivery is entered (Admin > Shops > Edit: send notices + email). Off by default.
+// Sent from here, at the moment the driver submits, so the delivery time in the email is the time the driver entered.
+const escH = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function fmtTime12(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) return '';
+  const h = parseInt(m[1], 10);
+  return ((h % 12) || 12) + ':' + m[2] + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+async function sendDeliveryNotice(order, photoDataUrl) {
+  if (!process.env.RESEND_API_KEY || !order.shop_code) return null;
+  const code = String(order.shop_code).toUpperCase();
+  const store = getStore('flower-shops');
+  const { blobs } = await store.list();
+  const shops = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+  const shop = shops.find(s => s.name && String(s.name).split(' ')[0].toUpperCase() === code);
+  if (!shop || !shop.notify_enabled || !shop.notify_email) return null;
+  const when = fmtTime12(order.delivery_time) || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(order.received_at)).replace(/\./g, '').toUpperCase();
+  const statuses = Array.isArray(order.delivery_status) ? order.delivery_status.join(', ') : (order.delivery_status || '');
+  const rows = [
+    ['Recipient', order.name], ['Address', (order.unit ? order.unit + ' - ' : '') + (order.address || '')],
+    ['Your order #', order.order_id], ['Delivered', (order.date || '') + (when ? ' at ' + when : '')],
+    ['How', statuses], ['Received by', order.accepted_by || order.neighboured_to || ''],
+  ].filter(r => r[1]);
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">' +
+    '<p>Your delivery to <strong>' + escH(order.name || 'your customer') + '</strong> has been completed.</p>' +
+    '<table style="border-collapse:collapse">' + rows.map(r => '<tr><td style="padding:3px 14px 3px 0;color:#666">' + escH(r[0]) + '</td><td style="padding:3px 0">' + escH(r[1]) + '</td></tr>').join('') + '</table>' +
+    (photoDataUrl ? '<p style="color:#666">Delivery photo attached.</p>' : '') +
+    '<p style="color:#666">Smart Choice Delivery &middot; 403 880 9822 &middot; text is best</p></div>';
+  const msg = { from: 'delivery@smartchoicedelivery.ca', to: shop.notify_email, reply_to: 'smartchoicedelivery@yahoo.com', subject: 'Delivered: ' + (order.name || 'delivery') + (order.address ? ' - ' + order.address : ''), html };
+  const pm = /^data:image\/(\w+);base64,(.+)$/.exec(photoDataUrl || '');
+  if (pm) msg.attachments = [{ filename: 'delivery-photo.' + (pm[1] === 'jpeg' ? 'jpg' : pm[1]), content: pm[2] }];
+  const { Resend } = await import('resend');
+  const result = await new Resend(process.env.RESEND_API_KEY).emails.send(msg);
+  if (result && result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+  return shop.notify_email;
+}
+
 async function getShopLocation(shopCode) {
   try {
     const store = getStore('flower-shops');
@@ -420,6 +459,16 @@ export default async (req) => {
           // has_photo flag above would then be misleading. Downgrade it.
           order.has_photo = false;
           await store.setJSON(orderId, order);
+        }
+      }
+      // Delivery notice to the shop, only for shops that asked for it. A failure here never fails the order.
+      if (!isWholesale || isEventZoneCode(zoneCode)) { // wholesale pickups get no notice; WED/WEDO are events, not wholesale
+        try {
+          const to = await sendDeliveryNotice(order, body.photo_base64 || '');
+          if (to) { order.notice_sent_at = new Date().toISOString(); order.notice_to = to; await store.setJSON(orderId, order); }
+        } catch (e) {
+          console.error('delivery notice failed:', e.message);
+          try { order.notice_error = String(e.message || e).slice(0, 200); await store.setJSON(orderId, order); } catch (e2) {}
         }
       }
       // has_photo reports whether the photo was actually stored (it is downgraded to
