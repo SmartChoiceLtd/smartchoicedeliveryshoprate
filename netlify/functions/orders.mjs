@@ -1,5 +1,14 @@
 import { getStore } from '@netlify/blobs';
 
+// Christmas greens: a per-piece upcharge for deliveries dated Nov 1 to Jan 31, while the office switch (Seasonal page) is on.
+// The server decides whether it applies and at what rate; the driver form only collects the number of green pieces.
+const XMAS_DEFAULTS = { enabled: true, driver_rate: 1.5, shop_rate: 2 };
+const inXmasSeason = iso => { const m = parseInt(String(iso || '').slice(5, 7), 10); return m === 11 || m === 12 || m === 1; };
+async function xmasSettings() {
+  try { const s = await getStore('flower-settings').get('seasonal', { type: 'json' }); return { ...XMAS_DEFAULTS, ...((s && s.xmas) || {}) }; }
+  catch (e) { return { ...XMAS_DEFAULTS }; }
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -284,6 +293,9 @@ export default async (req) => {
       zoneSuggestion.confidence === 'high';
 
     const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
+    const xs = await xmasSettings();
+    const xmasOn = !!xs.enabled && inXmasSeason(normalizeOrderDate(raw.date));
+    const xmasPcs = xmasOn ? Math.max(0, Math.min(parseInt(body.xmas_pieces, 10) || 0, parseInt(raw.total_pieces || 1, 10) || 1)) : 0;
     const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const order = {
       id: orderId,
@@ -310,7 +322,7 @@ export default async (req) => {
           ? (r.drate || 0) + (r.perkm || 0) * dist
           : (r.drate || 0);
         const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
-        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium;
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
       })(),
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
@@ -337,6 +349,10 @@ export default async (req) => {
       accepted_by: raw.accepted_by,
       comments: raw.comments,
       has_photo: !!body.photo_base64,
+      // Christmas greens: how many of the pieces, and the rates in force when the order was entered.
+      xmas_pieces: xmasPcs || 0,
+      xmas_driver_rate: xmasPcs ? (xs.driver_rate || 0) : 0,
+      xmas_shop_rate: xmasPcs ? (xs.shop_rate || 0) : 0,
     };
 
     // A delivery entered against an event quote (Q-2026-0001): the quote decides who is billed, what the shop is
@@ -354,6 +370,7 @@ export default async (req) => {
       order.quote_id = q.id;
       order.shop_code = String(q.customer.code).toUpperCase();
       order.shop_pay = Math.round((q.subtotal / trips) * 100) / 100;
+      order.xmas_pieces = 0; order.xmas_driver_rate = 0; order.xmas_shop_rate = 0; // the quote already sets the price and the pay
       if (q.driver_pay > 0) { order.driver_pay = q.driver_pay; order.driver_pay_from_quote = true; }
     }
 
