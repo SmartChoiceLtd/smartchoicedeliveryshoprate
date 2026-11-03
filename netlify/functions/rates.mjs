@@ -92,15 +92,25 @@ const DEFAULT_RATES = {
   WPH:{drate:15,dratex:1,gdpi:0.75,srate:20,sratex:1},
 };
 
+// Seasonal planters. Added without touching an existing rate table: a code missing from the saved rates is filled in from here,
+// and once someone edits it on the rates page the saved value wins.
+//   SPL  (in town): driver $14 + $2.50 per extra piece; shop $20 + $5 per extra piece.
+//   SPLO (out of town): the event form pays the driver the zone's pay + $2.50 per extra piece and bills the shop the zone's rate + $5 per
+//        extra piece; the values below are only the fallback when SPLO is picked by hand.
+const SEASONAL_RATES = {
+  SPL:  { drate: 14, dratex: 2.5, gdpi: 0, srate: 20, sratex: 5 },
+  SPLO: { drate: 14, dratex: 2.5, gdpi: 0, srate: 25, sratex: 5 },
+};
+
 export default async (req) => {
   const store = getStore('flower-rates');
 
   if (req.method === 'GET') {
     try {
       const stored = await store.get('rates', { type: 'json' });
-      return json(stored || DEFAULT_RATES);
+      return json({ ...SEASONAL_RATES, ...(stored || DEFAULT_RATES) });
     } catch(e) {
-      return json(DEFAULT_RATES);
+      return json({ ...SEASONAL_RATES, ...DEFAULT_RATES });
     }
   }
 
