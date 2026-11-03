@@ -1,426 +1,1908 @@
-import { getStore } from '@netlify/blobs';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SCD Driver">
+<meta name="theme-color" content="#0C769E">
+<link rel="manifest" id="manifestLink" href="/manifest.json">
+<script>
+// Point the manifest link at a per-driver manifest so "Add to Home Screen"
+// launches back into THIS driver's own /driver/:code page instead of the
+// generic /driver/ (no code) start_url a static manifest.json is stuck with.
+// Runs synchronously in <head>, before the browser evaluates installability.
+(function () {
+  var parts = location.pathname.split('/').filter(Boolean);
+  var code = parts[1] ? parts[1].toLowerCase() : '';
+  if (code) {
+    document.getElementById('manifestLink').setAttribute('href', '/api/manifest?code=' + encodeURIComponent(code));
+  }
+})();
+</script>
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>Smart Choice Delivery</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
+*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+[hidden]{display:none !important;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
+.driver-badge{background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}
+.container{max-width:540px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+.card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 14px;}
+.toggle-row{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.toggle-btn{flex:1;padding:8px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
+.toggle-btn.active{background:var(--accent);color:#fff;font-weight:700;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field textarea{resize:vertical;min-height:70px;}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+.zone-result{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;}
+.zone-code{font-size:20px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
+.zone-desc{font-size:12px;color:var(--ink-soft);}
+.zone-loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
+.pay-preview{background:var(--green-soft);border:1px solid #A8CFA8;border-radius:10px;padding:12px 14px;margin-top:10px;}
+.pay-amount{font-size:22px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
+.pay-breakdown{font-size:12px;color:var(--green);margin-top:2px;}
+.zone-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.zone-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;}
+.zone-btn:hover{border-color:var(--accent);color:var(--accent);}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.status-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;}
+.status-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
+.btn{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.btn:disabled{opacity:0.5;cursor:default;}
+.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);}
+.error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+.success{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:16px;border-radius:10px;text-align:center;}
+.success h3{font-family:Georgia,serif;font-size:18px;margin:0 0 6px;}
+.loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.shop-search-wrap{position:relative;}
+.shop-dd{position:absolute;z-index:200;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);display:none;}
+.shop-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+.shop-dd-item:last-child{border-bottom:none;}
+.shop-dd-item:hover{background:var(--accent-soft);}
+.shop-dd-header{padding:5px 12px;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;background:var(--bg);}
+#submitBtn{background:var(--warm);}
+</style>
+</head>
+<body>
 
-// Christmas greens: a per-piece upcharge for deliveries dated Nov 1 to Jan 31, while the office switch (Seasonal page) is on.
-// The server decides whether it applies and at what rate; the driver form only collects the number of green pieces.
-const XMAS_DEFAULTS = { enabled: true, driver_rate: 1.5, shop_rate: 2 };
-const inXmasSeason = iso => { const m = parseInt(String(iso || '').slice(5, 7), 10); return m === 11 || m === 12 || m === 1; };
-async function xmasSettings() {
-  try { const s = await getStore('flower-settings').get('seasonal', { type: 'json' }); return { ...XMAS_DEFAULTS, ...((s && s.xmas) || {}) }; }
-  catch (e) { return { ...XMAS_DEFAULTS }; }
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading...</p>
+</div>
+
+<div id="notFound" hidden>
+  <div class="container" style="padding-top:40px;text-align:center;">
+    <p style="color:var(--ink-soft);">Driver link not found. Check your link or contact your dispatcher.</p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <h1>Smart Choice Delivery</h1>
+    <span class="driver-badge" id="driverBadge"></span>
+  </div>
+  <div class="container">
+    <div id="errorMsg" class="error" hidden></div>
+    <div id="draftRestoredMsg" class="success" hidden></div>
+
+    <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:6px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
+    <a href="#" id="clearFormLink" style="display:block;text-align:center;font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Clear form and start over</a>
+
+    <div class="toggle-row" id="deliveryTypeToggle" style="margin-bottom:16px;">
+      <button class="toggle-btn active" data-type="store">Store to Door</button>
+      <button class="toggle-btn" data-type="wholesale">Wholesale</button>
+      <button class="toggle-btn" data-type="events">Events</button>
+    </div>
+
+    <div class="card">
+      <h2>Delivery Details</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="fDate">
+        </div>
+        <div class="field">
+          <label>Order ID</label>
+          <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
+        </div>
+      </div>
+      <div class="field" id="eventTypeField" hidden>
+        <label>Event Type</label>
+        <select id="fEventType">
+          <option value="" disabled selected>Select event type...</option>
+          <option value="SPEC">Special Event</option>
+          <option value="WED">Wedding</option>
+          <option value="FUN">Funeral</option>
+          <option value="SPL">Seasonal Planter</option>
+        </select>
+        <p id="eventTypeNote" hidden style="font-size:11px;color:var(--ink-soft);margin:4px 0 0;"></p>
+      </div>
+      <div class="field" id="quoteField" hidden>
+        <label>Quote # (only if this job was quoted)</label>
+        <input type="text" id="fQuote" placeholder="Q-2026-0001" autocapitalize="characters" autocomplete="off" maxlength="14">
+        <p style="font-size:11px;color:var(--ink-soft);margin:3px 0 0;">The year is filled in. Type just the quote number, e.g. 2 or 0002.</p>
+        <p id="quoteNote" hidden style="font-size:12px;margin:4px 0 0;"></p>
+      </div>
+      <div class="field" id="wholesalerField" hidden>
+        <label>Pick Up From (Wholesaler)</label>
+        <select id="fWholesaler">
+          <option value="">Select wholesaler...</option>
+          <option value="AM">AM AMAZING FLORAL WHOLESALE</option>
+          <option value="WFW">WFW WEAVER FLORAL WHOLESALE</option>
+          <option value="BA">BA BERNARD ANDERSON</option>
+          <option value="FC">FC FLOWER CENTER</option>
+          <option value="FS">FS FLORISTS SUPPLY</option>
+          <option value="SV">SV SAVANAH</option>
+          <option value="QF">QF QFRESH LOGISTICS</option>
+          <option value="SB">SB SBE WHOLESALE</option>
+        </select>
+      </div>
+      <div class="field" id="billingQueryField" hidden>
+        <label>Invoice To</label>
+        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">WFW, FS &amp; SV default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
+        <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
+          <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
+          <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="shopLabel">Shop</label>
+        <div class="shop-search-wrap">
+          <input type="text" id="fShopSearch" placeholder="Search shop..." autocomplete="off">
+          <input type="hidden" id="fShop">
+          <div class="shop-dd" id="fShopDropdown"></div>
+        </div>
+      </div>
+      <div class="field" id="recipientNameField">
+        <label>Recipient Name</label>
+        <input type="text" id="fName" placeholder="Name or company">
+      </div>
+      <div class="field" id="recipientPhoneField">
+        <label>Recipient Phone (optional)</label>
+        <input type="tel" id="fPhone" inputmode="tel" autocomplete="off" placeholder="403-555-0123">
+      </div>
+      <div class="field" id="callRow" hidden>
+        <a id="callLink" href="#" style="display:block;text-align:center;padding:12px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);font-weight:700;font-size:15px;text-decoration:none;">&#9742; Call recipient</a>
+      </div>
+      <div class="field" id="textRow" hidden>
+        <label>Text recipient (opens your messages, you tap Send)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button type="button" data-sms="door" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left at door</button>
+          <button type="button" data-sms="neighbour" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with neighbour</button>
+          <button type="button" data-sms="reception" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with reception</button>
+          <button type="button" data-sms="address" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Need correct address</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Delivery Address</label>
+        <input type="text" id="fAddress" placeholder="Start typing address...">
+        <div class="field-row" style="margin-top:8px;">
+          <div class="field" style="margin-bottom:0;">
+            <input type="text" id="fUnit" placeholder="Unit / Suite / Apt #">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <input type="text" id="fTimeRequest" placeholder="Time req. e.g. <2, >3" maxlength="20">
+          </div>
+        </div>
+        <div id="zoneResult" hidden>
+          <div class="zone-result">
+            <div>
+              <div class="zone-code" id="zoneCode">-</div>
+              <div class="zone-desc" id="zoneDesc"></div>
+            </div>
+            <button onclick="overrideZone()" style="font-size:12px;color:var(--ink-soft);background:none;border:none;cursor:pointer;text-decoration:underline;">Change</button>
+          </div>
+          <div class="pay-preview" id="payPreview" hidden>
+            <div class="pay-amount" id="payAmount"></div>
+            <div class="pay-breakdown" id="payBreakdown"></div>
+          </div>
+        </div>
+        <div id="zoneLoading" class="zone-loading" hidden>Looking up zone...</div>
+        <div id="zoneManual" hidden>
+          <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 6px;">Select zone:</p>
+          <div class="zone-buttons" id="zoneButtons"></div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Total Pieces</label>
+          <input type="number" id="fPieces" min="1" value="1">
+        </div>
+        <div class="field" id="xmasField" hidden>
+          <label>Xmas Greens</label>
+          <input type="number" id="fXmas" min="0" value="" placeholder="0" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Delivery Time</label>
+          <input type="time" id="fTime">
+        </div>
+      </div>
+      <p id="xmasNote" hidden style="font-size:12px;color:var(--ink-soft);margin:-4px 0 10px;"></p>
+      <div class="field" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="fRush" style="width:20px;height:20px;">
+        <label for="fRush" style="margin:0;font-weight:600;">Rush / Hotshot Delivery (adds premium)</label>
+      </div>
+    </div>
+
+    <div class="card" id="statusCard">
+      <h2>Delivery Status</h2>
+      <div class="status-grid" id="statusGrid">
+        <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
+        <button class="status-btn" data-status="Neighboured">Neighboured</button>
+        <button class="status-btn" data-status="Redirect">Redirect</button>
+        <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
+      </div>
+      <div id="directSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="directSubGrid">
+          <button class="status-btn" data-sub="Concierge/Reception">Concierge/<wbr>Reception</button>
+          <button class="status-btn" data-sub="Mailroom">Mailroom</button>
+          <button class="status-btn" data-sub="Loading Dock">Loading Dock</button>
+          <button class="status-btn" data-sub="Doorstep">Doorstep</button>
+        </div>
+      </div>
+      <div class="field" id="neighbouredToField" hidden style="margin-top:10px;">
+        <label>Neighboured To</label>
+        <input type="text" id="fNeighbouredTo" placeholder="Left with...">
+      </div>
+      <div class="field" id="redirectField" hidden style="margin-top:10px;">
+        <label>Redirect Details</label>
+        <input type="text" id="fRedirectDetail" placeholder="Redirected to...">
+      </div>
+      <div id="undeliverableSubField" hidden style="margin-top:8px;">
+        <div class="status-grid" id="undeliverableSubGrid">
+          <button class="status-btn" data-unsub="Incorrect Address">Incorrect Address</button>
+          <button class="status-btn" data-unsub="Incorrect Contact Info">Incorrect Contact Info</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Accepted By</label>
+        <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+      <div class="field" id="contactMethodField" hidden style="margin-top:10px;">
+        <label>Recipient Contact Method</label>
+        <div class="status-grid" id="contactMethodGrid">
+          <button class="status-btn" data-contact="In Person">In Person</button>
+          <button class="status-btn" data-contact="Direct By Phone">Direct By Phone</button>
+          <button class="status-btn" data-contact="Voicemail">Voicemail</button>
+          <button class="status-btn" data-contact="Text">Text</button>
+          <button class="status-btn" data-contact="Door Tag">Door Tag</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="wholesaleStatusCard" hidden>
+      <h2>Delivery Confirmation</h2>
+      <div class="field">
+        <div class="status-grid">
+          <button type="button" class="status-btn" id="wsDoorstepBtn">Doorstep</button>
+        </div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Select if left at the door. A photo is required.</div>
+      </div>
+      <div class="field">
+        <label>Accepted By</label>
+        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Notes &amp; Photo</h2>
+      <div class="field">
+        <label>Comments</label>
+        <textarea id="fComments" placeholder="Additional details..."></textarea>
+      </div>
+      <div class="field">
+        <label id="photoLabel">Photo (optional)</label>
+      <input type="file" id="fPhoto" accept="image/*">
+      <div id="photoButtonsAndroid" hidden style="display:flex;gap:8px;margin-top:4px;">
+        <button type="button" class="btn btn-ghost" id="photoTakeBtn" style="flex:1;">Take Photo</button>
+        <button type="button" class="btn btn-ghost" id="photoGalleryBtn" style="flex:1;">Choose from Gallery</button>
+      </div>
+      <div id="photoStatus" hidden style="display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:var(--green-soft);">
+        <img id="photoThumb" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:var(--green);font-size:14px;">&#10003; Photo attached</div>
+          <div id="photoStatusSub" style="font-size:12px;color:var(--ink-soft);">Uploads when you tap Submit</div>
+        </div>
+        <button type="button" id="photoRemoveBtn" style="background:transparent;border:1px solid var(--border);color:var(--ink-soft);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Remove</button>
+      </div>
+      <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn">Submit Delivery</button>
+    <button class="btn btn-secondary" id="summaryBtn">View Today's Summary</button>
+  </div>
+</div>
+
+<div id="successScreen" hidden>
+  <div class="container" style="padding-top:40px;">
+    <div class="success">
+      <h3>Delivery Submitted</h3>
+      <p id="successDetail"></p>
+      <p id="successPhoto" hidden style="margin-top:8px;font-weight:600;"></p>
+    </div>
+    <button class="btn" style="margin-top:16px;" id="myRouteBtn2">&larr; My Route</button>
+    <button class="btn btn-secondary" id="nextBtn">Next Delivery (Manual Entry)</button>
+    <button class="btn btn-secondary" id="summaryBtn2">View Today's Summary</button>
+  </div>
+</div>
+
+<script>
+var driverCode = '';
+var driverName = '';
+var rates = {};
+var shops = [];
+var selectedZone = '';
+var eventType = '';
+var selectedStatuses = [];
+var formattedAddress = '';
+var lastPlaceLat = null, lastPlaceLng = null; // coords of the last picked autocomplete address, so a tab switch can redo the zone lookup
+var matchedCommunity = '';
+var matchedDistanceKm = null;
+var deliveryType = 'store';
+var currentStopId = null;
+
+// ===== DRAFT AUTO-SAVE/RESTORE =====
+// Mobile browsers commonly kill a backgrounded tab's memory to free up
+// RAM when the driver switches to take a call or check a text - on
+// return, the page isn't "resumed," it's freshly reloaded, silently
+// wiping any in-progress entry that only ever lived in JS memory. This
+// persists the form to localStorage as the driver fills it in, and
+// restores it automatically if the page reloads mid-entry. Cleared on
+// successful submission or "Next Delivery" so it never bleeds into the
+// next entry. The photo itself can't be persisted this way (file
+// references don't survive a reload) - if Doorstep was selected, the
+// driver is reminded to retake it.
+var recipientPhone = '';
+// Tap-to-call button for the recipient. The number comes from the tag scan (carried in the link from the
+// route page) or is typed in the Recipient Phone box; either way the button follows what is in the box.
+function updateCallLink() {
+  var inp = document.getElementById('fPhone'), row = document.getElementById('callRow'), link = document.getElementById('callLink');
+  if (!inp || !row || !link) return;
+  recipientPhone = String(inp.value || '').trim();
+  var dial = recipientPhone.replace(/[^0-9+]/g, '');
+  var textRow = document.getElementById('textRow');
+  if (dial.replace(/\D/g, '').length < 7) { row.hidden = true; if (textRow) textRow.hidden = true; return; }
+  if (textRow) textRow.hidden = false;
+  link.href = 'tel:' + dial;
+  link.innerHTML = '&#9742; Call recipient &mdash; ' + recipientPhone.replace(/[<>&"]/g, '');
+  row.hidden = false;
+}
+function setRecipientPhone(p) {
+  var inp = document.getElementById('fPhone');
+  if (inp) inp.value = String(p || '').trim();
+  updateCallLink();
 }
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json' }
+// ---- Text the recipient: opens the driver's own messaging app with a ready-written note; the driver taps Send.
+// (A link cannot attach a photo, so the doorstep note says a photo was taken.)
+function buildSmsUrl(kind) {
+  var dial = String(document.getElementById('fPhone').value || '').replace(/[^0-9+]/g, '');
+  if (dial.replace(/\D/g, '').length < 7) return null;
+  var nm = String(document.getElementById('fName').value || '').trim();
+  var shopTxt = String(document.getElementById('fShopSearch').value || '').trim();
+  var who = (driverName || 'your driver');
+  var intro = 'Hi' + (nm ? ' ' + nm : '') + ', this is ' + who + ' with Smart Choice Delivery' + (shopTxt ? ', delivering your flowers from ' + shopTxt : ', delivering your flowers') + '. ';
+  var addr = String(document.getElementById('fAddress').value || '').trim();
+  var msg;
+  if (kind === 'door') {
+    msg = intro + 'I could not reach you at the door or by phone. As permitted, I left your delivery at your doorstep' + (addr ? ' at ' + addr : '') + ' and took a photo of it there for our records. Please bring it inside soon.';
+  } else if (kind === 'neighbour') {
+    var where = String(document.getElementById('fNeighbouredTo').value || '').trim();
+    if (!where) where = (window.prompt('Which neighbour (house or unit number)?', '') || '').trim();
+    if (!where) return null;
+    msg = intro + 'I could not reach you at the door or by phone, so I left your delivery with your neighbour at ' + where + '. Please collect it from them.';
+  } else if (kind === 'reception') {
+    var by = String(document.getElementById('fAcceptedBy').value || '').trim();
+    msg = intro + 'I left your delivery with the concierge/reception at your building' + (by ? ' (accepted by ' + by + ')' : '') + '. Please pick it up from them.';
+  } else if (kind === 'address') {
+    msg = intro + 'I could not complete your delivery because the address or access details we were given are incorrect or incomplete' + (addr ? ' (' + addr + ')' : '') + '. Please reply with the correct delivery address, unit number and any buzzer or access code so I can bring it to you.';
+  } else return null;
+  return 'sms:' + dial + '?&body=' + encodeURIComponent(msg);
+}
+document.addEventListener('click', function(e) {
+  var b = e.target.closest ? e.target.closest('[data-sms]') : null;
+  if (!b) return;
+  var url = buildSmsUrl(b.getAttribute('data-sms'));
+  if (url) window.location.href = url;
+});
+
+function draftStorageKey() {
+  return 'scd_driver_draft_' + (urlDriverCode || 'unknown');
+}
+
+function saveDraft() {
+  try {
+    var draft = {
+      savedAt: Date.now(),
+      deliveryType: deliveryType,
+      eventType: eventType,
+      selectedZone: selectedZone,
+      matchedCommunity: matchedCommunity,
+      matchedDistanceKm: matchedDistanceKm,
+      formattedAddress: formattedAddress,
+      selectedStatuses: selectedStatuses,
+      currentStopId: currentStopId,
+      recipientPhone: recipientPhone,
+      fields: {}
+    };
+    ['fDate','fOrderId','fPhone','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fXmas','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) draft.fields[id] = el.value;
+    });
+    draft.directSub = Array.from(document.querySelectorAll('#directSubGrid .status-btn.selected')).map(function(b){ return b.dataset.sub; });
+    draft.wsDoorstep = !!document.querySelector('#wsDoorstepBtn.selected');
+    draft.undeliverableSub = Array.from(document.querySelectorAll('#undeliverableSubGrid .status-btn.selected')).map(function(b){ return b.dataset.unsub; });
+    var contactSel = document.querySelector('#contactMethodGrid .status-btn.selected');
+    draft.contactMethod = contactSel ? contactSel.dataset.contact : '';
+    var billingSel = document.querySelector('#billingToggle .toggle-btn.active');
+    draft.billing = billingSel ? billingSel.dataset.billing : '';
+    localStorage.setItem(draftStorageKey(), JSON.stringify(draft));
+  } catch (e) { /* localStorage unavailable/full - draft recovery just won't work this time */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(draftStorageKey()); } catch (e) {}
+}
+
+function hasMeaningfulDraft(draft) {
+  // Don't bother restoring/notifying for a draft that's just default
+  // values with nothing actually entered yet.
+  return !!(draft.fields.fOrderId || draft.fields.fName || draft.fields.fAddress || draft.selectedZone);
+}
+
+function restoreDraftIfPresent() {
+  var raw;
+  try { raw = localStorage.getItem(draftStorageKey()); } catch (e) { return; }
+  if (!raw) return;
+  var draft;
+  try { draft = JSON.parse(raw); } catch (e) { return; }
+  if (!draft || !hasMeaningfulDraft(draft)) return;
+
+  if (draft.deliveryType && draft.deliveryType !== deliveryType) {
+    var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + draft.deliveryType + '"]');
+    if (typeBtn) typeBtn.click(); // reuses the existing toggle handler for correct field visibility; clears shop fields as a side effect, restored right after below
+  }
+
+  Object.keys(draft.fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = draft.fields[id];
+  });
+
+  deliveryType = draft.deliveryType || deliveryType;
+  eventType = draft.eventType || '';
+  if (eventType) document.getElementById('fEventType').value = eventType;
+  formattedAddress = draft.formattedAddress || '';
+  matchedCommunity = draft.matchedCommunity || '';
+  matchedDistanceKm = (typeof draft.matchedDistanceKm === 'number') ? draft.matchedDistanceKm : null;
+  selectedZone = draft.selectedZone || '';
+  selectedStatuses = draft.selectedStatuses || [];
+  currentStopId = draft.currentStopId || null;
+  setRecipientPhone(draft.recipientPhone || '');
+
+  document.querySelectorAll('#statusGrid .status-btn').forEach(function(b) {
+    b.classList.toggle('selected', selectedStatuses.indexOf(b.dataset.status) >= 0);
+  });
+  (draft.directSub || []).forEach(function(sub) {
+    var b = document.querySelector('#directSubGrid .status-btn[data-sub="' + sub + '"]');
+    if (b) b.classList.add('selected');
+  });
+  (draft.undeliverableSub || []).forEach(function(sub) {
+    var b = document.querySelector('#undeliverableSubGrid .status-btn[data-unsub="' + sub + '"]');
+    if (b) b.classList.add('selected');
+  });
+  if (draft.contactMethod) {
+    var cb = document.querySelector('#contactMethodGrid .status-btn[data-contact="' + draft.contactMethod + '"]');
+    if (cb) cb.classList.add('selected');
+  }
+  if (draft.billing) {
+    document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.billing === draft.billing);
+    });
+  }
+  document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
+  document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+  document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
+  document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+  document.getElementById('contactMethodField').hidden = !document.getElementById('fAcceptedBy').value.trim();
+
+  if (selectedZone) { refreshZoneDisplay(); updatePay(); }
+
+  if (draft.wsDoorstep) document.getElementById('wsDoorstepBtn').classList.add('selected');
+  refreshPhotoUI();
+  var doorstepSelected = isDoorstepSelected();
+  var noteEl = document.getElementById('draftRestoredMsg');
+  noteEl.textContent = 'Restored your in-progress entry.' + (doorstepSelected ? ' Photo will need to be retaken.' : '');
+  noteEl.hidden = false;
+  setTimeout(function() { noteEl.hidden = true; }, 6000);
+}
+
+// Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
+// SPEC/WED/FUN rate from the rate table directly. Anything else (border
+// communities, RVS/RVN, OUT1-4, etc.) is "out of town": pay is the
+// underlying zone's own drate+gdpi as base, with the per-extra-piece rate
+// overridden to the event's rate. The effective code shown/recorded
+// (WEDO/FUNO) exists mainly for tracking/reporting, not as its own flat
+// rate-table entry. Special Event has no out-of-town variant, so it always
+// uses the flat SPEC rate regardless of location.
+var EVENT_TYPES = {
+  SPEC: { label: 'Special Event', inTownCode: 'SPEC', outTownCode: null,    outTownExtraRate: null },
+  WED:  { label: 'Wedding',       inTownCode: 'WED',  outTownCode: 'WEDO', outTownExtraRate: 5 },
+  FUN:  { label: 'Funeral',       inTownCode: 'FUN',  outTownCode: 'FUNO', outTownExtraRate: 3 },
+  SPL:  { label: 'Seasonal Planter', inTownCode: 'SPL', outTownCode: 'SPLO', outTownExtraRate: 2.5 }
+};
+var IN_TOWN_ZONES = ['C1','C2','C3','C4','C5'];
+
+function isInTownZone(code) {
+  return IN_TOWN_ZONES.indexOf(code) >= 0;
+}
+
+// Returns the effective zone code to display/record/pay against, given the
+// currently selected geographic zone and event type. If no event type is
+// set, this is just a passthrough to the geographic zone.
+function getEffectiveZone() {
+  if (!eventType || !selectedZone || !EVENT_TYPES[eventType]) {
+    return { code: selectedZone, isEventOverride: false, baseZone: selectedZone };
+  }
+  var ev = EVENT_TYPES[eventType];
+  if (activeQuote || isInTownZone(selectedZone) || !ev.outTownCode) {
+    return { code: ev.inTownCode, isEventOverride: true, baseZone: selectedZone };
+  }
+  return { code: ev.outTownCode, isEventOverride: true, baseZone: selectedZone };
+}
+
+// Computes {base, extra, gdpi, total} pay for the current selection,
+// Base pay for a zone, handling RURALKM's distance formula (base + perkm x
+// distance) as a special case. All other zones just use their flat drate.
+function getZoneBasePay(zoneCode) {
+  var r = rates[zoneCode] || {};
+  if ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && matchedDistanceKm != null) {
+    return (r.drate || 0) + (r.perkm || 0) * matchedDistanceKm;
+  }
+  return r.drate || 0;
+}
+
+// Computes {base, extra, gdpi, total} pay for the current selection,
+// applying the event-type overlay if applicable.
+/* Christmas greens: shown only when the office switch is on and the delivery date is Nov 1 to Jan 31. */
+var xmasCfg = { enabled: false, driver_rate: 1.5 };
+function xmasActive() {
+  if (!xmasCfg.enabled || activeQuote) return false;
+  if (document.getElementById('fEventType').value === 'SPL') return false; // planters are greens already: plain base + extra pieces
+  var m = parseInt(String(document.getElementById('fDate').value || '').slice(5, 7), 10);
+  return m === 11 || m === 12 || m === 1;
+}
+function xmasCount() {
+  if (!xmasActive()) return 0;
+  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1;
+  return Math.max(0, Math.min(parseInt(document.getElementById('fXmas').value, 10) || 0, pieces));
+}
+function refreshXmas() {
+  var on = xmasActive(), f = document.getElementById('xmasField'), n = document.getElementById('xmasNote');
+  f.hidden = !on;
+  if (!on) { document.getElementById('fXmas').value = ''; n.hidden = true; return; }
+  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1, v = parseInt(document.getElementById('fXmas').value, 10) || 0;
+  if (v > pieces) { document.getElementById('fXmas').value = pieces; v = pieces; }
+  n.hidden = !v; n.textContent = v ? (v + ' of ' + pieces + ' pieces are Christmas greens: +$' + (v * (xmasCfg.driver_rate || 0)).toFixed(2) + ' pay') : '';
+}
+fetch('/api/seasonal').then(function(r) { return r.json(); }).then(function(c) {
+  if (c && c.xmas) { xmasCfg = { enabled: !!c.xmas.enabled, driver_rate: c.xmas.driver_rate }; refreshXmas(); if (selectedZone) updatePay(); }
+}).catch(function() {});
+document.addEventListener('input', function(e) { if (e.target && (e.target.id === 'fXmas' || e.target.id === 'fPieces')) { refreshXmas(); if (selectedZone) updatePay(); } });
+document.addEventListener('change', function(e) { if (e.target && (e.target.id === 'fDate' || e.target.id === 'fEventType')) { refreshXmas(); if (selectedZone) updatePay(); } });
+
+/* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
+var activeQuote = null;
+function quotePrefix() {
+  var y; try { y = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric' }).format(new Date()); } catch (e) { y = String(new Date().getFullYear()); }
+  return 'Q-' + y + '-';
+}
+function quoteTyped() { var v = document.getElementById('fQuote').value.trim().toUpperCase(); return v === quotePrefix() ? '' : v; } // the prefix alone is "nothing typed"
+function clearQuote() {
+  activeQuote = null; quoteZoneApplied = false; if (typeof refreshXmas === 'function') refreshXmas();
+  var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
+  if (f) f.value = quotePrefix();
+  if (n) { n.hidden = true; n.textContent = ''; }
+}
+/* A quoted job needs no zone choice: its price and pay come from the quote, and it is filed under the flat event code. */
+var quoteZoneApplied = false;
+function applyQuoteZone() {
+  if (!activeQuote || deliveryType !== 'events') return;
+  var ev = EVENT_TYPES[eventType], code = ev ? ev.inTownCode : 'SPEC';
+  quoteZoneApplied = true; refreshXmas();
+  setZone(code, code + ' - from quote ' + activeQuote.id, true, null, null);
+}
+function quoteNote(text, ok) {
+  var n = document.getElementById('quoteNote'); n.hidden = !text; n.textContent = text || '';
+  n.style.color = ok ? 'var(--green)' : 'var(--warm)';
+}
+async function lookupQuote() {
+  var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
+  activeQuote = null; refreshXmas();
+  if (quoteZoneApplied) { quoteZoneApplied = false; selectedZone = ''; document.getElementById('zoneResult').hidden = true; document.getElementById('payPreview').hidden = true; }
+  if (/^\d{1,4}$/.test(id)) id = quotePrefix() + ('0000' + id).slice(-4);          // just the number: 2 or 0002
+  else if (/^Q-\d{4}-\d{1,4}$/.test(id)) { var qp = id.split('-'); id = 'Q-' + qp[1] + '-' + ('0000' + qp[2]).slice(-4); }   // Q-2026-2
+  f.value = id;
+  if (!id || id === quotePrefix()) { f.value = quotePrefix(); quoteNote(''); if (selectedZone) updatePay(); return; }
+  quoteNote('Checking ' + id + '\u2026', true);
+  try {
+    var r = await fetch('/api/event-quotes?lookup=' + encodeURIComponent(id));
+    var q = await r.json().catch(function() { return {}; });
+    if (!r.ok) { quoteNote(q.error || 'Could not check that quote.', false); if (selectedZone) updatePay(); return; }
+    if (!q.open) { quoteNote('Quote ' + q.id + ' already has all ' + q.trips + ' of its deliveries entered. Ask the office.', false); return; }
+    if (!q.shop_code) { quoteNote('Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.', false); return; }
+    activeQuote = q;
+    var sh = shops.find(function(s) { return String(s.name).split(/\s+/)[0].toUpperCase() === String(q.shop_code).toUpperCase(); });
+    if (sh) { document.getElementById('fShop').value = sh.id; document.getElementById('fShopSearch').value = sh.name; }
+    // Fill what the quote already knows: event type, recipient (the event) and delivery address (the venue). Anything already typed is left alone.
+    var evCode = ({ 'Wedding': 'WED', 'Funeral': 'FUN' })[q.event_type] || 'SPEC';
+    var evSel = document.getElementById('fEventType');
+    if (evSel.value !== evCode) { evSel.value = evCode; evSel.dispatchEvent(new Event('change')); }
+    var nameEl = document.getElementById('fName');
+    if (!nameEl.value.trim() && q.event) nameEl.value = q.event;
+    var addrEl = document.getElementById('fAddress');
+    if (!addrEl.value.trim() && q.venue) { addrEl.value = q.venue; formattedAddress = q.venue; lookupZone(q.venue); }
+    quoteNote(q.id + ': ' + (q.event || 'event') + ' for ' + q.customer + (q.venue ? ', ' + q.venue : '') + '. Delivery ' + (q.used + 1) + ' of ' + q.trips + (q.driver_pay > 0 ? '. Your pay for this delivery: $' + Number(q.driver_pay).toFixed(2) : '. No pay set on the quote, so the usual event pay applies') + '.', true);
+    applyQuoteZone();
+  } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
+}
+document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fQuote') lookupQuote(); });
+document.addEventListener('focusin', function(e) { if (e.target && e.target.id === 'fQuote' && !e.target.value.trim()) e.target.value = quotePrefix(); });
+(function(){ var f = document.getElementById('fQuote'); if (f && !f.value) f.value = quotePrefix(); })();
+
+function computePay() {
+  if (!selectedZone) return null;
+  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
+  var eff = getEffectiveZone();
+  var base, extra, gdpi;
+  if (eff.isEventOverride && eff.code === (EVENT_TYPES[eventType] || {}).outTownCode) {
+    // Out-of-town event: base pay comes from the underlying geographic
+    // zone's own rate (RURALKM-aware), but the extra-piece rate is
+    // overridden to the event's rate.
+    var zr = rates[selectedZone] || {};
+    var ev = EVENT_TYPES[eventType];
+    base = getZoneBasePay(selectedZone);
+    gdpi = zr.gdpi || 0;
+    extra = (pieces - 1) * (ev.outTownExtraRate || 0);
+  } else {
+    // Flat rate (in-town event code, or no event type at all), or
+    // RURALKM's distance formula via getZoneBasePay - straight lookup
+    // otherwise.
+    var r = rates[eff.code] || {};
+    base = getZoneBasePay(eff.code);
+    extra = (pieces - 1) * (r.dratex || 0);
+    gdpi = r.gdpi || 0;
+  }
+  var byPremium = 0;
+  if (deliveryType === 'wholesale') {
+    var shopId = document.getElementById('fShop').value;
+    var receivingShop = shops.find(function(s){ return s.id === shopId; });
+    if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
+  }
+  var rushPremium = 0;
+  if (document.getElementById('fRush').checked) {
+    rushPremium = (rates['HOT'] || {}).drate || 0;
+  }
+  var xmasPay = xmasCount() * (xmasCfg.driver_rate || 0);
+  var res = { xmasPay: xmasPay, effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium + xmasPay, pieces: pieces };
+  if (activeQuote && deliveryType === 'events' && activeQuote.driver_pay > 0) { res.total = activeQuote.driver_pay; res.quoteId = activeQuote.id; }
+  return res;
+}
+
+var pathParts = location.pathname.split('/').filter(Boolean);
+var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
+
+function showNotFound() {
+  document.getElementById('loadingScreen').hidden = true;
+  document.getElementById('notFound').hidden = false;
+}
+
+// Event codes the driver can always pick by hand as a fallback when the
+// automatic zone / Events path misses. WED and WEDO start with W but are
+// event codes, not wholesale zones.
+var EVENT_ZONE_CODES = ['FUN', 'FUNO', 'WED', 'WEDO', 'SPEC', 'SPL', 'SPLO'];
+
+function isWholesaleZone(code) {
+  if (!code) return false;
+  var u = code.toUpperCase();
+  if (EVENT_ZONE_CODES.indexOf(u) >= 0) return false;
+  return u.startsWith('W');
+}
+
+var WHOLESALER_BILLING = {
+  WFW: 'wholesaler', FS: 'wholesaler',
+  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'wholesaler', QF: 'shop'
+};
+
+function setBillingDefault(code) {
+  var billing = WHOLESALER_BILLING[code] || 'shop';
+  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.billing === billing);
   });
 }
 
-// Map Zoho's "Shop (with Group Name)" to shop code
-// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
-function extractShopCode(shopWithGroup) {
-  if (!shopWithGroup) return null;
-  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+function getAllNonWholesaleZones() {
+  var list = Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); });
+  EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
+  return list.sort();
 }
 
-// Map Zoho's "Zone (with Group Name)" to zone code
-// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
-function extractZoneCode(zoneWithGroup) {
-  if (!zoneWithGroup) return null;
-  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
+function getNeighbourZones(code) {
+  if (deliveryType === 'wholesale') {
+    return Object.keys(rates).filter(isWholesaleZone).sort();
+  }
+  var city = ['C1','C2','C3','C4','C5'];
+  var idx = city.indexOf(code);
+  if (idx >= 0) {
+    // Suggested zone is a Calgary zone: show its immediate neighbours plus
+    // the two adjacent reserve/border codes. Kept short and relevant -
+    // matches the original scope (3-4 quick options), not the full rate table.
+    var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
+    return n.concat(['TSU','TSA']);
+  }
+  // Suggested zone is a named out-of-town zone: offer it plus a small set
+  // of commonly-adjacent out-of-town codes. "Show all zones" (below the
+  // buttons) covers anything not in this short list.
+  var out = ['TSA','TSU','DEW','HPT','RVS','RVN','C5'];
+  var base = [code];
+  out.forEach(function(z) { if (base.indexOf(z) < 0) base.push(z); });
+  return base;
 }
 
-// Determine if zone needs auto-calculation
-function needsZoneCalculation(zoneCode) {
-  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
-  return false;
+function haversineKm(a, b) {
+  var R=6371, rd=function(d){return d*Math.PI/180;};
+  var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
-// Event-type pricing codes from driver.html's Event Type overlay (Special
-// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
-// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
-// are tracked under their own code. None of them should ever be
-// re-suggested or overwritten by the address-based zone matcher below.
-const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
-function isEventZoneCode(zoneCode) {
-  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
+// Calgary reference point for measuring wholesale-rural distance - there's
+// no real wholesaler address on file to measure from (just a code/display
+// name in the dropdown), so this uses the same city-center approximation
+// suggest-zone.mjs falls back to for retail deliveries.
+var CALGARY_CENTER = { lat: 51.0447, lng: -114.0719 };
+
+// Returns {zone, distanceKm}. distanceKm is only meaningful for WRU
+// (Wholesale Rural) - the true catch-all when a delivery doesn't match
+// citywide or any named wholesale town. This is an infrequent case, but
+// still needs real distance-based pay (base + perkm x distance), same
+// formula as retail's RURALKM, rather than a flat rate.
+function getWholesaleZoneForPoint(lat, lng) {
+  if (lat == null || lng == null) return { zone: 'WPU', distanceKm: null };
+  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return { zone: 'WPU', distanceKm: null };
+  var towns = [
+    {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
+    {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
+    {zone:'WCH', lat:51.0487, lng:-113.8225, r:7},
+    {zone:'WPO', lat:50.7258, lng:-113.9758, r:8},
+    {zone:'WST', lat:51.0378, lng:-113.4003, r:8},
+    {zone:'WHR', lat:50.5808, lng:-113.8747, r:8},
+    {zone:'WLY', lat:51.1000, lng:-113.5000, r:6},
+    {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
+  ];
+  for (var i=0; i<towns.length; i++) {
+    var t = towns[i];
+    if (haversineKm({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return { zone: t.zone, distanceKm: null };
+  }
+  var distanceKm = haversineKm(CALGARY_CENTER, { lat: lat, lng: lng });
+  return { zone: 'WRU', distanceKm: Math.round(distanceKm * 10) / 10 };
 }
 
-// Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
-// the given date. Embedded directly in each order's storage key so a
-// specific week's orders can be found via a fast, server-side prefix
-// filter on .list() instead of fetching and filtering every order ever
-// created - which became a real bottleneck once the store grew into the
-// thousands of records.
-// Normalizes the date formats an order can arrive with to YYYY-MM-DD.
-// Driver-form orders send ISO dates, but the Zoho webhook sends
-// DD-Mon-YYYY (or D/M/YYYY) - the same formats reports.mjs and orders.html
-// already parse. Without this, those orders' week key came out wrong.
-// Returns null if the format isn't recognized.
-function normalizeOrderDate(raw) {
-  if (!raw) return null;
-  const s = String(raw).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
-  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
-  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-  return null;
+function getWholesaleZoneForShop(shop) {
+  if (!shop || !shop.lat || !shop.lng) return { zone: 'WPU', distanceKm: null };
+  return getWholesaleZoneForPoint(shop.lat, shop.lng);
 }
 
-function weekEndingSunday(dateStr) {
-  let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
-  // An unparseable date must still land on a real Sunday - previously this
-  // returned today's date as-is, which is almost never a Sunday, so the
-  // order got filed under a week key that no weekly report or pay run
-  // would ever look up.
-  if (!d || isNaN(d.getTime())) d = new Date();
-  const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const daysToSunday = day === 0 ? 0 : 7 - day;
-  d.setDate(d.getDate() + daysToSunday);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-async function suggestZone(address, shopLat, shopLng, key) {
-  try {
-    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
-    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone-v2?${params}`);
-    if (!res.ok) return null;
-    return res.json();
-  } catch (e) {
-    return null;
+function buildZoneButtons(suggested, showAll) {
+  var list;
+  if (deliveryType === 'wholesale') {
+    list = Object.keys(rates).filter(isWholesaleZone).sort();
+  } else if (showAll) {
+    list = getAllNonWholesaleZones();
+  } else {
+    list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
+    // Always offer the event codes as a manual fallback, even in the short list.
+    EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
+  }
+  var container = document.getElementById('zoneButtons');
+  container.innerHTML = '';
+  list.forEach(function(z) {
+    var r = rates[z];
+    var btn = document.createElement('button');
+    btn.className = 'zone-btn';
+    btn.textContent = z + (r ? ' $'+r.drate : '');
+    if (z === suggested) {
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.background = 'var(--accent-soft)';
+      btn.style.fontWeight = '700';
+    }
+    btn.onclick = function() { setZone(z, 'Manual selection', true); };
+    container.appendChild(btn);
+  });
+  // Only offer "show all" when the current list is a narrowed-down subset -
+  // avoids a redundant link when everything is already being shown (e.g.
+  // no suggestion at all, so there's no anchor to narrow around).
+  if (deliveryType !== 'wholesale' && !showAll && list.length < getAllNonWholesaleZones().length) {
+    var moreBtn = document.createElement('button');
+    moreBtn.className = 'zone-btn';
+    moreBtn.style.fontStyle = 'italic';
+    moreBtn.style.color = 'var(--ink-soft)';
+    moreBtn.textContent = 'Show all zones…';
+    moreBtn.onclick = function() { buildZoneButtons(suggested, true); };
+    container.appendChild(moreBtn);
   }
 }
 
-async function getShopLocation(shopCode) {
-  try {
-    const store = getStore('flower-shops');
-    const { blobs } = await store.list();
-    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
-    const match = shops.filter(Boolean).find(s =>
-      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
-    );
-    return match ? { lat: match.lat, lng: match.lng } : null;
-  } catch (e) {
-    return null;
+function setZone(code, desc, manual, community, distanceKm) {
+  selectedZone = code;
+  matchedCommunity = manual ? '' : (community || '');
+  matchedDistanceKm = manual ? null : (typeof distanceKm === 'number' ? distanceKm : null);
+  refreshZoneDisplay(desc);
+  updatePay();
+  trackStop();
+}
+
+// Creates a pending stop the first time a zone resolves for this entry, or
+// updates the existing one if the address/shop gets corrected before
+// submission - same trigger point regardless of whether the delivery was
+// started via Scan Tag or manual entry, so reconciliation coverage is
+// consistent either way. Best-effort: a network hiccup here shouldn't
+// block the driver from continuing their delivery.
+function trackStop() {
+  var shopId = document.getElementById('fShop').value;
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var now = new Date();
+  var payload = {
+    driver: driverCode,
+    shop_code: shop ? shop.name.split(' ')[0] : null,
+    address: formattedAddress || document.getElementById('fAddress').value.trim(),
+    name: document.getElementById('fName').value.trim(),
+    phone: (document.getElementById('fPhone').value || '').replace(/[^0-9+() .-]/g, '').trim() || null,
+    order_id: document.getElementById('fOrderId').value.trim() || null,
+    delivery_type: deliveryType,
+    local_date: now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0')
+  };
+  if (currentStopId) {
+    fetch('/api/stops/' + encodeURIComponent(currentStopId), {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    }).catch(function() { /* best-effort */ });
+  } else {
+    fetch('/api/stops', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+      .then(function(stop) { if (stop && stop.id) currentStopId = stop.id; })
+      .catch(function() { /* best-effort */ });
   }
 }
 
-export default async (req) => {
-  // Handle GET — list all orders. NOT auth-gated: this is shared with
-  // driver-summary.html (driver-facing, no login system at all) in
-  // addition to orders.html's dashboard - same category as shops.mjs/
-  // rates.mjs/stops.mjs, which were deliberately left open for the same
-  // reason. Protecting the dashboard relies on its page-level login
-  // redirect instead of blocking this endpoint outright.
-  if (req.method === 'GET') {
+function refreshZoneDisplay(baseDesc) {
+  var eff = getEffectiveZone();
+  var desc = baseDesc || '';
+  if (eff.isEventOverride) {
+    var ev = EVENT_TYPES[eventType];
+    desc = (eff.code === ev.outTownCode)
+      ? (ev.label + ' — out of town (underlying zone: ' + eff.baseZone + ')')
+      : (ev.label + ' — flat rate');
+  }
+  document.getElementById('zoneCode').textContent = eff.code;
+  document.getElementById('zoneDesc').textContent = desc;
+  document.getElementById('zoneResult').hidden = false;
+  document.getElementById('zoneManual').hidden = true;
+}
+
+function overrideZone() {
+  document.getElementById('zoneManual').hidden = false;
+  buildZoneButtons(selectedZone);
+}
+
+function updatePay() {
+  var pay = computePay();
+  if (!pay) return;
+  document.getElementById('payAmount').textContent = '$' + pay.total.toFixed(2);
+  var breakdown = pay.quoteId ? ('Pay set by quote ' + pay.quoteId) : ('Base $' + pay.base.toFixed(2) +
+    (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
+    ' + fuel $' + pay.gdpi.toFixed(2) +
+    (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '') +
+    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : '') +
+    (pay.xmasPay > 0 ? ' + Xmas greens ' + xmasCount() + ' x $' + (xmasCfg.driver_rate || 0).toFixed(2) : ''));
+  document.getElementById('payBreakdown').textContent = breakdown;
+  document.getElementById('payPreview').hidden = false;
+}
+
+function lookupZone(address, placeLat, placeLng) {
+  if (activeQuote && deliveryType === 'events') { document.getElementById('zoneLoading').hidden = true; applyQuoteZone(); return; }
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneLoading').hidden = false;
+  document.getElementById('zoneManual').hidden = true;
+  selectedZone = '';
+
+  if (deliveryType === 'wholesale') {
+    var wShopId = document.getElementById('fShop').value;
+    var wShop = shops.find(function(s) { return s.id === wShopId; });
+    document.getElementById('zoneLoading').hidden = true;
+    if (wShop) {
+      // Registered shop selected - unchanged behavior, zone from shop location.
+      var wResultShop = getWholesaleZoneForShop(wShop);
+      setZone(wResultShop.zone, wResultShop.zone + ' - auto from ' + wShop.name, false, null, wResultShop.distanceKm);
+      return;
+    }
+    if (typeof placeLat === 'number' && typeof placeLng === 'number') {
+      // No registered shop - client not in our shop database (e.g. Safeway,
+      // a home-based shop). Determine wholesale zone from the actual
+      // delivery address instead.
+      var wResultAddr = getWholesaleZoneForPoint(placeLat, placeLng);
+      setZone(wResultAddr.zone, wResultAddr.zone + ' - based on delivery address', false, null, wResultAddr.distanceKm);
+      return;
+    }
+    // No shop and no coordinates yet (e.g. typed and tabbed away without
+    // picking an autocomplete suggestion) - fall back to manual selection.
+    document.getElementById('zoneManual').hidden = false;
+    buildZoneButtons(null);
+    return;
+  }
+
+  var shopId = document.getElementById('fShop').value;
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var params = 'address=' + encodeURIComponent(address);
+  if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
+
+  fetch('/api/suggest-zone-v2?' + params)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('zoneLoading').hidden = true;
+      if (data.suggested) {
+        setZone(data.suggested, data.message, false, data.community, data.distance_km);
+      } else {
+        document.getElementById('zoneManual').hidden = false;
+        buildZoneButtons(null);
+      }
+    })
+    .catch(function() {
+      document.getElementById('zoneLoading').hidden = true;
+      document.getElementById('zoneManual').hidden = false;
+      buildZoneButtons(null);
+    });
+}
+
+/* Shop search dropdown */
+function populateShopDropdown(preserveShop) {
+  if (deliveryType === 'wholesale') {
+    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop) — optional';
+    document.getElementById('wholesalerField').hidden = false;
+    document.getElementById('fAddress').placeholder = 'Auto-fills from shop, or type address directly';
+    document.getElementById('recipientNameField').hidden = false;
+    document.getElementById('billingQueryField').hidden = true;
+    document.getElementById('statusCard').hidden = true;
+    document.getElementById('wholesaleStatusCard').hidden = false;
+    document.getElementById('eventTypeField').hidden = true;
+    document.getElementById('quoteField').hidden = true; clearQuote();
+  } else {
+    document.getElementById('wholesalerField').hidden = true;
+    document.getElementById('shopLabel').textContent = 'Shop';
+    document.getElementById('fAddress').placeholder = 'Start typing address...';
+    document.getElementById('recipientNameField').hidden = false;
+    document.getElementById('billingQueryField').hidden = true;
+    document.getElementById('statusCard').hidden = false;
+    document.getElementById('wholesaleStatusCard').hidden = true;
+    document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
+    document.getElementById('quoteField').hidden = deliveryType !== 'events';
+    if (deliveryType !== 'events') clearQuote(); else if (!quoteTyped()) document.getElementById('fQuote').value = quotePrefix();
+  }
+  if (!preserveShop) {
+    document.getElementById('fShopSearch').value = '';
+    document.getElementById('fShop').value = '';
+  }
+  document.getElementById('fShopDropdown').style.display = 'none';
+}
+
+function renderShopDropdown(search) {
+  var dd = document.getElementById('fShopDropdown');
+  var s = (search || '').toLowerCase();
+  var featured = shops.filter(function(sh){ return sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var others = shops.filter(function(sh){ return !sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
+  var html = '';
+  if (featured.length && !s) {
+    html += '<div class="shop-dd-header">Frequently Used</div>';
+    featured.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  var allShops = s ? featured.concat(others) : others;
+  if (allShops.length) {
+    if (!s) html += '<div class="shop-dd-header">All Shops</div>';
+    allShops.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
+      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    });
+  }
+  if (!featured.length && !allShops.length) {
+    html = '<div style="padding:10px 14px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
+  }
+  dd.innerHTML = html;
+  dd.querySelectorAll('.shop-dd-item').forEach(function(item) {
+    item.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      var id = this.dataset.id;
+      var shop = shops.find(function(sh){ return sh.id === id; });
+      if (!shop) return;
+      document.getElementById('fShop').value = id;
+      document.getElementById('fShopSearch').value = shop.name;
+      document.getElementById('fShopDropdown').style.display = 'none';
+      if (deliveryType === 'wholesale') {
+        var addr = shop.address || '';
+        document.getElementById('fAddress').value = addr;
+        formattedAddress = addr;
+        var wResult = getWholesaleZoneForShop(shop);
+        setZone(wResult.zone, wResult.zone + ' - auto from ' + shop.name, false, null, wResult.distanceKm);
+      }
+    });
+  });
+}
+
+// Marks the current stop fulfilled and links it to the real order, or
+// abandoned if the driver resets without ever submitting - either way
+// clears currentStopId so the next delivery starts its own fresh stop.
+var lastFulfilledStopId = null;
+
+function fulfillStop(orderId) {
+  if (!currentStopId) return Promise.resolve();
+  var id = currentStopId;
+  currentStopId = null;
+  lastFulfilledStopId = id;
+  return fetch('/api/stops/' + encodeURIComponent(id), {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'fulfilled', order_id: orderId })
+  }).catch(function() { /* best-effort - the stop may still show as pending until the next sync, but this no longer risks being cancelled mid-flight by navigation */ });
+}
+
+function abandonStop() {
+  if (!currentStopId) return Promise.resolve();
+  var id = currentStopId;
+  currentStopId = null;
+  return fetch('/api/stops/' + encodeURIComponent(id), {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ status: 'abandoned' })
+  }).catch(function() { /* best-effort */ });
+}
+
+function resetForm() {
+  clearDraft();
+  abandonStop();
+  setRecipientPhone('');
+  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; lastPlaceLat = null; lastPlaceLng = null; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
+  document.getElementById('fEventType').value = '';
+  document.getElementById('eventTypeNote').hidden = true;
+  clearQuote();
+  document.getElementById('fOrderId').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fAddress').value = '';
+  document.getElementById('fUnit').value = '';
+  document.getElementById('fTimeRequest').value = '';
+  document.getElementById('fRush').checked = false;
+  document.getElementById('fPieces').value = '1';
+  document.getElementById('fXmas').value = '';
+  refreshXmas();
+  document.getElementById('fComments').value = '';
+  document.getElementById('fAcceptedBy').value = '';
+  document.getElementById('fWholesaleAcceptedBy').value = '';
+  document.getElementById('fNeighbouredTo').value = '';
+  document.getElementById('fPhoto').value = '';
+  document.getElementById('fShopSearch').value = '';
+  document.getElementById('fShop').value = '';
+  document.getElementById('fShopDropdown').style.display = 'none';
+  document.getElementById('fWholesaler').value = '';
+  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('contactMethodField').hidden = true;
+  document.getElementById('billingQueryField').hidden = true;
+  document.getElementById('directSubField').hidden = true;
+  document.getElementById('redirectField').hidden = true;
+  document.getElementById('undeliverableSubField').hidden = true;
+  document.getElementById('fRedirectDetail').value = '';
+  document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#directSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('#undeliverableSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.getElementById('zoneResult').hidden = true;
+  document.getElementById('zoneManual').hidden = true;
+  document.getElementById('payPreview').hidden = true;
+  document.getElementById('errorMsg').hidden = true;
+  document.querySelectorAll('.status-btn').forEach(function(b) { b.classList.remove('selected'); });
+  document.getElementById('neighbouredToField').hidden = true;
+  var now = new Date();
+  document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('successScreen').hidden = true;
+  document.getElementById('successPhoto').hidden = true;
+  document.getElementById('app').hidden = false;
+  refreshPhotoUI();
+}
+
+// Resizes and re-compresses a photo file via canvas before upload - a raw
+// phone camera photo can be several MB, which is slow/costly on a driver's
+// mobile connection and unnecessary for proof-of-delivery purposes. Caps
+// the longest side at 1200px and re-encodes as JPEG at moderate quality.
+function getExifOrientation(arrayBuffer) {
+  var view = new DataView(arrayBuffer);
+  if (view.byteLength < 4 || view.getUint16(0, false) !== 0xFFD8) return 1;
+  var offset = 2, length = view.byteLength;
+  while (offset + 4 <= length) {
+    var marker = view.getUint16(offset, false);
+    offset += 2;
+    if (marker === 0xFFE1) {
+      if (offset + 10 > length || view.getUint32(offset + 2, false) !== 0x45786966) return 1;
+      var tiffOffset = offset + 8;
+      var little = view.getUint16(tiffOffset, false) === 0x4949;
+      var firstIFDOffset = view.getUint32(tiffOffset + 4, little);
+      var dirStart = tiffOffset + firstIFDOffset;
+      if (dirStart + 2 > length) return 1;
+      var entries = view.getUint16(dirStart, little);
+      for (var i = 0; i < entries; i++) {
+        var entryOffset = dirStart + 2 + i * 12;
+        if (entryOffset + 10 > length) break;
+        if (view.getUint16(entryOffset, little) === 0x0112) return view.getUint16(entryOffset + 8, little);
+      }
+      return 1;
+    } else if ((marker & 0xFF00) !== 0xFF00) {
+      break;
+    } else {
+      if (offset + 2 > length) break;
+      offset += view.getUint16(offset, false);
+    }
+  }
+  return 1;
+}
+
+var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+// Android's file input can't offer both camera and gallery access at once
+// the way iOS's single picker can - capture=environment forces
+// camera-only, its absence forces gallery-only, with no combined
+// chooser. Two explicit buttons give Android drivers real choice; iOS
+// keeps its native input visible as-is since it already handles both.
+if (!isIOS) {
+  document.getElementById('fPhoto').style.display = 'none';
+  document.getElementById('photoButtonsAndroid').hidden = false;
+  document.getElementById('photoTakeBtn').addEventListener('click', function() {
+    var input = document.getElementById('fPhoto');
+    input.setAttribute('capture', 'environment');
+    input.click();
+  });
+  document.getElementById('photoGalleryBtn').addEventListener('click', function() {
+    var input = document.getElementById('fPhoto');
+    input.removeAttribute('capture');
+    input.click();
+  });
+}
+
+// ---- Photo area: one function decides everything it shows -----------------------------
+var photoPreviewUrl = null;
+var photoPreviewFile = null;
+
+// Doorstep counts only where it is actually in effect. On the Wholesale tab that is
+// its own Doorstep button. On Store/Events it is the Doorstep sub-choice, and only
+// while "Direct to Address" is still selected: un-choosing Direct to Address hides the
+// sub-choices, and a hidden Doorstep must not keep demanding a photo (or get saved).
+function isDoorstepSelected() {
+  if (deliveryType === 'wholesale') {
+    var wb = document.getElementById('wsDoorstepBtn');
+    return !!(wb && wb.classList.contains('selected'));
+  }
+  return selectedStatuses.indexOf('Direct to Address') >= 0 &&
+    !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
+}
+
+// The statuses that actually apply to this delivery. Only choices belonging to the
+// current tab and to a still-selected parent status are included, so selections left
+// over on another tab (or under a status that was un-chosen) can't leak into the order.
+function collectDeliveryStatuses() {
+  if (deliveryType === 'wholesale') {
+    return isDoorstepSelected() ? ['Direct to Address', 'Doorstep'] : [];
+  }
+  var statuses = selectedStatuses.slice();
+  if (statuses.indexOf('Direct to Address') >= 0) {
+    document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
+  }
+  if (statuses.indexOf('Undeliverable') >= 0) {
+    document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
+  }
+  var rd = document.getElementById('fRedirectDetail').value.trim();
+  if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
+  return statuses;
+}
+
+function refreshPhotoUI() {
+  var input = document.getElementById('fPhoto');
+  var file = (input.files && input.files.length) ? input.files[0] : null;
+  var doorstep = isDoorstepSelected();
+  document.getElementById('photoLabel').textContent = doorstep ? 'Photo (required)' : 'Photo (optional)';
+  if (doorstep) input.setAttribute('required', 'required'); else input.removeAttribute('required');
+  // The red warning shows only while a photo is still missing.
+  document.getElementById('photoRequired').hidden = !(doorstep && !file);
+
+  var box = document.getElementById('photoStatus');
+  var thumb = document.getElementById('photoThumb');
+  if (!file) {
+    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
+    photoPreviewUrl = null; photoPreviewFile = null;
+    thumb.removeAttribute('src');
+    box.hidden = true;
+    return;
+  }
+  if (file !== photoPreviewFile) {
+    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
+    photoPreviewFile = file;
+    photoPreviewUrl = null;
+    thumb.style.display = '';
     try {
-      const store = getStore('flower-orders');
-      const url = new URL(req.url);
-      const limitParam = parseInt(url.searchParams.get('limit') || '500');
-      // week_end=YYYY-MM-DD returns EVERY order filed under that week. Order keys start with
-      // order_<week-ending>_, so this is a fast prefix lookup and is not affected by the
-      // 'most recent N orders' cap below (which silently hid older weeks once there were
-      // more than 500 orders in total).
-      const weekEnd = url.searchParams.get('week_end');
-      const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
-      if (weekPrefix) {
-        // Orders saved before the week-in-the-key scheme (and any filed under a different week)
-        // have no matching prefix, so the prefix lookup alone misses them. Same recovery the
-        // reports use: take other keys whose embedded timestamp is near this week, fetch them,
-        // and let the order's own date decide whether it belongs.
-        const DAY = 86400000;
-        const endD = new Date(weekEnd + 'T12:00:00');
-        const startD = new Date(endD); startD.setDate(startD.getDate() - 6);
-        const startIso = startD.getFullYear() + '-' + String(startD.getMonth() + 1).padStart(2, '0') + '-' + String(startD.getDate()).padStart(2, '0');
-        const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
-        const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
-        const { blobs: prefixed } = await store.list({ prefix: weekPrefix });
-        const { blobs: all } = await store.list();
-        const fallback = all.filter(b => {
-          if (b.key.startsWith(weekPrefix)) return false;
-          const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
-          if (!m) return false;
-          const ts = parseInt(m[1]);
-          return ts >= startMs && ts <= endMs;
-        });
-        const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
-        const inWeek = fetched.filter(o => {
-          const d = normalizeOrderDate(o.date) || (o.received_at ? String(o.received_at).slice(0, 10) : null);
-          return d && d >= startIso && d <= weekEnd;
-        });
-        return json(inWeek.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
-      }
-      const { blobs } = await store.list();
-      const picked = blobs.slice(-Math.min(limitParam, 5000));
-      const orders = await Promise.all(
-        picked.map(b => store.get(b.key, { type: 'json' }))
-      );
-      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
-    } catch (e) {
-      return json({ error: 'Could not load orders: ' + e.message }, 500);
-    }
-  }  
-  // Handle POST — receive Zoho webhook
-  if
-   (req.method === 'POST') {
-    const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
-    const ratesStore = getStore('flower-rates');
-    let ratesData = {};
-    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
-   let body;
+      photoPreviewUrl = URL.createObjectURL(file);
+      thumb.onerror = function() { thumb.style.display = 'none'; }; // keep the text confirmation even if a preview can't render
+      thumb.src = photoPreviewUrl;
+    } catch (e) { thumb.style.display = 'none'; }
+  }
+  document.getElementById('photoStatusSub').textContent = doorstep
+    ? 'Doorstep photo ready. Uploads when you tap Submit'
+    : 'Uploads when you tap Submit';
+  box.hidden = false;
+}
+
+// Called after any Doorstep-related tap. Opens the camera/picker straight away only
+// when Doorstep itself was just turned ON and no photo is attached yet - tapping some
+// other sub-choice (Mailroom etc.) or re-toggling with a photo already attached must
+// not re-prompt.
+function onDoorstepToggled(turnedOn) {
+  var input = document.getElementById('fPhoto');
+  var hadPhoto = !!(input.files && input.files.length);
+  refreshPhotoUI();
+  if (turnedOn && isDoorstepSelected() && !hadPhoto) {
+    if (!isIOS) input.setAttribute('capture', 'environment');
+    input.click();
+  }
+}
+
+// After a successful submit: say what actually happened to the photo. "Saved" is only
+// claimed when the server confirmed it stored the photo.
+function showSuccessPhotoStatus(sentPhoto, resData) {
+  var el = document.getElementById('successPhoto');
+  if (!sentPhoto || !resData) { el.hidden = true; return; }
+  if (resData.has_photo === false) {
+    el.textContent = '\u26A0 Delivery saved, but the photo did not upload. Please let dispatch know.';
+    el.style.color = 'var(--warm)';
+  } else if (resData.has_photo === true) {
+    el.textContent = '\uD83D\uDCF7 Photo saved';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '\uD83D\uDCF7 Photo sent with this delivery';
+    el.style.color = 'var(--ink-soft)';
+  }
+  el.hidden = false;
+}
+
+// One listener covers every way a photo can arrive: the Doorstep auto-prompt, Take Photo,
+// Choose from Gallery, and the iPhone picker all end in a change event on this input.
+document.getElementById('fPhoto').addEventListener('change', refreshPhotoUI);
+document.getElementById('photoRemoveBtn').addEventListener('click', function() {
+  document.getElementById('fPhoto').value = '';
+  refreshPhotoUI();
+});
+
+// Does this browser rotate photos by their EXIF orientation tag by itself when it loads
+// them? Modern ones do (Safari from iOS 13.4, Chrome, Firefox); older ones don't. Rotating
+// by hand ON TOP of a browser that already did it turns the photo the wrong way up - on a
+// modern iPhone that sent portrait tags to the AI sideways and the other way up sideways,
+// depending on how the phone was held. So rotate by hand only when the browser does not.
+// Found out by loading a tiny JPEG tagged "rotate 90 degrees": a browser that applies the
+// tag reports it as 1 wide by 2 tall instead of 2 wide by 1 tall. The answer is remembered.
+var exifAppliedPromise = null;
+function browserAppliesExifOrientation() {
+  if (exifAppliedPromise) return exifAppliedPromise;
+  exifAppliedPromise = new Promise(function(resolve) {
+    var settled = false;
+    function done(v) { if (!settled) { settled = true; resolve(v); } }
+    // If the check can't run or hangs, assume a modern browser - nearly every phone in use.
+    setTimeout(function() { done(true); }, 2000);
     try {
-      body = await req.json();
-    } catch (e) {
-      return json({ error: 'Invalid JSON payload' }, 400);
-    }
+      var c = document.createElement('canvas'); c.width = 2; c.height = 1;
+      var ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 2, 1);
+      var bin = atob(c.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      // EXIF segment: orientation = 6 (rotate 90 degrees)
+      var exif = [0xFF,0xE1,0x00,0x22, 0x45,0x78,0x69,0x66,0x00,0x00, 0x4D,0x4D,0x00,0x2A,0x00,0x00,0x00,0x08,
+                  0x00,0x01, 0x01,0x12,0x00,0x03,0x00,0x00,0x00,0x01, 0x00,0x06,0x00,0x00, 0x00,0x00,0x00,0x00];
+      var bytes = new Uint8Array(bin.length + exif.length);
+      bytes[0] = 0xFF; bytes[1] = 0xD8;
+      for (var e = 0; e < exif.length; e++) bytes[2 + e] = exif[e];
+      for (var i = 2; i < bin.length; i++) bytes[i + exif.length] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
+      var img = new Image();
+      img.onload = function() { URL.revokeObjectURL(url); done(img.naturalWidth === 1 && img.naturalHeight === 2); };
+      img.onerror = function() { URL.revokeObjectURL(url); done(true); };
+      img.src = url;
+    } catch (err) { done(true); }
+  });
+  return exifAppliedPromise;
+}
+if (isIOS) browserAppliesExifOrientation(); // start early so the answer is ready for the first photo
 
-      // Map Zoho field names to our internal structure
-    const raw = {
-      date:             body['Date']                     || body['date']              || null,
-      order_id:         body['Order ID']                 || body['order_id']          || null,
-      name:             body['Name']                     || body['name']              || null,
-      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
-      unit: body.unit || body['Unit'] || null,
-      time_request: body.time_request || body['Time Request'] || null,
-      rush: !!body.rush,
-      shop:             body['Shop']                     || body['shop']              || null,
-     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
-      driver:           body['Driver']                   || body['driver']            || null,
-      driver_pay: body.driver_pay || body['driver_pay'] || 0,
-     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
-      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
-      zone:             body['Zone']                     || body['zone']              || null,
-      zone_full:        body['Zone (with Group Name)']   || null,
-      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
-      delivery_time:    body['Delivery Time']            || body.delivery_time    || null,
-      contact_method:   body['Recipient Contact Method'] || body.contact_method   || null,
-      neighboured_to:   body['Neighboured To']           || body.neighboured_to   || null,
-      accepted_by:      body['Delivery Accepted By']     || body.accepted_by      || null,
-      comments:         body['Comments']                 || null,
-    };
-
-    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
-    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
-
-    // Wholesale deliveries use their own separate zone system (WPU, WAI,
-    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
-    // entered directly from Zoho). Checked BEFORE zone determination below:
-    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
-    // etc, and re-running a wholesale order's address through it could
-    // silently overwrite a correct wholesale code with an unrelated retail
-    // one - the same category of bug we already fixed for event-type codes.
-    const isWholesale = (raw.delivery_type === 'wholesale') ||
-      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
-
-    // Auto-calculate zone if not entered or flagged as needing calculation
-    let zoneCode = enteredZoneCode;
-    let zoneSource = 'manual';
-    let zoneSuggestion = null;
-
-    if (isWholesale) {
-      // Wholesale zone codes are authoritative as entered - never
-      // re-suggested against the retail address matcher. If no zone was
-      // entered at all, this needs a human to fill in rather than guessing
-      // a retail zone that doesn't apply to wholesale pricing.
-      if (enteredZoneCode) {
-        zoneCode = enteredZoneCode.toUpperCase();
-        zoneSource = 'manual';
-      } else {
-        zoneSource = 'needs_review';
-      }
-    } else if (isEventZoneCode(enteredZoneCode)) {
-      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
-      // never re-suggested/overwritten. Still look up the address for its
-      // community name (for tracking/reports), but ignore any suggested
-      // zone code that comes back with it.
-      zoneCode = enteredZoneCode.toUpperCase();
-      zoneSource = 'manual';
-      if (raw.address && key) {
-        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-        zoneSuggestion = await suggestZone(
-          raw.address,
-          shopLoc?.lat || 51.0447,
-          shopLoc?.lng || -114.0719,
-          key
-        );
-      }
-    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
-      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-      zoneSuggestion = await suggestZone(
-        raw.address,
-        shopLoc?.lat || 51.0447,
-        shopLoc?.lng || -114.0719,
-        key
-      );
-      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
-        zoneCode = zoneSuggestion.suggested;
-        zoneSource = 'auto';
-      } else {
-        zoneSource = 'needs_review';
-      }
-  } else if (enteredZoneCode) {
-      if (raw.address && key) {
-        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
-        zoneSuggestion = await suggestZone(
-          raw.address,
-          shopLoc?.lat || 51.0447,
-          shopLoc?.lng || -114.0719,
-          key
-        );
-        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
-          zoneCode = zoneSuggestion.suggested;
-          zoneSource = 'auto';
-        } else {
-          zoneCode = enteredZoneCode;
-          zoneSource = 'manual';
-        }
-      } else {
-        zoneCode = enteredZoneCode;
-        zoneSource = 'manual';
-      }
-    }
+// The straightforward path: draw the photo as the browser decodes it (what Android has always done).
+function compressPhotoSimple(file) {
+    return new Promise(function(resolve, reject) {
+      var img = new Image();
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        img.onload = function() {
+          var maxSide = 1200;
+          var w = img.width, h = img.height;
+          if (w > maxSide || h > maxSide) {
+            if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+            else { w = Math.round(w * (maxSide / h)); h = maxSide; }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+        img.onerror = function() { reject(new Error('Could not read photo.')); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function() { reject(new Error('Could not read photo file.')); };
+      reader.readAsDataURL(file);
+    });
   
-    
+}
 
-    // Flag if manual zone differs from suggestion
-    const zoneConflict = !isWholesale &&
-      !isEventZoneCode(enteredZoneCode) &&
-      zoneSuggestion?.suggested &&
-      enteredZoneCode &&
-      zoneSuggestion.suggested !== enteredZoneCode &&
-      zoneSuggestion.confidence === 'high';
+// For old browsers only: reads the EXIF orientation tag itself and rotates the photo to match.
+function compressPhotoWithManualRotation(file) {
+  return new Promise(function(resolve, reject) {
+    var bufReader = new FileReader();
+    bufReader.onload = function(bufEvent) {
+      var orientation = 1;
+      try { orientation = getExifOrientation(bufEvent.target.result); } catch (e) { orientation = 1; }
 
-    const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
-    const xs = await xmasSettings();
-    const xmasOn = !!xs.enabled && inXmasSeason(normalizeOrderDate(raw.date));
-    const xmasPcs = xmasOn ? Math.max(0, Math.min(parseInt(body.xmas_pieces, 10) || 0, parseInt(raw.total_pieces || 1, 10) || 1)) : 0;
-    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const order = {
-      id: orderId,
-      received_at: new Date().toISOString(),
-      date: raw.date,
-      order_id: raw.order_id,
-      name: raw.name,
-      address: raw.address,
-      unit: raw.unit || null,
-      time_request: raw.time_request || null,
-      formatted_address: zoneSuggestion?.formatted_address || raw.address,
-      community: zoneSuggestion?.community || null,
-      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
-      shop_code: shopCode,
-      shop_full: raw.shop_full || raw.shop || null,
-      driver: raw.driver,
-      driver_pay: (function() {
-        if (raw.driver_pay) return parseFloat(raw.driver_pay);
-        const r = ratesData ? ratesData[zoneCode] : null;
-        if (!r) return 0;
-        const pieces = parseInt(raw.total_pieces || 1);
-        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
-        const base = ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && dist != null)
-          ? (r.drate || 0) + (r.perkm || 0) * dist
-          : (r.drate || 0);
-        const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
-        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
-      })(),
-      total_pieces: raw.total_pieces,
-      zone_entered: enteredZoneCode,
-      zone_code: zoneCode,
-      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
-      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
-      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
-      rush: !!raw.rush,
-      // Snapshot of the rate table entry actually in effect for this zone
-      // at the moment this order was created. Reports should prefer this
-      // over a live rate-table lookup - otherwise, changing a rate later
-      // would silently rewrite what an already-invoiced order says every
-      // time a shop report gets re-run, which is a real billing-integrity
-      // problem, not just a cosmetic one.
-      rate_snapshot: (ratesData && ratesData[zoneCode]) ? ratesData[zoneCode] : null,
-      // Same historical-accuracy reasoning applies to the rush premium -
-      // if HOT's rate changes later, old rush orders shouldn't silently
-      // reflect the new amount.
-      hot_rate_snapshot: (raw.rush && ratesData && ratesData['HOT']) ? ratesData['HOT'] : null,
-      delivery_status: raw.delivery_status,
-      delivery_time: raw.delivery_time,
-      contact_method: raw.contact_method,
-      neighboured_to: raw.neighboured_to,
-      accepted_by: raw.accepted_by,
-      comments: raw.comments,
-      has_photo: !!body.photo_base64,
-      // Christmas greens: how many of the pieces, and the rates in force when the order was entered.
-      xmas_pieces: xmasPcs || 0,
-      xmas_driver_rate: xmasPcs ? (xs.driver_rate || 0) : 0,
-      xmas_shop_rate: xmasPcs ? (xs.shop_rate || 0) : 0,
+      var img = new Image();
+      var urlReader = new FileReader();
+      urlReader.onload = function(e) {
+        img.onload = function() {
+          var maxSide = 1200;
+          var w = img.width, h = img.height;
+          if (w > maxSide || h > maxSide) {
+            if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+            else { w = Math.round(w * (maxSide / h)); h = maxSide; }
+          }
+          var swapDims = orientation >= 5 && orientation <= 8;
+          var canvas = document.createElement('canvas');
+          canvas.width = swapDims ? h : w;
+          canvas.height = swapDims ? w : h;
+          var ctx = canvas.getContext('2d');
+          switch (orientation) {
+            case 2: ctx.transform(-1, 0, 0, 1, w, 0); break;
+            case 3: ctx.transform(-1, 0, 0, -1, w, h); break;
+            case 4: ctx.transform(1, 0, 0, -1, 0, h); break;
+            case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+            case 6: ctx.transform(0, 1, -1, 0, h, 0); break;
+            case 7: ctx.transform(0, -1, -1, 0, h, w); break;
+            case 8: ctx.transform(0, -1, 1, 0, 0, w); break;
+            default: break;
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        };
+        img.onerror = function() { reject(new Error('Could not read photo.')); };
+        img.src = e.target.result;
+      };
+      urlReader.onerror = function() { reject(new Error('Could not read photo file.')); };
+      urlReader.readAsDataURL(file);
     };
+    bufReader.onerror = function() { reject(new Error('Could not read photo file.')); };
+    bufReader.readAsArrayBuffer(file);
+  });
+}
 
-    // A delivery entered against an event quote (Q-2026-0001): the quote decides who is billed, what the shop is
-    // charged for this delivery, and the driver's pay. Checked here, on the server, so a phone cannot change them.
-    let linkedQuote = null;
-    const quoteId = String(body.quote_id || '').trim().toUpperCase();
-    if (quoteId) {
-      const q = await getStore('flower-event-quotes').get(quoteId, { type: 'json', consistency: 'strong' }).catch(() => null);
-      if (!q) return json({ error: 'Quote ' + quoteId + ' was not found. Check the number.' }, 400);
-      if (!['sent', 'accepted'].includes(q.status)) return json({ error: 'Quote ' + q.id + ' is ' + q.status + ', not accepted. Ask the office.' }, 400);
-      const trips = Math.max(1, (q.event && q.event.trips) || 1);
-      if ((q.linked || []).length >= trips) return json({ error: 'Quote ' + q.id + ' already has all ' + trips + ' of its deliveries entered. If there is another, ask the office to raise the number of trips on the quote.' }, 409);
-      if (!(q.customer && q.customer.code)) return json({ error: 'Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.' }, 400);
-      linkedQuote = q;
-      order.quote_id = q.id;
-      order.shop_code = String(q.customer.code).toUpperCase();
-      order.shop_pay = Math.round((q.subtotal / trips) * 100) / 100;
-      order.xmas_pieces = 0; order.xmas_driver_rate = 0; order.xmas_shop_rate = 0; // the quote already sets the price and the pay
-      if (q.driver_pay > 0) { order.driver_pay = q.driver_pay; order.driver_pay_from_quote = true; }
+function compressPhotoToBase64(file) {
+  // Android: unchanged. iPhone: rotate by hand only if this browser doesn't already.
+  if (!isIOS) return compressPhotoSimple(file);
+  return browserAppliesExifOrientation().then(function(applied) {
+    return applied ? compressPhotoSimple(file) : compressPhotoWithManualRotation(file);
+  });
+}
+
+// Scans a delivery tag photo via the vision API and auto-fills Order ID,
+// Recipient Name, and Delivery Address for the driver to review/edit
+// before submitting - never submits automatically, since OCR-style
+// extraction across many different tag layouts/handwriting can be wrong.
+
+/* Activity log: tells the office what happened on this phone (opened, tried to save, saved, failed). Silent and best-effort. */
+function logAct(ev, detail, tid) {
+  try {
+    var code = (typeof driverCode !== 'undefined' && driverCode) || (typeof urlDriverCode !== 'undefined' && urlDriverCode) || '';
+    if (!code) return;
+    fetch('/api/activity-log', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ driver: code, event: ev, page: 'form', tid: tid || '', detail: String(detail || '').slice(0, 160), online: navigator.onLine !== false }) }).catch(function() {});
+  } catch (e) {}
+}
+function newTid() { return Math.random().toString(36).slice(2, 10); }
+
+async function submitDelivery() {
+  var btn = document.getElementById('submitBtn');
+  var errEl = document.getElementById('errorMsg');
+  errEl.hidden = true;
+  var address = formattedAddress || document.getElementById('fAddress').value.trim();
+  var shopId = document.getElementById('fShop').value;
+  if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
+  if (deliveryType === 'wholesale') {
+    if (!shopId && !document.getElementById('fName').value.trim()) {
+      errEl.textContent = 'Select a receiving shop, or enter a recipient name.';
+      errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
     }
-
-    try {
-      const store = getStore('flower-orders');
-      await store.setJSON(orderId, order);
-      if (linkedQuote) { // count this delivery against the quote
-        try {
-          const qs = getStore('flower-event-quotes');
-          const fresh = (await qs.get(linkedQuote.id, { type: 'json', consistency: 'strong' })) || linkedQuote;
-          fresh.linked = (fresh.linked || []).concat([{ id: orderId, at: order.received_at, driver: order.driver || '', order_id: order.order_id || '' }]);
-          await qs.setJSON(fresh.id, fresh);
-        } catch (e) { console.error('quote link failed:', e.message); }
-      }
-      // Photo is stored in a separate blob store, not embedded in the order
-      // record itself - GET /api/orders loads every order's full JSON on
-      // every page view, so embedding potentially-large photo data there
-      // would slow that down for every order, viewed or not. The photo is
-      // only fetched on-demand when someone actually wants to view it.
-      if (body.photo_base64) {
-        try {
-          const photoStore = getStore('flower-order-photos');
-          await photoStore.set(orderId, body.photo_base64);
-        } catch (e) {
-          // Order itself already saved successfully - don't fail the whole
-          // submission just because the photo couldn't be stored, but the
-          // has_photo flag above would then be misleading. Downgrade it.
-          order.has_photo = false;
-          await store.setJSON(orderId, order);
-        }
-      }
-      // has_photo reports whether the photo was actually stored (it is downgraded to
-      // false above if the photo write failed), so the driver form can tell the driver
-      // the truth instead of assuming the photo made it.
-      // If this week has been closed, list the late order against it (not blocked - just visible).
-      try {
-        const lockStore = getStore('flower-week-locks');
-        const lk = await lockStore.get(weekEnd, { type: 'json' });
-        if (lk && lk.locked) {
-          lk.changes = lk.changes || [];
-          lk.changes.push({ at: new Date().toISOString(), by: 'new entry', id: orderId, order_id: order.order_id, action: 'added', reason: 'Order entered after the week was closed' });
-          await lockStore.setJSON(weekEnd, lk);
-        }
-      } catch (e) { /* the order is saved; logging is best-effort */ }
-      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
-    } catch (e) {
-      return json({ error: 'Could not store order: ' + e.message }, 500);
-   }
+  } else if (!shopId) {
+    errEl.textContent = 'Select a shop.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
   }
-  return json({ error: 'Method not allowed' }, 405);
-};
+  if (deliveryType === 'events' && quoteTyped() && !activeQuote) {
+    errEl.textContent = 'The quote number was not accepted. Fix it or clear the box.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
+  }
+  if (deliveryType === 'events' && !eventType) {
+    errEl.textContent = 'Select an event type (Special Event, Wedding, or Funeral).';
+    errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
+  }
+  if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
+  if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
+  var photoFile = document.getElementById('fPhoto').files[0];
+  var doorstepSelected = isDoorstepSelected();
+  if (doorstepSelected && !photoFile) {
+    errEl.textContent = 'Photo required for Doorstep delivery. Please take a photo.';
+    errEl.hidden = false;
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  var pay = computePay() || { effCode: selectedZone, isEventOverride: false, baseZone: selectedZone, total: 0 };
+  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
+  var driverPay = pay.total;
+  var billingParty = '';
+  var wsName = document.getElementById('fName').value.trim();
+  var wsAddress = address;
+  var wsShopName = shop ? shop.name : shopId;
+  var wsShopCode = shop ? shop.name.split(' ')[0] : '';
+  if (deliveryType === 'wholesale') {
+    var active = document.querySelector('#billingToggle .toggle-btn.active');
+    var billing = active ? active.dataset.billing : 'shop';
+    if (!shop) billing = 'wholesaler'; // no shop exists to bill under 'shop' billing
+    var w = document.getElementById('fWholesaler').value;
+    var wOpt = document.querySelector('#fWholesaler option[value="' + w + '"]');
+    var wholesalerDisplayName = wOpt ? wOpt.textContent : w;
+    billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
+    if (billing === 'wholesaler') {
+      // Wholesaler is billed - DSHOP = wholesaler (who gets invoiced).
+      // name/address show the receiving shop as reference info on that
+      // invoice (or a direct recipient if there's no receiving shop).
+      wsShopName = wholesalerDisplayName;
+      wsShopCode = w;
+      wsName = shop ? shop.name : document.getElementById('fName').value.trim();
+      wsAddress = shop ? shop.address : address;
+    } else {
+      // Shop is billed - DSHOP = receiving shop (who gets invoiced).
+      // name/address show the sending wholesaler as reference info. No
+      // wholesaler address is on file anywhere in the system currently, so
+      // the wholesaler's name is used in the address field as a fallback
+      // reference rather than leaving it blank.
+      wsShopName = shop ? shop.name : '';
+      wsShopCode = shop ? shop.name.split(' ')[0] : '';
+      wsName = wholesalerDisplayName;
+      wsAddress = wholesalerDisplayName;
+    }
+  }
+  var photoBase64 = null;
+  if (photoFile) {
+    try {
+      btn.textContent = 'Processing photo...';
+      photoBase64 = await compressPhotoToBase64(photoFile);
+      btn.textContent = 'Submitting...';
+    } catch (e) {
+      errEl.textContent = 'Could not process photo: ' + e.message;
+      errEl.hidden = false;
+      btn.disabled = false; btn.textContent = 'Submit Delivery';
+      return;
+    }
+  }
+  var payload = {
+    date: document.getElementById('fDate').value,
+    order_id: document.getElementById('fOrderId').value.trim() || '1',
+    name: wsName,
+    address: wsAddress,
+    unit: document.getElementById('fUnit').value.trim(),
+    time_request: document.getElementById('fTimeRequest').value.trim(),
+    rush: document.getElementById('fRush').checked,
+    shop: wsShopName,
+    shop_code: wsShopCode,
+    driver: driverCode,
+    driver_name: driverName,
+    total_pieces: pieces,
+    zone: pay.effCode,
+    community: matchedCommunity || '',
+    distance_km: matchedDistanceKm,
+    event_type: eventType || '',
+    underlying_zone: pay.isEventOverride ? pay.baseZone : '',
+    delivery_type: deliveryType,
+    delivery_status: collectDeliveryStatuses(),
+    delivery_time: document.getElementById('fTime').value,
+    accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
+    neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
+    comments: document.getElementById('fComments').value.trim(),
+    driver_pay: driverPay,
+    contact_method: (function(){
+      var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
+      return sel ? sel.dataset.contact : '';
+    })(),
+    billing_party: billingParty,
+    xmas_pieces: xmasCount(),
+    quote_id: (activeQuote && deliveryType === 'events') ? activeQuote.id : '',
+    wholesaler: document.getElementById('fWholesaler').value,
+    source: 'driver_form',
+    photo_base64: photoBase64
+  };
+  var tid = newTid(); logAct('submit_try', (payload.order_id || '') + ' ' + (payload.address || '').slice(0, 60), tid);
+  try {
+    var res = await fetch('/api/orders', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    var resData = await res.json();
+    if (resData.queued) {
+      logAct('submit_queued', '', tid);
+      clearDraft();
+      await fulfillStop(null);
+      showSuccessPhotoStatus(null, null); // can't confirm what an offline queue does with a photo, so say nothing
+      document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
+      document.getElementById('app').hidden = true;
+      document.getElementById('successScreen').hidden = false;
+      return;
+    }
+    if (!res.ok) throw new Error('Status ' + res.status);
+    logAct('submit_ok', resData.order_id || '', tid);
+    clearDraft();
+    reportDelivered(payload.formatted_address || payload.address || '');
+    await fulfillStop(resData.order_id);
+    showSuccessPhotoStatus(photoBase64, resData);
+    document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
+    document.getElementById('app').hidden = true;
+    document.getElementById('successScreen').hidden = false;
+  } catch(e) {
+    logAct('submit_fail', e.message, tid);
+    errEl.textContent = 'Could not submit: ' + e.message;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit Delivery';
+  }
+}
 
-export const config = { path: '/api/orders' };
+/* Dispatch status: after a delivery is submitted, tell the office where it was (and where the phone is, if it will say).
+   Best-effort and silent - it must never slow down or break a submit. */
+function reportDelivered(addr) {
+  try {
+    if (!driverCode) return;
+    var send = function(lat, lng) {
+      fetch('/api/driver-status', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ driver: driverCode, kind: 'delivered', address: addr || '', lat: lat, lng: lng })
+      }).catch(function() {});
+    };
+    if (!navigator.geolocation) { send(null, null); return; }
+    var done = false;
+    var t = setTimeout(function() { if (!done) { done = true; send(null, null); } }, 3500);
+    navigator.geolocation.getCurrentPosition(
+      function(p) { if (done) return; done = true; clearTimeout(t); send(p.coords.latitude, p.coords.longitude); },
+      function() { if (done) return; done = true; clearTimeout(t); send(null, null); },
+      { timeout: 3000, maximumAge: 120000 }
+    );
+  } catch (e) { /* ignore */ }
+}
+
+async function init() {
+  try {
+    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
+    if (!res.ok) { logAct('bad_link', 'driver code not found'); showNotFound(); return; }
+    var driver = await res.json();
+    driverCode = driver.code;
+    driverName = driver.name;
+    logAct('opened', '');
+    document.getElementById('driverBadge').textContent = driver.name;
+    document.title = 'Smart Choice - ' + driver.name;
+
+    var now = new Date();
+    document.getElementById('fDate').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+    document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+    // Every interactive element gets wired up immediately here, completely
+    // independent of rates/shops/Maps loading below. Previously all of
+    // this was gated behind four sequential fetches (including an
+    // external Google Maps script load) - if any one of those hung or was
+    // slow, NOTHING in the form responded to taps at all. The form must
+    // be usable right away regardless of how long background data takes.
+
+    // Shop search
+    document.getElementById('fShopSearch').addEventListener('input', function() {
+      var s = this.value.trim();
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(s);
+    });
+    document.getElementById('fShopSearch').addEventListener('focus', function() {
+      document.getElementById('fShopDropdown').style.display = 'block';
+      renderShopDropdown(this.value.trim());
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
+        document.getElementById('fShopDropdown').style.display = 'none';
+      }
+    });
+
+    document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      var prevType = deliveryType;
+      deliveryType = btn.dataset.type;
+      document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+      // Store to Door and Events use the shop identically (the sending
+      // shop), so switching between them must not wipe it - special
+      // events always originate from a registered shop, and a tag scanned
+      // as Store to Door and then switched to Events was losing its shop
+      // every time. Wholesale is different: the field there means the
+      // RECEIVING shop, so crossing that boundary in either direction
+      // still clears it.
+      var crossesWholesale = (prevType === 'wholesale') !== (deliveryType === 'wholesale');
+      populateShopDropdown(!crossesWholesale);
+      selectedZone = '';
+      if (deliveryType !== 'events') {
+        eventType = '';
+        document.getElementById('fEventType').value = '';
+        document.getElementById('eventTypeNote').hidden = true;
+      }
+      document.getElementById('zoneResult').hidden = true;
+      document.getElementById('zoneManual').hidden = true;
+      document.getElementById('payPreview').hidden = true;
+      // The zone belongs to the address, not to the tab. Clearing it above is
+      // right (wholesale zones differ), but if an address is already entered
+      // the zone must be looked up again - otherwise a driver who typed the
+      // address first and then switched to Events (or any tab) is left with
+      // no zone and cannot submit.
+      var addrNow = formattedAddress || document.getElementById('fAddress').value.trim();
+      if (addrNow) {
+        if (!formattedAddress) formattedAddress = addrNow;
+        lookupZone(addrNow, lastPlaceLat === null ? undefined : lastPlaceLat, lastPlaceLng === null ? undefined : lastPlaceLng);
+      }
+      refreshPhotoUI(); // the red "photo required" note must follow the tab you are now on
+    });
+
+    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var status = this.dataset.status;
+        if (status === 'Undeliverable') {
+          selectedStatuses = ['Undeliverable'];
+          document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
+          this.classList.add('selected');
+        } else {
+          var unIdx = selectedStatuses.indexOf('Undeliverable');
+          if (unIdx >= 0) {
+            selectedStatuses.splice(unIdx, 1);
+            document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){
+              if (b.dataset.status === 'Undeliverable') b.classList.remove('selected');
+            });
+          }
+          var idx = selectedStatuses.indexOf(status);
+          if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
+          else { selectedStatuses.push(status); this.classList.add('selected'); }
+        }
+        document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
+        document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
+        document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
+        document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
+        refreshPhotoUI();
+      });
+    });
+
+    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        this.classList.toggle('selected');
+        onDoorstepToggled(this.dataset.sub === 'Doorstep' && this.classList.contains('selected'));
+      });
+    });
+
+    document.getElementById('wsDoorstepBtn').addEventListener('click', function() {
+      this.classList.toggle('selected');
+      onDoorstepToggled(this.classList.contains('selected'));
+    });
+
+    document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
+    });
+
+    document.getElementById('fEventType').addEventListener('change', function() {
+      eventType = this.value;
+      var note = document.getElementById('eventTypeNote');
+      if (eventType && EVENT_TYPES[eventType]) {
+        var ev = EVENT_TYPES[eventType];
+        note.hidden = false;
+        note.textContent = ev.outTownCode
+          ? (ev.label + ': in-town = flat rate, out-of-town = zone rate + $' + ev.outTownExtraRate + '/extra pc (tracked as ' + ev.outTownCode + ')')
+          : (ev.label + ': flat rate regardless of location.');
+      } else {
+        note.hidden = true;
+      }
+      if (selectedZone) { refreshZoneDisplay(); updatePay(); }
+    });
+
+    document.getElementById('fPieces').addEventListener('change', updatePay);
+    document.getElementById('fPieces').addEventListener('input', updatePay);
+    document.getElementById('fPhone').addEventListener('input', updateCallLink);
+    // Keep the saved stop in step once the number is entered (best-effort; only after the stop exists).
+    document.getElementById('fPhone').addEventListener('change', function() { if (currentStopId && typeof trackStop === 'function') trackStop(); });
+    document.getElementById('fRush').addEventListener('change', updatePay);
+
+    document.getElementById('fAcceptedBy').addEventListener('input', function() {
+      document.getElementById('contactMethodField').hidden = !this.value.trim();
+    });
+
+    document.getElementById('contactMethodGrid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.status-btn');
+  if (!btn) return;
+  btn.classList.toggle('selected');
+});
+  
+
+    document.getElementById('billingToggle').addEventListener('click', function(e) {
+      var btn = e.target.closest('.toggle-btn');
+      if (!btn) return;
+      document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
+    });
+
+    document.getElementById('fWholesaler').addEventListener('change', function() {
+      var code = this.value;
+      if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
+      else { document.getElementById('billingQueryField').hidden = true; }
+    });
+
+    document.getElementById('fAddress').addEventListener('blur', function() {
+      if (this.value.trim() && !selectedZone) {
+        formattedAddress = this.value.trim();
+        lookupZone(this.value.trim());
+      }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', submitDelivery);
+    document.getElementById('backToRouteLink').href = '/route/' + driverCode.toLowerCase();
+    document.getElementById('myRouteBtn2').addEventListener('click', function() {
+      var url = '/route/' + driverCode.toLowerCase();
+      if (lastFulfilledStopId) url += '?just_completed=' + encodeURIComponent(lastFulfilledStopId);
+      window.location.href = url;
+    });
+    document.getElementById('clearFormLink').addEventListener('click', function(e) {
+      e.preventDefault();
+      if (confirm('Clear this form and start over? Anything entered so far will be lost.')) {
+        resetForm();
+      }
+    });
+    document.getElementById('summaryBtn').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+    document.getElementById('nextBtn').addEventListener('click', resetForm);
+    document.getElementById('summaryBtn2').addEventListener('click', function() {
+      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
+    });
+
+    // Delegated listener - saves on any field edit anywhere in the form,
+    // rather than wiring up individual listeners per field.
+    document.getElementById('app').addEventListener('input', saveDraft);
+    document.getElementById('app').addEventListener('change', saveDraft);
+    document.getElementById('app').addEventListener('click', function(e) {
+      if (e.target.closest('.status-btn') || e.target.closest('.toggle-btn')) saveDraft();
+    });
+
+    document.getElementById('loadingScreen').hidden = true;
+    document.getElementById('app').hidden = false;
+
+    // Everything below loads in the background, without blocking any of
+    // the interactivity wired up above. Shop-dependent logic (the shop
+    // dropdown, the Complete-link pre-fill, and draft restore) waits
+    // specifically for shops data to arrive, but nothing else does.
+    (async function() {
+      try {
+        var rRes = await fetch('/api/rates');
+        rates = await rRes.json();
+
+        var sRes = await fetch('/api/shops');
+        shops = await sRes.json();
+        populateShopDropdown();
+
+        var urlParams = new URLSearchParams(location.search);
+        var linkedStopId = urlParams.get('stop_id');
+        if (linkedStopId) {
+          clearDraft();
+          currentStopId = linkedStopId;
+          var linkedType = urlParams.get('delivery_type');
+          if (linkedType && linkedType !== deliveryType) {
+            var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + linkedType + '"]');
+            if (typeBtn) typeBtn.click(); // reuses the real toggle handler so field visibility (Wholesaler/Event Type fields, shop label, etc.) is set up correctly for the restored type
+          }
+          if (urlParams.get('order_id')) document.getElementById('fOrderId').value = urlParams.get('order_id');
+          if (urlParams.get('name')) document.getElementById('fName').value = urlParams.get('name');
+          setRecipientPhone(urlParams.get('phone') || '');
+          // Shop first, THEN the zone lookup: lookupZone reads the selected
+          // shop to pass its coordinates, and the C1-C5 bands are driving
+          // distance from the shop. With the order reversed, the lookup
+          // fired with no shop selected and measured from a fallback
+          // downtown point instead of the actual pickup location.
+          if (urlParams.get('shop_code')) {
+            var linkedShop = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === urlParams.get('shop_code').toUpperCase(); });
+            if (linkedShop) {
+              document.getElementById('fShop').value = linkedShop.id;
+              document.getElementById('fShopSearch').value = linkedShop.name;
+            }
+          }
+          if (urlParams.get('address')) {
+            var addr = urlParams.get('address');
+            document.getElementById('fAddress').value = addr;
+            formattedAddress = addr;
+            lookupZone(addr);
+          }
+        } else {
+          restoreDraftIfPresent();
+        }
+      } catch (e) {
+        console.error('Background data load error:', e.message);
+      }
+    })();
+
+    // Maps/Places autocomplete loads fully independently - this is an
+    // enhancement to address entry, not a requirement for the rest of the
+    // form, and was previously the single most likely point of failure
+    // for the entire form going unresponsive (an external script load
+    // with no timeout).
+    fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+      loadMaps(cfg.key);
+    }).catch(function(e) { console.error('Could not load maps config:', e.message); });
+
+  } catch(e) {
+    console.error('init error:', e.message);
+    showNotFound();
+  }
+}
+
+function loadMaps(key) {
+  window.__mapsReady = function() {
+    var input = document.getElementById('fAddress');
+    var ac = new google.maps.places.Autocomplete(input, {
+      componentRestrictions: { country: 'ca' },
+      fields: ['formatted_address', 'geometry']
+    });
+    ac.addListener('place_changed', function() {
+      var place = ac.getPlace();
+      if (place.geometry) {
+        formattedAddress = place.formatted_address;
+        var loc = place.geometry.location;
+        lastPlaceLat = loc.lat(); lastPlaceLng = loc.lng();
+        lookupZone(place.formatted_address, loc.lat(), loc.lng());
+      }
+    });
+  };
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&libraries=places&callback=__mapsReady';
+  document.head.appendChild(s);
+}
+
+init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(e) {
+      console.log('SW registration failed:', e);
+    });
+  });
+}
+</script>
+</body>
+</html>
