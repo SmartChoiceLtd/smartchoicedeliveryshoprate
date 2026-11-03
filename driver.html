@@ -219,11 +219,16 @@
           <label>Total Pieces</label>
           <input type="number" id="fPieces" min="1" value="1">
         </div>
+        <div class="field" id="xmasField" hidden>
+          <label>Xmas Greens</label>
+          <input type="number" id="fXmas" min="0" value="" placeholder="0" inputmode="numeric">
+        </div>
         <div class="field">
           <label>Delivery Time</label>
           <input type="time" id="fTime">
         </div>
       </div>
+      <p id="xmasNote" hidden style="font-size:12px;color:var(--ink-soft);margin:-4px 0 10px;"></p>
       <div class="field" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="fRush" style="width:20px;height:20px;">
         <label for="fRush" style="margin:0;font-weight:600;">Rush / Hotshot Delivery (adds premium)</label>
@@ -432,7 +437,7 @@ function saveDraft() {
       recipientPhone: recipientPhone,
       fields: {}
     };
-    ['fDate','fOrderId','fPhone','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
+    ['fDate','fOrderId','fPhone','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fXmas','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) draft.fields[id] = el.value;
     });
@@ -569,6 +574,32 @@ function getZoneBasePay(zoneCode) {
 
 // Computes {base, extra, gdpi, total} pay for the current selection,
 // applying the event-type overlay if applicable.
+/* Christmas greens: shown only when the office switch is on and the delivery date is Nov 1 to Jan 31. */
+var xmasCfg = { enabled: false, driver_rate: 1.5 };
+function xmasActive() {
+  if (!xmasCfg.enabled || activeQuote) return false;
+  var m = parseInt(String(document.getElementById('fDate').value || '').slice(5, 7), 10);
+  return m === 11 || m === 12 || m === 1;
+}
+function xmasCount() {
+  if (!xmasActive()) return 0;
+  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1;
+  return Math.max(0, Math.min(parseInt(document.getElementById('fXmas').value, 10) || 0, pieces));
+}
+function refreshXmas() {
+  var on = xmasActive(), f = document.getElementById('xmasField'), n = document.getElementById('xmasNote');
+  f.hidden = !on;
+  if (!on) { document.getElementById('fXmas').value = ''; n.hidden = true; return; }
+  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1, v = parseInt(document.getElementById('fXmas').value, 10) || 0;
+  if (v > pieces) { document.getElementById('fXmas').value = pieces; v = pieces; }
+  n.hidden = !v; n.textContent = v ? (v + ' of ' + pieces + ' pieces are Christmas greens: +$' + (v * (xmasCfg.driver_rate || 0)).toFixed(2) + ' pay') : '';
+}
+fetch('/api/seasonal').then(function(r) { return r.json(); }).then(function(c) {
+  if (c && c.xmas) { xmasCfg = { enabled: !!c.xmas.enabled, driver_rate: c.xmas.driver_rate }; refreshXmas(); if (selectedZone) updatePay(); }
+}).catch(function() {});
+document.addEventListener('input', function(e) { if (e.target && (e.target.id === 'fXmas' || e.target.id === 'fPieces')) { refreshXmas(); if (selectedZone) updatePay(); } });
+document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fDate') { refreshXmas(); if (selectedZone) updatePay(); } });
+
 /* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
 var activeQuote = null;
 function quotePrefix() {
@@ -577,7 +608,7 @@ function quotePrefix() {
 }
 function quoteTyped() { var v = document.getElementById('fQuote').value.trim().toUpperCase(); return v === quotePrefix() ? '' : v; } // the prefix alone is "nothing typed"
 function clearQuote() {
-  activeQuote = null; quoteZoneApplied = false;
+  activeQuote = null; quoteZoneApplied = false; if (typeof refreshXmas === 'function') refreshXmas();
   var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
   if (f) f.value = quotePrefix();
   if (n) { n.hidden = true; n.textContent = ''; }
@@ -587,7 +618,7 @@ var quoteZoneApplied = false;
 function applyQuoteZone() {
   if (!activeQuote || deliveryType !== 'events') return;
   var ev = EVENT_TYPES[eventType], code = ev ? ev.inTownCode : 'SPEC';
-  quoteZoneApplied = true;
+  quoteZoneApplied = true; refreshXmas();
   setZone(code, code + ' - from quote ' + activeQuote.id, true, null, null);
 }
 function quoteNote(text, ok) {
@@ -596,7 +627,7 @@ function quoteNote(text, ok) {
 }
 async function lookupQuote() {
   var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
-  activeQuote = null;
+  activeQuote = null; refreshXmas();
   if (quoteZoneApplied) { quoteZoneApplied = false; selectedZone = ''; document.getElementById('zoneResult').hidden = true; document.getElementById('payPreview').hidden = true; }
   if (/^\d{1,4}$/.test(id)) id = quotePrefix() + ('0000' + id).slice(-4);          // just the number: 2 or 0002
   else if (/^Q-\d{4}-\d{1,4}$/.test(id)) { var qp = id.split('-'); id = 'Q-' + qp[1] + '-' + ('0000' + qp[2]).slice(-4); }   // Q-2026-2
@@ -661,7 +692,8 @@ function computePay() {
   if (document.getElementById('fRush').checked) {
     rushPremium = (rates['HOT'] || {}).drate || 0;
   }
-  var res = { effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium, pieces: pieces };
+  var xmasPay = xmasCount() * (xmasCfg.driver_rate || 0);
+  var res = { xmasPay: xmasPay, effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium + xmasPay, pieces: pieces };
   if (activeQuote && deliveryType === 'events' && activeQuote.driver_pay > 0) { res.total = activeQuote.driver_pay; res.quoteId = activeQuote.id; }
   return res;
 }
@@ -880,7 +912,8 @@ function updatePay() {
     (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
     ' + fuel $' + pay.gdpi.toFixed(2) +
     (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '') +
-    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : ''));
+    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : '') +
+    (pay.xmasPay > 0 ? ' + Xmas greens ' + xmasCount() + ' x $' + (xmasCfg.driver_rate || 0).toFixed(2) : ''));
   document.getElementById('payBreakdown').textContent = breakdown;
   document.getElementById('payPreview').hidden = false;
 }
@@ -1055,6 +1088,8 @@ function resetForm() {
   document.getElementById('fTimeRequest').value = '';
   document.getElementById('fRush').checked = false;
   document.getElementById('fPieces').value = '1';
+  document.getElementById('fXmas').value = '';
+  refreshXmas();
   document.getElementById('fComments').value = '';
   document.getElementById('fAcceptedBy').value = '';
   document.getElementById('fWholesaleAcceptedBy').value = '';
@@ -1503,6 +1538,7 @@ async function submitDelivery() {
       return sel ? sel.dataset.contact : '';
     })(),
     billing_party: billingParty,
+    xmas_pieces: xmasCount(),
     quote_id: (activeQuote && deliveryType === 'events') ? activeQuote.id : '',
     wholesaler: document.getElementById('fWholesaler').value,
     source: 'driver_form',
