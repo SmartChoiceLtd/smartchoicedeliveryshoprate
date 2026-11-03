@@ -329,7 +329,7 @@ export default async (req) => {
         const rushPremium = o.rush ? (hotR.srate || 0) : 0;
         // A delivery entered against an event quote is charged its share of the quote, not the zone rate.
         const xmasAmt = (o.xmas_pieces || 0) * (o.xmas_shop_rate || 0); // Christmas greens upcharge
-        const amount = (o.quote_id && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : base + (pieces-1)*(r.sratex||0) + rushPremium + xmasAmt;
+        const amount = ((o.quote_id || o.shop_pay_source) && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : base + (pieces-1)*(r.sratex||0) + rushPremium + xmasAmt;
         return {o, zone, pieces, amount};
       });
 
