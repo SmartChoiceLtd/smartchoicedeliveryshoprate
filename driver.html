@@ -125,6 +125,7 @@
           <option value="SPEC">Special Event</option>
           <option value="WED">Wedding</option>
           <option value="FUN">Funeral</option>
+          <option value="SPL">Seasonal Planter</option>
         </select>
         <p id="eventTypeNote" hidden style="font-size:11px;color:var(--ink-soft);margin:4px 0 0;"></p>
       </div>
@@ -539,7 +540,8 @@ function restoreDraftIfPresent() {
 var EVENT_TYPES = {
   SPEC: { label: 'Special Event', inTownCode: 'SPEC', outTownCode: null,    outTownExtraRate: null },
   WED:  { label: 'Wedding',       inTownCode: 'WED',  outTownCode: 'WEDO', outTownExtraRate: 5 },
-  FUN:  { label: 'Funeral',       inTownCode: 'FUN',  outTownCode: 'FUNO', outTownExtraRate: 3 }
+  FUN:  { label: 'Funeral',       inTownCode: 'FUN',  outTownCode: 'FUNO', outTownExtraRate: 3 },
+  SPL:  { label: 'Seasonal Planter', inTownCode: 'SPL', outTownCode: 'SPLO', outTownExtraRate: 2.5 }
 };
 var IN_TOWN_ZONES = ['C1','C2','C3','C4','C5'];
 
@@ -578,6 +580,7 @@ function getZoneBasePay(zoneCode) {
 var xmasCfg = { enabled: false, driver_rate: 1.5 };
 function xmasActive() {
   if (!xmasCfg.enabled || activeQuote) return false;
+  if (document.getElementById('fEventType').value === 'SPL') return false; // planters are greens already: plain base + extra pieces
   var m = parseInt(String(document.getElementById('fDate').value || '').slice(5, 7), 10);
   return m === 11 || m === 12 || m === 1;
 }
@@ -598,7 +601,7 @@ fetch('/api/seasonal').then(function(r) { return r.json(); }).then(function(c) {
   if (c && c.xmas) { xmasCfg = { enabled: !!c.xmas.enabled, driver_rate: c.xmas.driver_rate }; refreshXmas(); if (selectedZone) updatePay(); }
 }).catch(function() {});
 document.addEventListener('input', function(e) { if (e.target && (e.target.id === 'fXmas' || e.target.id === 'fPieces')) { refreshXmas(); if (selectedZone) updatePay(); } });
-document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fDate') { refreshXmas(); if (selectedZone) updatePay(); } });
+document.addEventListener('change', function(e) { if (e.target && (e.target.id === 'fDate' || e.target.id === 'fEventType')) { refreshXmas(); if (selectedZone) updatePay(); } });
 
 /* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
 var activeQuote = null;
@@ -709,7 +712,7 @@ function showNotFound() {
 // Event codes the driver can always pick by hand as a fallback when the
 // automatic zone / Events path misses. WED and WEDO start with W but are
 // event codes, not wholesale zones.
-var EVENT_ZONE_CODES = ['FUN', 'FUNO', 'WED', 'WEDO', 'SPEC'];
+var EVENT_ZONE_CODES = ['FUN', 'FUNO', 'WED', 'WEDO', 'SPEC', 'SPL', 'SPLO'];
 
 function isWholesaleZone(code) {
   if (!code) return false;
