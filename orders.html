@@ -167,6 +167,7 @@ function openFocus(id) {
   if (o.time_request) html += focusFieldRow('Time Request', o.time_request);
   html += focusFieldRow('Shop', (o.shop_code || '') + (o.shop_full || o.shop ? ' \u2014 ' + (o.shop_full || o.shop) : ''));
   html += focusFieldRow('Driver', o.driver);
+  if (o.xmas_pieces) html += focusFieldRow('Christmas greens', o.xmas_pieces + ' of ' + (o.total_pieces || 1) + ' pieces \u2014 driver +$' + (o.xmas_pieces * (o.xmas_driver_rate || 0)).toFixed(2) + ', shop +$' + (o.xmas_pieces * (o.xmas_shop_rate || 0)).toFixed(2));
   if (o.quote_id) html += focusFieldRow('Event quote', o.quote_id + (o.shop_pay != null ? ' \u2014 shop charged $' + Number(o.shop_pay).toFixed(2) : '') + (o.driver_pay_from_quote ? ', driver pay $' + Number(o.driver_pay).toFixed(2) : ''));
   html += focusFieldRow('Zone', o.zone_code);
   html += focusFieldRow('Pieces', String(o.total_pieces || 1));
