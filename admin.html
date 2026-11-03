@@ -356,7 +356,7 @@ async function loadDrivers() {
 function renderShops() {
   var el = document.getElementById('shopsList');
   if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Aliases</th><th>Edit</th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Aliases</th><th>Notices</th><th>Edit</th></tr></thead><tbody>' +
     shops.map(function(s) {
       var code = s.name ? s.name.split(' ')[0] : '';
       var aliasCount = (s.aliases || []).length;
@@ -366,6 +366,7 @@ function renderShops() {
         '<td>' + esc(s.name) + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + (aliasCount ? aliasCount + ': ' + esc((s.aliases||[]).join(', ')) : '—') + '</td>' +
+        '<td style="font-size:12px;color:var(--ink-soft)">' + (s.notify_enabled && s.notify_email ? 'On: ' + esc(s.notify_email) : '—') + '</td>' +
         '<td style="white-space:nowrap;"><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button> <button class="btn-danger btn-grey" onclick="deleteShop(\'' + esc(s.id) + '\')">Delete</button></td>' +
         '</tr>';
     }).join('') + '</tbody></table>';
@@ -426,16 +427,20 @@ async function editShop(shopId) {
   var aliasesStr = window.prompt('Alternate names seen on delivery tags (comma-separated, for tag-scan matching):', (shop.aliases || []).join(', '));
   if (aliasesStr === null) return;
   var aliases = aliasesStr.split(',').map(function(a) { return a.trim(); }).filter(Boolean);
+  var notifyEmail = window.prompt('Email delivery notices to (leave empty to turn notices OFF). Sent each time a driver enters a delivery for this shop:', shop.notify_email || '');
+  if (notifyEmail === null) return;
+  notifyEmail = notifyEmail.trim();
+  if (notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) { alert('That does not look like an email address. Nothing was saved.'); return; }
   try {
     var geoRes = await fetch('/api/geocode?address=' + encodeURIComponent(address));
     var geo = await geoRes.json();
     if (!geo.lat) throw new Error('Could not geocode');
-    var putRes = await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng, aliases: aliases }) });
+    var putRes = await fetch('/api/shops/' + encodeURIComponent(shopId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), address: geo.formatted, lat: geo.lat, lng: geo.lng, aliases: aliases, notify_enabled: !!notifyEmail, notify_email: notifyEmail }) });
     if (!putRes.ok) {
       var errBody = await putRes.json().catch(function(){ return {}; });
       throw new Error(errBody.error || ('Save failed, status ' + putRes.status));
     }
-    shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng; shop.aliases = aliases;
+    shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng; shop.aliases = aliases; shop.notify_enabled = !!notifyEmail; shop.notify_email = notifyEmail;
     renderShops(); alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
 }
