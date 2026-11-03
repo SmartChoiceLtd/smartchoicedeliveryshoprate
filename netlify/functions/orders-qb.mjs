@@ -258,6 +258,9 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         amount = srate + (pieces - 1) * sratex;
       }
 
+      // Christmas greens upcharge (a quoted delivery's price already includes everything).
+      if (!o.quote_id && o.xmas_pieces) amount += o.xmas_pieces * (parseFloat(o.xmas_shop_rate) || 0);
+
       // Deliveries on an event quote get their own invoice line, labelled with the quote number.
       var gKey = o.quote_id ? zone + '|' + o.quote_id : zone;
       if (!shopGroups[shopCode][gKey]) shopGroups[shopCode][gKey] = 0;
