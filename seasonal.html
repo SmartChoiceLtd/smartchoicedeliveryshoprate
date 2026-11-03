@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0C769E">
+<title>Smart Choice Delivery - Seasonal Charges</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--warm:#B8472B;--green:#2C6B2C;--green-soft:#EAF4EA;--radius:10px;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;gap:16px;align-items:center;}
+.topbar h1{font-family:Georgia,serif;font-size:19px;margin:0;font-weight:600;flex:1;}.topbar a{color:var(--accent);text-decoration:none;font-size:13px;font-weight:600;}
+.main{max-width:620px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+h2{font-family:Georgia,serif;font-size:16px;margin:0 0 8px;}
+label{display:block;font-size:11px;color:var(--ink-soft);margin:10px 0 3px;text-transform:uppercase;letter-spacing:.03em;}
+input[type=number]{width:140px;padding:8px 9px;border:1px solid var(--border);border-radius:8px;font:inherit;}
+.row{display:flex;gap:16px;flex-wrap:wrap;}
+.sw{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;cursor:pointer;}.sw input{width:22px;height:22px;}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;}
+.hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin:8px 0 0;}
+.msg{border-radius:8px;padding:9px 12px;margin-top:12px;font-size:13px;}.ok{background:var(--green-soft);color:var(--green);}.err{background:#FBEAEA;color:#7A2E22;}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;}.p-on{background:var(--green-soft);color:var(--green);}.p-off{background:#eee;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Seasonal Charges</h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <div class="card">
+    <h2>Christmas greens <span id="status" class="pill p-off">&hellip;</span></h2>
+    <p class="hint">Drivers enter how many of a delivery&rsquo;s pieces are Christmas greens. Each green piece adds to the driver&rsquo;s pay and to the shop&rsquo;s charge, on top of the usual rate and extra-piece amount. It applies only to deliveries dated <b>November 1 to January 31</b>, and only while this switch is on.</p>
+    <label class="sw" style="margin-top:14px;text-transform:none;font-size:15px;color:var(--ink);"><input type="checkbox" id="on"> Christmas greens box is on</label>
+    <div class="row">
+      <div><label>Driver pay per green piece</label><input id="dr" type="number" min="0" step="0.05"></div>
+      <div><label>Shop charge per green piece</label><input id="sr" type="number" min="0" step="0.05"></div>
+    </div>
+    <button class="btn" id="save" type="button">Save</button>
+    <div id="msg"></div>
+    <p class="hint">A change applies to deliveries entered from now on. Deliveries already entered keep the rates they were entered with.</p>
+  </div>
+</div>
+<script>
+function $(i){return document.getElementById(i);}
+var gate=fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){ if(!d.authenticated) location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return !!d.authenticated; }).catch(function(){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return false; });
+function show(x){
+  $('on').checked=!!x.enabled; $('dr').value=Number(x.driver_rate).toFixed(2); $('sr').value=Number(x.shop_rate).toFixed(2);
+  var s=$('status'); if(x.enabled&&x.in_season){ s.className='pill p-on'; s.textContent='Showing on driver forms now'; }
+  else if(x.enabled){ s.className='pill p-off'; s.textContent='On, but outside Nov 1 to Jan 31'; } else { s.className='pill p-off'; s.textContent='Off'; }
+}
+gate.then(function(ok){ if(!ok) return; return fetch('/api/seasonal').then(function(r){return r.json();}).then(function(d){ show(d.xmas); }).catch(function(){ $('msg').innerHTML='<div class="msg err">Could not load the settings.</div>'; }); });
+$('save').addEventListener('click',function(){
+  fetch('/api/seasonal',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({xmas:{enabled:$('on').checked,driver_rate:$('dr').value,shop_rate:$('sr').value}})})
+   .then(function(r){ if(r.status===401){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); throw new Error('Not signed in'); } return r.json().then(function(d){ if(!r.ok) throw new Error(d.error||'Could not save'); return d; }); })
+   .then(function(d){ show(d.xmas); $('msg').innerHTML='<div class="msg ok">Saved.</div>'; })
+   .catch(function(e){ $('msg').innerHTML='<div class="msg err">'+e.message+'</div>'; });
+});
+</script>
+</body>
+</html>
