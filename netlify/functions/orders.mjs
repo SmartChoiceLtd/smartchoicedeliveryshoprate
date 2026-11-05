@@ -116,7 +116,7 @@ async function sendDeliveryNotice(order, photoDataUrl) {
   const rows = [
     ['Recipient', order.name], ['Address', (order.unit ? order.unit + ' - ' : '') + (order.address || '')],
     ['Your order #', order.order_id], ['Delivered', (order.date || '') + (when ? ' at ' + when : '')],
-    ['How', statuses], ['Received by', order.accepted_by || order.neighboured_to || ''],
+    ['How', statuses], ['Left with neighbour at', order.neighboured_to || ''], ['Received by', order.accepted_by || ''],
   ].filter(r => r[1]);
   const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">' +
     '<p>Your delivery to <strong>' + escH(order.name || 'your customer') + '</strong> has been completed.</p>' +
@@ -130,6 +130,33 @@ async function sendDeliveryNotice(order, photoDataUrl) {
   const result = await new Resend(process.env.RESEND_API_KEY).emails.send(msg);
   if (result && result.error) throw new Error(result.error.message || JSON.stringify(result.error));
   return shop.notify_email;
+}
+
+// ---- Close the loop on a delivery request --------------------------------------------------------------------
+// When a driver submits a delivery, an open request from the same shop, for that date, at the same address is marked done.
+// Matching is deliberately cautious: the street number AND a street-name word must agree, and exactly one request must fit.
+// Anything unclear is left open on the request list for the office to close by hand. Never fails the order.
+const ADDR_SKIP = new Set(['street', 'avenue', 'drive', 'road', 'place', 'court', 'crescent', 'close', 'boulevard', 'trail', 'calgary', 'alberta', 'suite', 'unit', 'apt', 'north', 'south', 'east', 'west']);
+function addrKey(a) {
+  const t = String(a || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  return { nums: new Set(t.filter(x => /^\d+$/.test(x))), words: new Set(t.filter(x => /^[a-z]{4,}$/.test(x) && !ADDR_SKIP.has(x))) };
+}
+function sameAddress(a, b) {
+  const x = addrKey(a), y = addrKey(b);
+  return [...x.nums].some(n => y.nums.has(n)) && [...x.words].some(w => y.words.has(w));
+}
+async function closeRequestFor(order, orderKey) {
+  if (!order.shop_code || !order.date) return;
+  if (/undeliverable/i.test(JSON.stringify(order.delivery_status || ''))) return; // not delivered: the request stays open
+  const rs = getStore('flower-requests');
+  const code = String(order.shop_code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const { blobs } = await rs.list({ prefix: 'req_' + order.date + '_' + code + '_' });
+  const recs = (await Promise.all(blobs.map(b => rs.get(b.key, { type: 'json' }).catch(() => null)))).filter(r => r && (r.status === 'new' || r.status === 'accepted'));
+  const hits = recs.filter(r => sameAddress(order.address, r.address));
+  if (hits.length !== 1) return;
+  const rec = hits[0];
+  rec.status = 'done'; rec.done_by = 'delivery entry'; rec.done_at = new Date().toISOString(); rec.order_key = orderKey; rec.delivered_by = order.driver || '';
+  await rs.setJSON(rec.id, rec);
 }
 
 async function getShopLocation(shopCode) {
@@ -471,6 +498,7 @@ export default async (req) => {
           try { order.notice_error = String(e.message || e).slice(0, 200); await store.setJSON(orderId, order); } catch (e2) {}
         }
       }
+      if (!isWholesale || isEventZoneCode(zoneCode)) { try { await closeRequestFor(order, orderId); } catch (e) { console.error('request close failed:', e.message); } }
       // has_photo reports whether the photo was actually stored (it is downgraded to
       // false above if the photo write failed), so the driver form can tell the driver
       // the truth instead of assuming the photo made it.
