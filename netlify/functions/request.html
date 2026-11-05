@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0C769E">
+<title>Request a Delivery - Smart Choice Delivery</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FBF0D6;--radius:12px;}
+@media (prefers-color-scheme: dark){:root{--bg:#1c1a17;--card:#26231f;--ink:#f1ece4;--ink-soft:#b3a999;--border:#3a352e;--accent:#4db6dd;--accent-soft:#17323d;--warm:#f08c6e;--warm-soft:#3d2219;--green:#7fd27f;--green-soft:#183018;--amber:#f0c060;--amber-soft:#3a2d10;}}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 16px;}
+.topbar h1{font-family:Georgia,serif;font-size:19px;font-weight:600;margin:0;}
+.topbar .shop{color:var(--ink-soft);font-size:14px;margin-top:2px;}
+.main{max-width:640px;margin:0 auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.rules{font-size:14px;line-height:1.55;color:var(--ink-soft);}
+.rules strong{color:var(--ink);}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;}
+label .opt{font-weight:400;color:var(--ink-soft);}
+input,select,textarea{width:100%;padding:11px 10px;border:1px solid var(--border);border-radius:8px;font-size:16px;background:var(--card);color:var(--ink);font-family:inherit;}
+textarea{min-height:60px;resize:vertical;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media (max-width:420px){.row2{grid-template-columns:1fr;}}
+.dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.dhead h2{font-family:Georgia,serif;font-size:16px;margin:0;}
+button{border:0;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;padding:12px 16px;}
+.btn{background:var(--accent);color:#fff;width:100%;}
+.btn:disabled{opacity:.6;}
+.btn2{background:var(--accent-soft);color:var(--accent);width:100%;margin-bottom:14px;}
+.rm{background:transparent;color:var(--warm);padding:4px 8px;font-size:14px;}
+.msg{border-radius:var(--radius);padding:13px 15px;margin-bottom:14px;font-size:15px;line-height:1.5;}
+.m-ok{background:var(--green-soft);color:var(--green);}.m-bad{background:var(--warm-soft);color:var(--warm);}.m-warn{background:var(--amber-soft);color:var(--amber);}
+.cut{font-size:13px;color:var(--amber);background:var(--amber-soft);border-radius:8px;padding:8px 10px;margin-top:8px;}
+h2.sec{font-family:Georgia,serif;font-size:16px;margin:4px 0 8px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--border);vertical-align:top;}th{font-size:12px;color:var(--ink-soft);}
+.tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);}
+.tag.ok{background:var(--green-soft);color:var(--green);}.tag.bad{background:var(--warm-soft);color:var(--warm);}
+.empty{color:var(--ink-soft);font-size:14px;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Request a Delivery</h1><div class="shop" id="shopName">Smart Choice Delivery</div></div>
+<div class="main">
+  <div id="bad" class="msg m-bad" hidden></div>
+  <div id="ok" class="msg m-ok" hidden></div>
+  <div id="app" hidden>
+    <div class="card rules">
+      <strong>Same-day cut-off is 2:00 PM.</strong> After that, please call or text <strong>403 880 9822</strong>.<br>
+      We need the <strong>date, recipient name, address</strong> (with the access code for apartments and condos) and a <strong>contact number</strong>: the recipient&rsquo;s if possible, otherwise the sender&rsquo;s. Deliveries without a contact number cannot be accepted.<br>
+      We will make every effort to match a morning or afternoon request. Weddings, funerals and special events take priority.
+    </div>
+    <div class="card" id="csvCard">
+      <h2 class="sec" style="margin-top:0">Many deliveries? Upload a spreadsheet</h2>
+      <div class="rules">Save your list as a CSV file with these columns: <strong>date, name, address, unit, access code, phone, time, time details, pieces, notes</strong>. Date, name, address and phone are required. Time can be Anytime, Morning, Afternoon or Specific time.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn2" type="button" id="tplBtn" style="width:auto;margin:0">Download a blank template</button><button class="btn2" type="button" id="csvBtn" style="width:auto;margin:0">Choose CSV file</button></div>
+      <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+      <div id="csvOut" style="margin-top:10px"></div>
+    </div>
+    <div id="deliveries"></div>
+    <button class="btn2" id="addBtn" type="button">+ Add another delivery</button>
+    <button class="btn" id="sendBtn" type="button">Send request</button>
+    <h2 class="sec" style="margin-top:22px">Your recent and upcoming requests</h2>
+    <div class="card" id="mine"><div class="empty">Loading&hellip;</div></div>
+    <p class="empty">To change or cancel a request, call or text 403 880 9822.</p>
+  </div>
+</div>
+<script>
+var TOKEN = new URLSearchParams(location.search).get('s') || '';
+var today = '', hourNow = 0, cutoff = 14, n = 0, subId = '';
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function newSub(){ subId = (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)).replace(/[^a-z0-9]/g, ''); }
+function show(id, text){ var e=document.getElementById(id); e.textContent=text; e.hidden=!text; }
+function card(){
+  n++;
+  var d = document.createElement('div'); d.className = 'card'; d.dataset.n = n;
+  d.innerHTML =
+    '<div class="dhead"><h2>Delivery</h2><button class="rm" type="button" data-rm="1">Remove</button></div>' +
+    '<div class="row2"><div><label>Delivery date</label><input type="date" class="f-date" value="' + today + '" min="' + today + '"></div>' +
+    '<div><label>Pieces <span class="opt">(optional)</span></label><input type="number" class="f-pieces" min="1" max="99" value="1" inputmode="numeric"></div></div>' +
+    '<div class="cut f-cut" hidden>It is past the 2:00 PM same-day cut-off. We will do our best, but please also call or text 403 880 9822.</div>' +
+    '<label>Recipient name</label><input type="text" class="f-name" autocomplete="off">' +
+    '<label>Address</label><input type="text" class="f-address" autocomplete="off" placeholder="Street, city">' +
+    '<div class="row2"><div><label>Unit / Suite <span class="opt">(optional)</span></label><input type="text" class="f-unit"></div>' +
+    '<div><label>Access code <span class="opt">(apartments, condos)</span></label><input type="text" class="f-code"></div></div>' +
+    '<label>Contact number</label><input type="tel" class="f-phone" inputmode="tel" autocomplete="off" placeholder="Recipient\'s, or sender\'s if not">' +
+    '<div class="row2"><div><label>Time</label><select class="f-tp"><option>Anytime</option><option>Morning</option><option>Afternoon</option><option>Specific time</option></select></div>' +
+    '<div><label>Time details <span class="opt">(optional)</span></label><input type="text" class="f-tn" placeholder="e.g. before 11"></div></div>' +
+    '<label>Notes <span class="opt">(optional)</span></label><textarea class="f-notes" placeholder="Anything the driver should know"></textarea>';
+  document.getElementById('deliveries').appendChild(d);
+  cutCheck(d); renumber();
+  return d;
+}
+function renumber(){
+  var cs = document.querySelectorAll('#deliveries .card');
+  cs.forEach(function(c, i){ c.querySelector('h2').textContent = cs.length > 1 ? 'Delivery ' + (i + 1) : 'Delivery'; c.querySelector('[data-rm]').hidden = cs.length < 2; });
+}
+function cutCheck(c){
+  var dt = c.querySelector('.f-date').value;
+  c.querySelector('.f-cut').hidden = !(dt === today && hourNow >= cutoff);
+}
+document.addEventListener('click', function(e){
+  var rm = e.target.closest && e.target.closest('[data-rm]');
+  if (rm){ rm.closest('.card').remove(); renumber(); }
+});
+document.addEventListener('change', function(e){ if (e.target.classList.contains('f-date')) cutCheck(e.target.closest('.card')); });
+document.getElementById('addBtn').onclick = function(){ var c = card(); c.querySelector('.f-name').focus(); };
+
+async function loadMine(){
+  try {
+    var r = await fetch('/api/requests?token=' + encodeURIComponent(TOKEN)); var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not load');
+    var box = document.getElementById('mine');
+    if (!d.requests.length){ box.innerHTML = '<div class="empty">No requests yet.</div>'; return d; }
+    var lab = {new:['Received',''], accepted:['Confirmed','ok'], done:['Delivered','ok'], cancelled:['Cancelled','bad']};
+    box.innerHTML = '<table><thead><tr><th>Date</th><th>Recipient / address</th><th>Status</th></tr></thead><tbody>' + d.requests.map(function(q){
+      var l = lab[q.status] || ['Received',''];
+      return '<tr><td>' + esc(q.date) + '</td><td>' + esc(q.name) + '<br><span style="color:var(--ink-soft)">' + esc((q.unit ? q.unit + ' - ' : '') + q.address) + '</span></td><td><span class="tag ' + l[1] + '">' + l[0] + '</span>' + (q.after_cutoff ? '<br><span style="color:var(--amber);font-size:12px">after cut-off</span>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+    return d;
+  } catch (e) { document.getElementById('mine').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+
+document.getElementById('sendBtn').onclick = async function(){
+  var btn = this; show('bad', ''); show('ok', '');
+  var items = [], problems = [];
+  document.querySelectorAll('#deliveries .card').forEach(function(c, i){
+    var g = function(s){ return c.querySelector(s).value.trim(); };
+    var it = { date: g('.f-date'), pieces: g('.f-pieces'), name: g('.f-name'), address: g('.f-address'), unit: g('.f-unit'), access_code: g('.f-code'), phone: g('.f-phone'), time_pref: g('.f-tp'), time_note: g('.f-tn'), notes: g('.f-notes') };
+    var miss = [];
+    if (!it.date) miss.push('date'); if (!it.name) miss.push('recipient name'); if (!it.address) miss.push('address');
+    if (it.phone.replace(/\D/g, '').length < 10) miss.push('a contact number with area code');
+    if (miss.length) problems.push('Delivery ' + (i + 1) + ': please add ' + miss.join(', ') + '.');
+    items.push(it);
+  });
+  if (problems.length){ show('bad', problems.join(' ')); window.scrollTo(0, 0); return; }
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    var r = await fetch('/api/requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: TOKEN, submission_id: subId, deliveries: items }) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not send');
+    var msg = 'Thank you. ' + d.saved + ' delivery request' + (d.saved === 1 ? '' : 's') + ' received.' + (d.after_cutoff ? ' ' + d.after_cutoff + ' of them are after the 2:00 PM cut-off, so please also call or text 403 880 9822.' : '');
+    document.getElementById('deliveries').innerHTML = ''; n = 0; newSub(); card();
+    var ok = document.getElementById('ok'); ok.textContent = msg; ok.hidden = false; window.scrollTo(0, 0);
+    loadMine();
+  } catch (e) {
+    show('bad', e.message + ' If this keeps happening, please call or text 403 880 9822.'); window.scrollTo(0, 0);
+  }
+  btn.disabled = false; btn.textContent = 'Send request';
+};
+
+
+/* ---------- CSV upload for big shops ---------- */
+function parseCsv(text){
+  var rows=[], row=[], cur='', q=false, i=0;
+  text=text.replace(/^\uFEFF/,'');
+  for(; i<text.length; i++){
+    var c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur); cur=''; if(row.some(function(x){return x.trim();})) rows.push(row); row=[]; }
+    else cur+=c;
+  }
+  row.push(cur); if(row.some(function(x){return x.trim();})) rows.push(row);
+  return rows;
+}
+var CSV_COLS={date:['date','delivery date'],name:['name','recipient','recipient name'],address:['address','street address'],unit:['unit','suite','unit / suite'],access_code:['access code','code','buzzer'],phone:['phone','contact','contact number','phone number'],time_pref:['time','time request'],time_note:['time details','time note'],pieces:['pieces','pcs','qty'],notes:['notes','comments']};
+function normDate(s){
+  s=String(s||'').trim(); var m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return m[3]+'-'+('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2);
+  return '';
+}
+var csvItems=[];
+function csvShow(html){ document.getElementById('csvOut').innerHTML=html; }
+function csvLoad(text){
+  var rows=parseCsv(text); csvItems=[];
+  if(rows.length<2){ csvShow('<div class="msg m-bad">That file has no deliveries in it.</div>'); return; }
+  var head=rows[0].map(function(x){return x.trim().toLowerCase();}), idx={};
+  Object.keys(CSV_COLS).forEach(function(k){ idx[k]=-1; CSV_COLS[k].forEach(function(n){ if(idx[k]<0) idx[k]=head.indexOf(n); }); });
+  var need=['date','name','address','phone'].filter(function(k){ return idx[k]<0; });
+  if(need.length){ csvShow('<div class="msg m-bad">The first row must have column headings. Missing: '+esc(need.join(', '))+'. Use the blank template.</div>'); return; }
+  var errs=[];
+  rows.slice(1).forEach(function(r,i){
+    var g=function(k){ return idx[k]>=0?String(r[idx[k]]||'').trim():''; };
+    var it={date:normDate(g('date')),name:g('name'),address:g('address'),unit:g('unit'),access_code:g('access_code'),phone:g('phone'),time_pref:g('time_pref')||'Anytime',time_note:g('time_note'),pieces:g('pieces'),notes:g('notes')};
+    var tp=['Anytime','Morning','Afternoon','Specific time'].filter(function(x){return x.toLowerCase()===it.time_pref.toLowerCase();})[0];
+    it.time_pref=tp||'Anytime';
+    var why=[];
+    if(!it.date) why.push('date (use 2026-11-05 or 11/5/2026)'); else if(it.date<today) why.push('date is in the past');
+    if(!it.name) why.push('name'); if(!it.address) why.push('address');
+    if(it.phone.replace(/\D/g,'').length<10) why.push('phone with area code');
+    if(why.length) errs.push('Row '+(i+2)+': '+why.join(', ')); csvItems.push(it);
+  });
+  if(errs.length){ csvItems=[]; csvShow('<div class="msg m-bad">Nothing was sent. Please fix these rows and choose the file again:<br>'+errs.slice(0,25).map(esc).join('<br>')+(errs.length>25?'<br>...and '+(errs.length-25)+' more':'')+'</div>'); return; }
+  var late=csvItems.filter(function(x){return x.date===today;}).length;
+  csvShow('<div class="msg m-ok">'+csvItems.length+' deliveries ready.'+(late&&hourNow>=cutoff?' '+late+' are for today, which is past the 2:00 PM cut-off, so please also call or text 403 880 9822.':'')+'</div><button class="btn" type="button" id="csvSend">Send '+csvItems.length+' deliveries</button>');
+  document.getElementById('csvSend').onclick=csvSend;
+}
+async function csvSend(){
+  var btn=document.getElementById('csvSend'); btn.disabled=true;
+  var base=(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).replace(/[^a-z0-9]/g,''), size=40, total=csvItems.length, sent=0;
+  try{
+    for(var i=0;i<total;i+=size){
+      var chunk=csvItems.slice(i,i+size), last=i+size>=total;
+      btn.textContent='Sending '+Math.min(i+size,total)+' of '+total+'...';
+      var r=await fetch('/api/requests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:TOKEN,submission_id:base+'c'+(i/size),deliveries:chunk,quiet:!last,batch_count:total})});
+      var d=await r.json(); if(!r.ok) throw new Error(d.error||'Could not send');
+      sent+=d.saved;
+    }
+    csvShow('<div class="msg m-ok">Thank you. '+sent+' delivery requests received.</div>'); csvItems=[]; loadMine();
+  }catch(e){
+    csvShow('<div class="msg m-bad">'+esc(e.message)+' '+sent+' of '+total+' were received before this stopped. Please call or text 403 880 9822 before sending again, so nothing is doubled.</div>');
+  }
+}
+document.getElementById('csvBtn').onclick=function(){ document.getElementById('csvFile').click(); };
+document.getElementById('csvFile').onchange=function(){
+  var f=this.files[0]; if(!f) return;
+  var rd=new FileReader(); rd.onload=function(){ csvLoad(String(rd.result||'')); }; rd.readAsText(f); this.value='';
+};
+document.getElementById('tplBtn').onclick=function(){
+  var t='date,name,address,unit,access code,phone,time,time details,pieces,notes\n'+today+',Jane Smith,123 4 Ave SW,#204,1234,403-555-1212,Anytime,,1,Leave with concierge\n';
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'})); a.download='delivery-request-template.csv'; document.body.appendChild(a); a.click(); a.remove();
+};
+
+(async function(){
+  if (!TOKEN){ show('bad', 'This link is incomplete. Please call or text Smart Choice Delivery for your request link.'); return; }
+  try {
+    var r = await fetch('/api/requests?token=' + encodeURIComponent(TOKEN)); var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'This link is not valid.');
+    today = d.today; hourNow = d.hour_now; cutoff = d.cutoff_hour;
+    document.getElementById('shopName').textContent = d.shop.name;
+    document.title = 'Request a Delivery - ' + d.shop.name;
+    document.getElementById('app').hidden = false;
+    newSub(); card(); loadMine();
+  } catch (e) { show('bad', e.message); }
+})();
+</script>
+</body>
+</html>
