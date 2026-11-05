@@ -108,7 +108,7 @@ function phoneLinks(p,body,extras){
 var shopsByLabel={};
 function shopCode(sh){ return String(sh.name||'').trim().split(/\s+/)[0].toUpperCase(); }
 function loadShops(){
-  fetch('/api/shops').then(function(r){return r.json();}).then(function(list){
+  return fetch('/api/shops').then(function(r){return r.json();}).then(function(list){
     var dl=document.getElementById('shopList');
     dl.innerHTML=list.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(sh){
       shopsByLabel[sh.name.toLowerCase()]=sh; shopsByLabel[shopCode(sh).toLowerCase()]=sh;
@@ -295,7 +295,7 @@ async function createOffer(jobs){
   btn.disabled=true; btn.textContent='Creating\u2026';
   try{
     var r=await fetch('/api/offers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
-      jobs:jobs.map(function(j){return {code:j.code,address:j.address,to:j.to,cases:j.cases,wpu:j.wpu,stops:j.stops};}),
+      jobs:jobs.map(function(j){return {code:j.code,address:j.address,to:j.to,cases:j.cases,wpu:j.wpu,stops:j.stops,req_ids:(j.stops||[]).map(function(s){return reqByLine[s]||'';})};}),
       drivers:boxes.map(function(b){return b.dataset.code;})})});
     if(r.status===401){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
     var d=await r.json();
@@ -371,9 +371,29 @@ document.getElementById('addShopBtn').addEventListener('click',addJobRow);
 addJobRow();
 document.getElementById('refreshBtn').addEventListener('click',function(){ rosterCall().then(loadBoard).catch(function(){ loadBoard(); }); loadOffers(); });
 
+/* From the Delivery Requests list: the ticked requests arrive grouped by shop, one pickup row per shop, then drivers are ranked. */
+var reqByLine={};
+function loadFromRequests(){
+  if(!/[?&]fromreq=1/.test(location.search)) return;
+  var list=[]; try{ list=JSON.parse(sessionStorage.getItem('scd_req_dispatch')||'[]'); sessionStorage.removeItem('scd_req_dispatch'); }catch(e){}
+  if(!list.length) return;
+  var by={}, order=[];
+  list.forEach(function(x){ if(!by[x.shop_code]){ by[x.shop_code]=[]; order.push(x.shop_code); } by[x.shop_code].push(x); reqByLine[x.text]=x.id; });
+  var host=document.getElementById('jobRows');
+  order.slice(0,3).forEach(function(code,i){
+    if(i>0) addJobRow();
+    var row=host.querySelectorAll('.jr')[i];
+    row.querySelector('.jr-shop').value=code;
+    row.querySelector('.jr-stops').value=by[code].map(function(x){return x.text;}).join('\n');
+    row.querySelector('.jr-shop').dispatchEvent(new Event('input'));
+  });
+  var note=document.getElementById('pickupNote'); if(note) note.textContent='Filled from '+list.length+' delivery request'+(list.length===1?'':'s')+'. Check the drivers, then create the offer.';
+  document.getElementById('jobRows').scrollIntoView({block:'start'});
+  return true;
+}
 fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){
   if(!d.authenticated){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);return;}
-  wireRoster(); loadShops(); rosterCall().then(function(){ return loadBoard(); }).catch(function(){ loadBoard(); }); loadOffers();
+  wireRoster(); loadShops().then(function(){ if(loadFromRequests()) rank(); }); rosterCall().then(function(){ return loadBoard(); }).catch(function(){ loadBoard(); }); loadOffers();
   setInterval(function(){ if(!document.hidden){ rosterCall().then(loadBoard).catch(function(){}); loadOffers(); } },30000);
 }).catch(function(){location.href='/login.html?redirect='+encodeURIComponent(location.pathname);});
 </script>
