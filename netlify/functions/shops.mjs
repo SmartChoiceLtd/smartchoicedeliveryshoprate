@@ -1,142 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Choice Delivery — Hub</title>
-<style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;}
-*{box-sizing:border-box;}html,body{height:100%;margin:0;}
-body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-h1{font-family:Georgia,serif;font-weight:600;font-size:20px;margin:0;}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin:0 0 8px;}
-.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:16px 20px;}
-.main{padding:16px;max-width:500px;margin:0 auto;}
-.section{margin-bottom:22px;}
-.link-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:8px;text-decoration:none;color:var(--ink);}
-.link-card:hover{border-color:var(--accent);}
-.link-icon{font-size:22px;flex-shrink:0;width:28px;text-align:center;}
-.link-text{flex:1;}
-.link-title{font-size:15px;font-weight:600;}
-.link-sub{font-size:12px;color:var(--ink-soft);margin-top:1px;}
-</style>
-</head>
-<body>
-<div class="topbar"><h1>Smart Choice Delivery</h1></div>
-<div class="main">
+import { getStore } from '@netlify/blobs';
 
-  <div class="section">
-    <h2>Daily Operations</h2>
-    <a class="link-card" href="/today.html">
-      <span class="link-icon">&#128200;</span>
-      <div class="link-text"><div class="link-title">Today's Deliveries</div><div class="link-sub">Quick count, live throughout the day</div></div>
-    </a>
-    <a class="link-card" href="/orders.html">
-      <span class="link-icon">&#128203;</span>
-      <div class="link-text"><div class="link-title">Orders Dashboard</div><div class="link-sub">Search, override, delete, reports</div></div>
-    </a>
-    <a class="link-card" href="/reconciliation.html">
-      <span class="link-icon">&#9989;</span>
-      <div class="link-text"><div class="link-title">Reconciliation</div><div class="link-sub">Pending, stale, and completed stops</div></div>
-    </a>
-  </div>
-
-  <div class="section">
-    <h2>Admin</h2>
-    <a class="link-card" href="/admin.html">
-      <span class="link-icon">&#9881;&#65039;</span>
-      <div class="link-text"><div class="link-title">Admin Panel</div><div class="link-sub">Drivers, Shops, Rates, GDPI, Applications</div></div>
-    </a>
-    <a class="link-card" href="/weekly-close.html">
-      <span class="link-icon">&#9745;&#65039;</span>
-      <div class="link-text"><div class="link-title">Weekly Close</div><div class="link-sub">Checklist before pay: conflicts, duplicates, stops, statements, balances</div></div>
-    </a>
-    <a class="link-card" href="/dispatch.html">
-      <span class="link-icon">&#128205;</span>
-      <div class="link-text"><div class="link-title">Dispatch Board</div><div class="link-sub">Where drivers are now, and who is closest to a new pickup</div></div>
-    </a>
-    <a class="link-card" href="/pay-ledger.html">
-      <span class="link-icon">&#128178;</span>
-      <div class="link-text"><div class="link-title">Driver Pay Ledger</div><div class="link-sub">Statements emailed, e-transfers, advances, adjustments, paid in full</div></div>
-    </a>
-    <a class="link-card" href="/driver-pay-detail.html">
-      <span class="link-icon">&#129534;</span>
-      <div class="link-text"><div class="link-title">Driver Pay Detail</div><div class="link-sub">One driver's statements, payments, advances and adjustments, week by week</div></div>
-    </a>
-    <a class="link-card" href="/driver-activity.html">
-      <span class="link-icon">&#128241;</span>
-      <div class="link-text"><div class="link-title">Driver Activity</div><div class="link-sub">What a driver's phone reported today: opened, tried to save, saved or failed</div></div>
-    </a>
-    <a class="link-card" href="/requests.html">
-      <span class="link-icon">&#128230;</span>
-      <div class="link-text"><div class="link-title">Delivery Requests</div><div class="link-sub">Deliveries shops request through their link: accept, mark done or cancel</div></div>
-    </a>
-    <a class="link-card" href="/event-quote.html">
-      <span class="link-icon">&#128221;</span>
-      <div class="link-text"><div class="link-title">Event Quotes</div><div class="link-sub">Price a special event, give it a quote number, print or email it</div></div>
-    </a>
-    <a class="link-card" href="/seasonal.html">
-      <span class="link-icon">&#127876;</span>
-      <div class="link-text"><div class="link-title">Seasonal Charges</div><div class="link-sub">Christmas greens: turn the driver box on or off and set the per-piece amounts</div></div>
-    </a>
-    <a class="link-card" href="/scan-quality.html">
-      <span class="link-icon">&#128269;</span>
-      <div class="link-text"><div class="link-title">Scan Quality</div><div class="link-sub">How accurately tags are read, by AI model, phone and driver</div></div>
-    </a>
-    <a class="link-card" href="/backups.html">
-      <span class="link-icon">&#128190;</span>
-      <div class="link-text"><div class="link-title">Backups</div><div class="link-sub">Daily backup status, back up now, restore a record</div></div>
-    </a>
-    <a class="link-card" href="/rate-history.html">
-      <span class="link-icon">&#128214;</span>
-      <div class="link-text"><div class="link-title">Rate &amp; Price History</div><div class="link-sub">Who changed a zone rate or shop price, when, and what it was before</div></div>
-    </a>
-    <a class="link-card" href="/change-password.html">
-      <span class="link-icon">&#128273;</span>
-      <div class="link-text"><div class="link-title">Change Password</div><div class="link-sub">Change the admin sign-in password</div></div>
-    </a>
-    <a class="link-card" href="/import-shops.html">
-      <span class="link-icon">&#128229;</span>
-      <div class="link-text"><div class="link-title">Import Shops</div><div class="link-sub">Bulk shop import</div></div>
-    </a>
-    <a class="link-card" href="/load-ytd.html">
-      <span class="link-icon">&#128197;</span>
-      <div class="link-text"><div class="link-title">Load YTD</div><div class="link-sub">Year-to-date historical import</div></div>
-    </a>
-  </div>
-
-  <div class="section">
-    <h2>Guides &amp; Training</h2>
-    <a class="link-card" href="https://claude.ai/code/artifact/800b30f4-3a8b-425f-9696-799fc7fb01cd" target="_blank" rel="noopener">
-      <span class="link-icon">&#128214;</span>
-      <div class="link-text"><div class="link-title">Driver Guide</div><div class="link-sub">October 2026 update: events, funerals, weddings, phone capture</div></div>
-    </a>
-    <a class="link-card" href="https://claude.ai/artifact/RPQyqy8srWTP77ysyp68k4" target="_blank" rel="noopener">
-      <span class="link-icon">&#127916;</span>
-      <div class="link-text"><div class="link-title">Shop Quote Presentation</div><div class="link-sub">How shops use their quote link and price sheet</div></div>
-    </a>
-  </div>
-
-  <div class="section">
-    <h2>Customer &amp; Driver Facing</h2>
-    <a class="link-card" href="/index.html">
-      <span class="link-icon">&#128176;</span>
-      <div class="link-text"><div class="link-title">Quote Tool</div><div class="link-sub">Shop pricing lookup</div></div>
-    </a>
-    <a class="link-card" href="/onboard.html">
-      <span class="link-icon">&#128100;</span>
-      <div class="link-text"><div class="link-title">Driver Onboarding</div><div class="link-sub">New driver application form</div></div>
-    </a>
-  </div>
-
-</div>
-<script>
-fetch('/api/auth?action=check')
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (!data.authenticated) window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname);
-  })
-  .catch(function() { window.location.href = '/login.html?redirect=' + encodeURIComponent(location.pathname); });
-</script>
-</body>
-</html>
+// Price/name changes to a shop are recorded in flower-rate-history (kind "shop"). Not blocked or login-gated
+// here - the quote page also saves shops - so "by" is the signed-in user when there is one.
+async function whoIs(req) {
+  try {
+    const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
+    if (!m) return 'not signed in';
+    const s = await getStore('flower-sessions').get(m[1], { type: 'json' });
+    return (s && new Date(s.expires_at) > new Date()) ? s.username : 'not signed in';
+  } catch (e) { return 'unknown'; }
+}
+function flat(prefix, obj, out) {
+  Object.keys(obj || {}).forEach(k => { out[prefix + '.' + k] = obj[k]; });
+}
+function shopFields(s) {
+  const out = {};
+  if (!s) return out;
+  ['name', 'address', 'featured'].forEach(k => { if (s[k] !== undefined) out[k] = s[k]; });
+  flat('zonePrices', s.zonePrices, out); flat('townPrices', s.townPrices, out); flat('communityZones', s.communityZones, out);
+  return out;
+}
+async function logShopChange(req, before, after) {
+  try {
+    const b = shopFields(before), a = shopFields(after), changes = [];
+    new Set([...Object.keys(b), ...Object.keys(a)]).forEach(f => {
+      if (JSON.stringify(b[f]) !== JSON.stringify(a[f])) changes.push({ field: f, from: b[f] === undefined ? null : b[f], to: a[f] === undefined ? null : a[f] });
+    });
+    if (!changes.length) return;
+    const at = new Date().toISOString();
+    const shop = after || before;
+    await getStore('flower-rate-history').setJSON(at + '_' + Math.random().toString(36).slice(2, 6), { at, by: await whoIs(req), kind: 'shop', target: shop.name || shop.id, shop_id: shop.id, changes });
+  } catch (e) { console.error('shop history log failed:', e.message); }
+}
+function json(data, status = 200) { return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } }); }
+function slugify(name) { const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); return (base || 'shop') + '-' + Math.random().toString(36).slice(2, 6); }
+export default async (req) => {
+  const store = getStore('flower-shops');
+  if (req.method === 'GET') {
+    const { blobs } = await store.list(); const shops = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+    // The shop list is readable without a login (driver pages use it), so a shop's notice email is only included when someone is signed in.
+    if ((await whoIs(req)) === 'not signed in') shops.forEach(s => { delete s.notify_email; });
+    return json(shops);
+  }
+  if (req.method === 'POST') {
+    let body; try { body = await req.json(); } catch (e) { return json({ error: 'Invalid JSON body' }, 400); }
+    if (!body.name || !body.address || typeof body.lat !== 'number' || typeof body.lng !== 'number') return json({ error: 'name, address, lat, and lng are required' }, 400);
+    const id = slugify(body.name);
+    const shop = { id, name: body.name, address: body.address, lat: body.lat, lng: body.lng, zonePrices: body.zonePrices || { C1:10,C2:15,C3:20,C4:30,OUT1:45,OUT2:55,OUT3:75,OUT4:95,OUT5:120 }, communityZones: body.communityZones || {}, townPrices: body.townPrices || {} };
+    await store.setJSON(id, shop); await logShopChange(req, null, shop); return json(shop, 201);
+  }
+  return json({ error: 'Method not allowed' }, 405);
+};
+export const config = { path: '/api/shops' };
