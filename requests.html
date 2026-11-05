@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0C769E">
+<title>Smart Choice Delivery - Delivery Requests</title>
+<style>
+:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--green:#2C6B2C;--green-soft:#EAF4EA;--amber:#8A5A00;--amber-soft:#FBF0D6;--radius:12px;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+.topbar h1{font-family:Georgia,serif;font-size:18px;font-weight:600;margin:0;flex:1;}
+.topbar a{color:var(--accent);font-weight:600;text-decoration:none;font-size:14px;}
+.main{max-width:900px;margin:0 auto;padding:16px;}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.tab{border:1px solid var(--border);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;cursor:pointer;}
+.tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fff;}
+.day{font-family:Georgia,serif;font-size:15px;margin:16px 0 6px;color:var(--ink-soft);}
+.req{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--accent);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;}
+.req.new{border-left-color:var(--warm);}
+.req.done,.req.cancelled{opacity:.6;border-left-color:var(--border);}
+.top{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;}
+.shop{font-weight:800;}
+.who{font-weight:700;}
+.meta{font-size:14px;color:var(--ink-soft);line-height:1.5;margin-top:4px;}
+.meta a{color:var(--accent);text-decoration:none;font-weight:600;}
+.tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;}
+.t-new{background:var(--warm-soft);color:var(--warm);}.t-ok{background:var(--green-soft);color:var(--green);}.t-warn{background:var(--amber-soft);color:var(--amber);}.t-info{background:var(--accent-soft);color:var(--accent);}
+.acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.acts button{border:0;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;background:var(--accent-soft);color:var(--accent);}
+.acts button.go{background:var(--accent);color:#fff;}.acts button.x{background:var(--warm-soft);color:var(--warm);}
+.empty{color:var(--ink-soft);padding:14px 0;}
+.pick{display:flex;gap:10px;align-items:flex-start;}
+.pick input{width:22px;height:22px;margin-top:2px;flex:0 0 auto;}
+.pick .body{flex:1;min-width:0;}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:3px solid var(--accent);padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;z-index:5;}
+.bar button{border:0;border-radius:8px;padding:11px 18px;font-size:15px;font-weight:700;cursor:pointer;}
+.bar .go{background:var(--accent);color:#fff;}.bar .clr{background:var(--accent-soft);color:var(--accent);}
+body{padding-bottom:70px;}
+.hint{color:var(--ink-soft);font-size:13px;margin:0 0 10px;}
+</style>
+</head>
+<body>
+<div class="topbar"><h1>Delivery Requests <span id="cnt"></span></h1><a href="/hub.html">&larr; Hub</a></div>
+<div class="main">
+  <p class="hint">Requests shops send through their private link. Refreshes by itself every 30 seconds. Shop links are made in Admin &rarr; Shops (&ldquo;Request link&rdquo;).</p>
+  <div class="tabs">
+    <button class="tab on" data-f="open">Open</button>
+    <button class="tab" data-f="new">New only</button>
+    <button class="tab" data-f="done">Done</button>
+    <button class="tab" data-f="all">All</button>
+    <button class="tab" id="selAll" type="button">Select first 40 new</button>
+    <select id="shopSel"><option value="">All shops</option></select>
+  </div>
+  <div id="out"><div class="empty">Loading&hellip;</div></div>
+</div>
+<div class="bar" id="bar" hidden><span id="barN"></span><button class="go" id="sendDrivers" type="button">Send to drivers</button><button class="clr" id="clrSel" type="button">Clear</button></div>
+<script>
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+var gate=fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){ if(!d.authenticated) location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return !!d.authenticated; }).catch(function(){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return false; });
+var rows = [], filter = 'open', today = '', sel = {};
+function hm(iso){ try { return new Date(iso).toLocaleTimeString('en-CA', {hour:'numeric', minute:'2-digit'}); } catch (e) { return ''; } }
+function updateBar(){
+  var ids = Object.keys(sel).filter(function(k){ return sel[k] && rows.some(function(r){ return r.id === k && r.status === 'new'; }); });
+  document.getElementById('bar').hidden = !ids.length;
+  document.getElementById('barN').textContent = ids.length + ' selected';
+}
+function dayLabel(d){ if (d === today) return 'Today, ' + d; var x = new Date(d + 'T12:00:00'); return x.toLocaleDateString('en-CA', {weekday:'long', month:'short', day:'numeric'}); }
+function render(){
+  var shop = document.getElementById('shopSel').value;
+  var list = rows.filter(function(r){
+    if (shop && r.shop_code !== shop) return false;
+    if (filter === 'open') return r.status === 'new' || r.status === 'accepted';
+    if (filter === 'new') return r.status === 'new';
+    if (filter === 'done') return r.status === 'done' || r.status === 'cancelled';
+    return true;
+  });
+  var newCount = rows.filter(function(r){ return r.status === 'new'; }).length;
+  document.getElementById('cnt').textContent = newCount ? '(' + newCount + ' new)' : '';
+  document.title = (newCount ? '(' + newCount + ') ' : '') + 'Delivery Requests';
+  var out = document.getElementById('out');
+  if (!list.length){ out.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+  var html = '', last = '';
+  list.forEach(function(r){
+    if (r.date !== last){ html += '<div class="day">' + esc(dayLabel(r.date)) + '</div>'; last = r.date; }
+    var addr = (r.unit ? r.unit + ' - ' : '') + r.address;
+    var tp = r.time_pref && r.time_pref !== 'Anytime' ? r.time_pref + (r.time_note ? ' (' + r.time_note + ')' : '') : (r.time_note || '');
+    var offerTag = '';
+    if (r.status === 'new' && r.offered_at) {
+      var gone = r.offer_expires_at && Date.now() > Date.parse(r.offer_expires_at);
+      offerTag = gone ? '<span class="tag t-warn">offered ' + esc(hm(r.offered_at)) + ', nobody took it</span>' : '<span class="tag t-info">offered ' + esc(hm(r.offered_at)) + ', waiting</span>';
+    }
+    var who2 = r.assigned_name && (r.status === 'accepted' || r.status === 'done') ? '<span class="tag t-ok">' + esc(r.assigned_name) + '</span>' : '';
+    var canPick = r.status === 'new';
+    html += '<div class="req ' + r.status + '"><div class="pick">' + (canPick ? '<input type="checkbox" class="sel" data-sel="' + esc(r.id) + '"' + (sel[r.id] ? ' checked' : '') + '>' : '') + '<div class="body"><div class="top"><span class="shop">' + esc(r.shop_code) + '</span><span class="who">' + esc(r.name) + '</span>' +
+      '<span class="tag ' + (r.status === 'new' ? 't-new' : r.status === 'accepted' ? 't-info' : 't-ok') + '">' + esc(r.status) + '</span>' + who2 + offerTag +
+      (r.after_cutoff ? '<span class="tag t-warn">after cut-off</span>' : '') + (r.done_by ? '<span class="tag t-ok">closed by delivery entry</span>' : '') + '</div>' +
+      '<div class="meta"><a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(r.address) + '" target="_blank" rel="noopener">' + esc(addr) + '</a>' +
+      (r.access_code ? ' &middot; code <strong>' + esc(r.access_code) + '</strong>' : '') + '<br>' +
+      '<a href="tel:' + esc(r.phone.replace(/[^0-9+]/g, '')) + '">' + esc(r.phone) + '</a>' +
+      (r.pieces > 1 ? ' &middot; ' + r.pieces + ' pcs' : '') + (tp ? ' &middot; ' + esc(tp) : '') +
+      (r.notes ? '<br>' + esc(r.notes) : '') + '</div><div class="acts">' +
+      (r.status === 'new' ? '<button class="go" data-id="' + esc(r.id) + '" data-s="accepted">Accept</button>' : '') +
+      (r.status === 'new' || r.status === 'accepted' ? '<button data-id="' + esc(r.id) + '" data-s="done">Done</button><button class="x" data-id="' + esc(r.id) + '" data-s="cancelled">Cancel</button>' : '<button data-id="' + esc(r.id) + '" data-s="new">Reopen</button>') +
+      '</div></div></div></div>';
+  });
+  out.innerHTML = html; updateBar();
+}
+async function load(){
+  if (!(await gate)) return;
+  try {
+    var r = await fetch('/api/requests'); var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not load');
+    today = d.today; rows = d.requests;
+    var sel = document.getElementById('shopSel'), cur = sel.value, codes = {};
+    rows.forEach(function(q){ codes[q.shop_code] = 1; });
+    sel.innerHTML = '<option value="">All shops</option>' + Object.keys(codes).sort().map(function(c){ return '<option>' + esc(c) + '</option>'; }).join('');
+    sel.value = cur; render();
+  } catch (e) { document.getElementById('out').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+document.addEventListener('change', function(e){
+  if (e.target.classList && e.target.classList.contains('sel')){ sel[e.target.dataset.sel] = e.target.checked; updateBar(); }
+});
+document.getElementById('selAll').onclick = function(){
+  var shop = document.getElementById('shopSel').value, n = 0; sel = {};
+  rows.forEach(function(r){ if (r.status === 'new' && (!shop || r.shop_code === shop) && n < 40){ sel[r.id] = true; n++; } });
+  render();
+};
+document.getElementById('clrSel').onclick = function(){ sel = {}; render(); };
+document.getElementById('sendDrivers').onclick = function(){
+  var picked = rows.filter(function(r){ return sel[r.id] && r.status === 'new'; });
+  if (!picked.length) return;
+  var shops = {}; picked.forEach(function(r){ shops[r.shop_code] = 1; });
+  var per = {}; picked.forEach(function(r){ per[r.shop_code] = (per[r.shop_code] || 0) + 1; });
+  if (Object.keys(per).some(function(k){ return per[k] > 40; })){ alert('An offer holds up to 40 deliveries per shop. Select fewer, then send the rest in another round.'); return; }
+  if (Object.keys(shops).length > 3){ alert('Dispatch can send up to 3 shops at once. Pick fewer shops, or send these in two rounds.'); return; }
+  var lines = picked.map(function(r){ return { id: r.id, shop_code: r.shop_code, text: r.address + (r.unit ? ' (' + r.unit + ')' : '') + (r.time_pref && r.time_pref !== 'Anytime' ? ' - ' + r.time_pref.toLowerCase() + (r.time_note ? ' ' + r.time_note : '') : '') }; });
+  try { sessionStorage.setItem('scd_req_dispatch', JSON.stringify(lines)); } catch (e) { alert('Could not pass the list to Dispatch.'); return; }
+  location.href = '/dispatch.html?fromreq=1';
+};
+document.addEventListener('click', async function(e){
+  var t = e.target.closest && e.target.closest('.tab');
+  if (t && t.dataset.f){ document.querySelectorAll('.tab[data-f]').forEach(function(x){ x.classList.remove('on'); }); t.classList.add('on'); filter = t.dataset.f; render(); return; }
+  var b = e.target.closest && e.target.closest('[data-id]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    var r = await fetch('/api/requests', { method: 'PATCH', headers: {'content-type': 'application/json'}, body: JSON.stringify({ id: b.dataset.id, status: b.dataset.s }) });
+    if (!r.ok) throw new Error('Could not update');
+    var u = await r.json(); rows = rows.map(function(q){ return q.id === u.id ? u : q; }); render();
+  } catch (err) { alert(err.message); b.disabled = false; }
+});
+document.getElementById('shopSel').onchange = render;
+load(); setInterval(load, 30000);
+</script>
+</body>
+</html>
