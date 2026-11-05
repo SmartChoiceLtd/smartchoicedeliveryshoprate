@@ -18,6 +18,7 @@ import { getStore } from '@netlify/blobs';
 
 const OFFER_MIN = 15;
 const SETTLE_MS = 700;
+const REQ_ID = /^req_\d{4}-\d{2}-\d{2}_[A-Z0-9]*_[A-Za-z0-9]+_\d+$/;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
@@ -79,6 +80,22 @@ function state(offer, claims, now) {
   if (got === total) return { ...base, state: 'taken', winner: first.driver, winner_name: nameOf(offer, first.driver), taken_at: first.at };
   if (now > Date.parse(offer.expires_at)) return { ...base, state: 'expired' };
   return { ...base, state: 'open' };
+}
+// Keep the delivery request list in step with offers: offered when the offer goes out, accepted (with the driver's name) when a driver wins it.
+// Never blocks or fails the offer itself.
+async function markRequests(offer, list, kind, driver) {
+  if (!list.length) return;
+  try {
+    const rs = getStore('flower-requests');
+    const at = new Date().toISOString();
+    await Promise.all(list.map(async ({ rid, item }) => {
+      const rec = await rs.get(rid, { type: 'json', consistency: 'strong' }).catch(() => null);
+      if (!rec || rec.status === 'done' || rec.status === 'cancelled') return;
+      if (kind === 'offered') { rec.offered_at = at; rec.offer_id = offer.id; rec.offer_item = item; rec.offer_expires_at = offer.expires_at; }
+      else if (kind === 'accepted') { rec.status = 'accepted'; rec.assigned_code = driver.code; rec.assigned_name = driver.name; rec.accepted_at = at; rec.offer_id = offer.id; }
+      await rs.setJSON(rid, rec);
+    }));
+  } catch (e) { console.error('request update failed:', e.message); }
 }
 const myItems = (st, d) => Object.entries(st.awards).filter(([, v]) => v.driver === d).map(([k]) => k);
 
@@ -150,6 +167,7 @@ export default async (req) => {
         if (first) { cur.heading = { address: first, at }; cur.history = [{ kind: 'heading', address: first, at }].concat(cur.history || []).slice(0, 15); cur.updated_at = at; await ds.setJSON(key, cur); }
       } catch (e) { console.error('offer winner status failed:', e.message); }
     }
+    if (won.length) await markRequests(offer, won.map(it => { const m = /^j(\d+)s(\d+)$/.exec(it); const j = m && offer.jobs[parseInt(m[1], 10)]; return j && j.req_ids && j.req_ids[parseInt(m[2], 10)] ? { rid: j.req_ids[parseInt(m[2], 10)], item: it } : null; }).filter(Boolean), 'accepted', { code: d, name: me.name });
     return json({ ...st, my_items: won, mine: 'accept' });
   }
 
@@ -159,7 +177,9 @@ export default async (req) => {
   const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, 3).map(j => ({
     code: clean(j.code, 10).toUpperCase(), address: clean(j.address, 200), wpu: j.wpu === true, to: clean(j.to, 80),
     cases: Number.isFinite(j.cases) && j.cases > 0 ? Math.min(999, Math.floor(j.cases)) : 0,
-    stops: j.wpu === true ? [] : (Array.isArray(j.stops) ? j.stops : []).map(s => clean(s, 120)).filter(s => s.length >= 3).slice(0, 40)
+    stops: j.wpu === true ? [] : (Array.isArray(j.stops) ? j.stops : []).map(s => clean(s, 120)).filter(s => s.length >= 3).slice(0, 40),
+    // Delivery requests behind each stop (same order as stops), when the offer was made from the request list.
+    req_ids: j.wpu === true ? [] : (Array.isArray(j.stops) ? j.stops : []).map((s, k) => clean(s, 120).length >= 3 ? ((Array.isArray(j.req_ids) && REQ_ID.test(String(j.req_ids[k] || ''))) ? String(j.req_ids[k]) : '') : null).filter(x => x !== null).slice(0, 40)
   })).filter(j => j.address.length >= 5);
   if (!jobs.length) return json({ error: 'At least one pickup address is required' }, 400);
   const codes = [...new Set((Array.isArray(body.drivers) ? body.drivers : []).map(c => clean(c, 12).toUpperCase()).filter(Boolean))].slice(0, 30);
@@ -171,6 +191,7 @@ export default async (req) => {
   const created = new Date(now);
   const offer = { id, jobs, drivers, created_at: created.toISOString(), expires_at: new Date(now + OFFER_MIN * 60000).toISOString(), created_by: user };
   await offers.setJSON(id, offer);
+  await markRequests(offer, (offer.jobs || []).flatMap((j, i) => (j.req_ids || []).map((rid, k) => rid ? { rid, item: 'j' + i + 's' + k } : null).filter(Boolean)), 'offered');
   return json({ id, expires_at: offer.expires_at, minutes: OFFER_MIN, links: drivers.map(d => ({ code: d.code, name: d.name, path: '/offer.html?id=' + id + '&d=' + encodeURIComponent(d.code) })) }, 201);
 };
 
