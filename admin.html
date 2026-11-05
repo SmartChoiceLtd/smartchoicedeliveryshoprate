@@ -356,7 +356,7 @@ async function loadDrivers() {
 function renderShops() {
   var el = document.getElementById('shopsList');
   if (!shops.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No shops yet.</p>'; return; }
-  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Aliases</th><th>Notices</th><th>Edit</th></tr></thead><tbody>' +
+  el.innerHTML = '<table><thead><tr><th>Featured</th><th>Code</th><th>Name</th><th>Address</th><th>Aliases</th><th>Notices</th><th>Request link</th><th>Edit</th></tr></thead><tbody>' +
     shops.map(function(s) {
       var code = s.name ? s.name.split(' ')[0] : '';
       var aliasCount = (s.aliases || []).length;
@@ -367,6 +367,7 @@ function renderShops() {
         '<td style="font-size:12px;color:var(--ink-soft)">' + esc(s.address) + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + (aliasCount ? aliasCount + ': ' + esc((s.aliases||[]).join(', ')) : '—') + '</td>' +
         '<td style="font-size:12px;color:var(--ink-soft)">' + (s.notify_enabled && s.notify_email ? 'On: ' + esc(s.notify_email) : '—') + '</td>' +
+        '<td style="white-space:nowrap;"><button class="btn-danger btn-grey" onclick="requestLink(\'' + esc(s.id) + '\')">Link</button></td>' +
         '<td style="white-space:nowrap;"><button class="btn-danger" onclick="editShop(\'' + esc(s.id) + '\')">Edit</button> <button class="btn-danger btn-grey" onclick="deleteShop(\'' + esc(s.id) + '\')">Delete</button></td>' +
         '</tr>';
     }).join('') + '</tbody></table>';
@@ -443,6 +444,26 @@ async function editShop(shopId) {
     shop.name = name.trim(); shop.address = geo.formatted; shop.lat = geo.lat; shop.lng = geo.lng; shop.aliases = aliases; shop.notify_enabled = !!notifyEmail; shop.notify_email = notifyEmail;
     renderShops(); alert('Updated: ' + geo.formatted);
   } catch(e) { alert('Could not update: ' + e.message); }
+}
+
+async function requestLink(shopId) {
+  var shop = shops.find(function(s) { return s.id === shopId; });
+  if (!shop) return;
+  try {
+    var res = await fetch('/api/requests?link=' + encodeURIComponent(shopId));
+    var d = await res.json();
+    if (!res.ok) throw new Error(d.error || ('status ' + res.status));
+    var url = location.origin + d.path;
+    try { await navigator.clipboard.writeText(url); } catch (e) {}
+    var again = window.prompt('Request link for ' + shop.name + ' (copied if your browser allows). Send this to the shop.\n\nTo cancel this link and make a new one, type NEW and press OK.', url);
+    if (again && again.trim().toUpperCase() === 'NEW') {
+      if (!confirm('Cancel the old link for ' + shop.name + '? The shop will need the new one.')) return;
+      var r2 = await fetch('/api/requests?link=' + encodeURIComponent(shopId) + '&rotate=1');
+      var d2 = await r2.json();
+      if (!r2.ok) throw new Error(d2.error || 'Could not make a new link');
+      window.prompt('New request link for ' + shop.name + ':', location.origin + d2.path);
+    }
+  } catch (e) { alert('Could not get the link: ' + e.message); }
 }
 
 async function deleteShop(shopId) {
