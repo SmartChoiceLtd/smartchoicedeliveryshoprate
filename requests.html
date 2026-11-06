@@ -47,7 +47,8 @@ body{padding-bottom:70px;}
 <div class="main">
   <p class="hint">Requests shops send through their private link. Refreshes by itself every 30 seconds. Shop links are made in Admin &rarr; Shops (&ldquo;Request link&rdquo;).</p>
   <div class="tabs">
-    <button class="tab on" data-f="open">Open</button>
+    <button class="tab on" data-f="open" id="tabOpen">Open</button>
+    <button class="tab" data-f="upcoming" id="tabUp">Upcoming</button>
     <button class="tab" data-f="new">New only</button>
     <button class="tab" data-f="done">Done</button>
     <button class="tab" data-f="all">All</button>
@@ -61,6 +62,10 @@ body{padding-bottom:70px;}
 function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 var gate=fetch('/api/auth?action=check').then(function(r){return r.json();}).then(function(d){ if(!d.authenticated) location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return !!d.authenticated; }).catch(function(){ location.href='/login.html?redirect='+encodeURIComponent(location.pathname); return false; });
 var rows = [], filter = 'open', today = '', sel = {};
+function addDays(day, n){ var d = new Date(day + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+// Open = anything due now or soon (including overdue and the next 3 days, where funerals usually fall). Upcoming = later than that.
+function isSoon(r){ return r.date <= addDays(today, 3); }
+function shortDate(d){ return new Date(d + 'T12:00:00').toLocaleDateString('en-CA', {weekday:'short', month:'short', day:'numeric'}); }
 function hm(iso){ try { return new Date(iso).toLocaleTimeString('en-CA', {hour:'numeric', minute:'2-digit'}); } catch (e) { return ''; } }
 function updateBar(){
   var ids = Object.keys(sel).filter(function(k){ return sel[k] && rows.some(function(r){ return r.id === k && r.status === 'new'; }); });
@@ -72,16 +77,21 @@ function render(){
   var shop = document.getElementById('shopSel').value;
   var list = rows.filter(function(r){
     if (shop && r.shop_code !== shop) return false;
-    if (filter === 'open') return r.status === 'new' || r.status === 'accepted';
+    if (filter === 'open') return (r.status === 'new' || r.status === 'accepted') && isSoon(r);
+    if (filter === 'upcoming') return (r.status === 'new' || r.status === 'accepted') && !isSoon(r);
     if (filter === 'new') return r.status === 'new';
     if (filter === 'done') return r.status === 'done' || r.status === 'cancelled';
     return true;
   });
+  var upN = rows.filter(function(r){ return (r.status === 'new' || r.status === 'accepted') && !isSoon(r) && (!shop || r.shop_code === shop); }).length;
+  var openN = rows.filter(function(r){ return (r.status === 'new' || r.status === 'accepted') && isSoon(r) && (!shop || r.shop_code === shop); }).length;
+  document.getElementById('tabUp').textContent = 'Upcoming' + (upN ? ' (' + upN + ')' : '');
+  document.getElementById('tabOpen').textContent = 'Open' + (openN ? ' (' + openN + ')' : '');
   var newCount = rows.filter(function(r){ return r.status === 'new'; }).length;
   document.getElementById('cnt').textContent = newCount ? '(' + newCount + ' new)' : '';
   document.title = (newCount ? '(' + newCount + ') ' : '') + 'Delivery Requests';
   var out = document.getElementById('out');
-  if (!list.length){ out.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+  if (!list.length){ out.innerHTML = '<div class="empty">' + (filter === 'open' ? 'Nothing due in the next few days.' : 'Nothing here.') + '</div>'; return; }
   var html = '', last = '';
   list.forEach(function(r){
     if (r.date !== last){ html += '<div class="day">' + esc(dayLabel(r.date)) + '</div>'; last = r.date; }
@@ -133,10 +143,15 @@ document.getElementById('sendDrivers').onclick = function(){
   var picked = rows.filter(function(r){ return sel[r.id] && r.status === 'new'; });
   if (!picked.length) return;
   var shops = {}; picked.forEach(function(r){ shops[r.shop_code] = 1; });
+  var later = picked.filter(function(r){ return r.date > today; });
+  if (later.length){
+    var ds = {}; later.forEach(function(r){ ds[shortDate(r.date)] = 1; });
+    if (!confirm(later.length + ' of these ' + (later.length === 1 ? 'is' : 'are') + ' not for today (' + Object.keys(ds).join(', ') + '). The date will be added to the offer text so drivers see it. Send to drivers now?')) return;
+  }
   var per = {}; picked.forEach(function(r){ per[r.shop_code] = (per[r.shop_code] || 0) + 1; });
   if (Object.keys(per).some(function(k){ return per[k] > 40; })){ alert('An offer holds up to 40 deliveries per shop. Select fewer, then send the rest in another round.'); return; }
   if (Object.keys(shops).length > 3){ alert('Dispatch can send up to 3 shops at once. Pick fewer shops, or send these in two rounds.'); return; }
-  var lines = picked.map(function(r){ return { id: r.id, shop_code: r.shop_code, text: r.address + (r.unit ? ' (' + r.unit + ')' : '') + (r.time_pref && r.time_pref !== 'Anytime' ? ' - ' + r.time_pref.toLowerCase() + (r.time_note ? ' ' + r.time_note : '') : '') }; });
+  var lines = picked.map(function(r){ return { id: r.id, shop_code: r.shop_code, text: r.address + (r.unit ? ' (' + r.unit + ')' : '') + (r.date !== today ? ' - ' + shortDate(r.date) : '') + (r.time_pref && r.time_pref !== 'Anytime' ? ' - ' + r.time_pref.toLowerCase() + (r.time_note ? ' ' + r.time_note : '') : '') }; });
   try { sessionStorage.setItem('scd_req_dispatch', JSON.stringify(lines)); } catch (e) { alert('Could not pass the list to Dispatch.'); return; }
   location.href = '/dispatch.html?fromreq=1';
 };
