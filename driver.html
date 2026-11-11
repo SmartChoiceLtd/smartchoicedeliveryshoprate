@@ -755,7 +755,7 @@ function getNeighbourZones(code) {
   // Suggested zone is a named out-of-town zone: offer it plus a small set
   // of commonly-adjacent out-of-town codes. "Show all zones" (below the
   // buttons) covers anything not in this short list.
-  var out = ['TSA','TSU','DEW','HPT','RVS','RVN','C5'];
+  var out = ['TSA','TSU','DEW','HPT','RWM','RVS','RVN','C5'];
   var base = [code];
   out.forEach(function(z) { if (base.indexOf(z) < 0) base.push(z); });
   return base;
