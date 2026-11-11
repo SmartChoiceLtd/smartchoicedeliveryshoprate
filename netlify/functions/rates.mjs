@@ -59,7 +59,8 @@ const DEFAULT_RATES = {
   FUN:{drate:9.75,dratex:1.5,gdpi:0.5,srate:15,sratex:3},
   FUNO:{drate:16.25,dratex:3,gdpi:1,srate:25,sratex:3},
   HOT:{drate:16.25,dratex:0,gdpi:0.5,srate:25,sratex:0},
-  HPT:{drate:14.3,dratex:1.5,gdpi:0.75,srate:23,sratex:3},
+  HPT:{drate:14.3,dratex:1.5,gdpi:0.75,srate:25,sratex:3},
+  RWM:{drate:22.5,dratex:1.5,gdpi:0.75,srate:37,sratex:3},
   HRV:{drate:26,dratex:1.5,gdpi:1.5,srate:40,sratex:3},
   KAN:{drate:45,dratex:1.5,gdpi:3,srate:65,sratex:3},
   LAN:{drate:19.5,dratex:1.5,gdpi:1,srate:30,sratex:3},
@@ -98,6 +99,7 @@ const DEFAULT_RATES = {
 //   SPLO (out of town): the event form pays the driver the zone's pay + $2.50 per extra piece and bills the shop the zone's rate + $5 per
 //        extra piece; the values below are only the fallback when SPLO is picked by hand.
 const SEASONAL_RATES = {
+  RWM:{drate:22.5,dratex:1.5,gdpi:0.75,srate:37,sratex:3},
   SPL:  { drate: 14, dratex: 2.5, gdpi: 0, srate: 20, sratex: 5 },
   SPLO: { drate: 14, dratex: 2.5, gdpi: 0, srate: 25, sratex: 5 },
 };
