@@ -9,83 +9,91 @@ function csvEscape(val) {
 function toCSVRow(fields) { return fields.map(csvEscape).join(','); }
 
 var QB_ZONE_MAP = {
-  AIR:  { product:'OUT OF TOWN:AIR',          desc:'AIRDRIE $25 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
-  BAK1: { product:'BAKERY:BAK1',              desc:'BAK1 CITY BASIC $15  1 PKG  OR AS QUOTED' },
-  BAK2: { product:'BAKERY:BAK2',              desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' },
-  BAKP: { product:'BAKERY:BAKP',              desc:'BAKERY $15 OR AS QUOTED FOR MULTIPLE PKGS AND EVENTS' },
-  BAL:  { product:'OUT OF TOWN:BAL',          desc:'BALZAC $22 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
-  BAS:  { product:'GIFT BASKETS:BAS',         desc:'GIFT BASKETS IN CITY $13/1 PIECE + $2.50 EACH EXTRA PIECE OR AS QUOTED' },
-  BEI:  { product:'OUT OF TOWN:BEI',          desc:'BEISEKER $50' },
-  BLK:  { product:'OUT OF TOWN:BLK',          desc:'BLACK DIAMOND $35 BASE RATE' },
-  BNF:  { product:'OUT OF TOWN:BNF',          desc:'BANFF BASE RATE' },
-  BPW:  { product:'OUT OF TOWN:BPW',          desc:'BEARSPAW COUNTRY ESTATES $25' },
-  BRG:  { product:'OUT OF TOWN:BRG',          desc:'BRAGG CREEK $35' },
-  BTY:  { product:'BEAUTY PRODUCTS:BTY',      desc:'BEAUTY PRODUCTS $15/1 PIECE +$1 PER EXTRA PIECE' },
-  C1:   { product:'CITY WIDE:C1',             desc:'CITY WIDE SHOP SPECIFIC $11 + $3 PER EXTRA PIECE/OR AS QUOTED' },
-  C2:   { product:'CITY WIDE:C2',             desc:'CITY WIDE $12 + $3 PER EXTRA PIECE/OR AS QUOTED' },
-  C3:   { product:'CITY WIDE:C3',             desc:'CITY WIDE $13 + $3 PER EXTRA PIECE/OR AS QUOTED' },
-  C4:   { product:'CITY WIDE:C4',             desc:'CITY WIDE SHOP SPECIFIC $14 +$3 PER EXTRA PIECE OR AS QUOTED' },
-  C5:   { product:'CITY WIDE:C5',             desc:'CITY WIDE SHOP SPECIFIC $15 + $3 PER EXTRA PIECE/OR AS QUOTED' },
-  CAN:  { product:'OUT OF TOWN:CAN',          desc:'CANMORE $80' },
-  CAR:  { product:'OUT OF TOWN:CAR',          desc:'OUT OF TOWN CARSLAND BASE $60' },
-  CHE:  { product:'OUT OF TOWN:CHE',          desc:'CHESTERMERE $25/1 PCE + $3 PER EXTRA PIECE' },
-  COC:  { product:'OUT OF TOWN:COC',          desc:'COCHRANE $30' },
-  COR:  { product:'CORPORATE:COR',            desc:'PICK UP DELIVERY AND RETURN OF CORPORATE' }, 
-  CRO:  { product:'OUT OF TOWN:CRO',          desc:'CROSSFIELD $45' },
-  DEW:  { product:'OUT OF TOWN:DEW',          desc:'DEWINTON $22' },
-  DOC:  { product:'DOCUMENTS:DOC',            desc:'DOCUMENT SERVICE PICK UP & DELIVERY $18 OR AS QUOTED' },
-  DVA:  { product:'OUT OF TOWN:DVA',          desc:'DIAMOND VALLEY $50 BASE RATE' },
-  ERV:  { product:'OUT OF TOWN:ERV',          desc:'ELBOW RIVER ESTATES $22' },
-  EVA:  { product:'OUT OF TOWN:EVA',          desc:'ELBOW VALLEY $22' },
-  FUN:  { product:'SPECIAL EVENTS:FUN',       desc:'FUNERAL $15/1 PIECE + $3/EACH EXTRA PIECE' },
-  FUNO: { product:'SPECIAL EVENTS:FUNO',      desc:'FUNERAL OUT OF TOWN $25 +$3 EACH ADDITIONAL PIECE' },
-  HOT:  { product:'CITY WIDE:HOT',            desc:'HOT SHOT RATE $25 IN ADDITION TO BASE RATE / OR AS QUOTED' },
-  HPT:  { product:'OUT OF TOWN:HPT',          desc:'HERITAGE POINT $20' },
-  HRV:  { product:'OUT OF TOWN:HRV',          desc:'HIGH RIVER $40' },
-  KAN:  { product:'OUT OF TOWN:KAN',          desc:'KANANASKIS $50' },
-  LAN:  { product:'OUT OF TOWN:LAN',          desc:'LANGDON $30' },
-  LYA:  { product:'OUT OF TOWN:LYA',          desc:'LYALTA $38' },
-  MDF:  { product:'OUT OF TOWN:MDF',          desc:'MD FOOTHILLS DEWINTON' },
-  MIL:  { product:'OUT OF TOWN:MIL',          desc:'MILLARVILLE $45 BASE RATE' },
-  NAN:  { product:'OUT OF TOWN:NAN',          desc:'NANTON $65' },
-  NCH:  { product:'NCH',                      desc:'NO CHARGE' },
-  OKO:  { product:'OUT OF TOWN:OKO',          desc:'OKOTOKS $25' },
-  PRI:  { product:'OUT OF TOWN:PRI',          desc:'PRIDDIS $30' },
-  RVS:  { product:'OUT OF TOWN:RVS',          desc:'ROCKY VIEW COUNTY SW SE $23' },
-  RVN: { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NORTH $25' },          
-  SBK:  { product:'OUT OF TOWN:SBK',          desc:'SPRINGBANK $25' },
+  AIR:  { product:'OUT OF TOWN:AIR', desc:'AIRDRIE $29 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  BAK1: { product:'BAKERY:BAK1', desc:'BAK1 CITY BASIC $15 1 PKG OR AS QUOTED' },
+  BAK2: { product:'BAKERY:BAK2', desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' },
+  BAKP: { product:'BAKERY:BAKP', desc:'BAKERY $15 OR AS QUOTED FOR MULTIPLE PKGS AND EVENTS' },
+  BAL:  { product:'OUT OF TOWN:BAL', desc:'BALZAC$22 BASE RATE $25 +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  BAS:  { product:'GIFT BASKETS:BAS', desc:'GIFT BASKETS IN CITY $13/1 PIECE + $2.50 EACH EXTRA PIECE OR AS QUOTED' },
+  BEI:  { product:'OUT OF TOWN:BEI', desc:'BEISEKER $50 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  BNF:  { product:'OUT OF TOWN:BNF', desc:'BANFF $125 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  BPW:  { product:'OUT OF TOWN:BPW', desc:'BEARSPAW COUNTRY ESTATES $26 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  BRG:  { product:'OUT OF TOWN:BRG', desc:'BRAGG CREEK $40 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  C1:   { product:'CITY WIDE:C1', desc:'CITY up to 10 km SHOP SPECIFIC $13.5 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C2:   { product:'CITY WIDE:C2', desc:'CITY 10-15 km SHOP SPECIFIC $14.5 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C3:   { product:'CITY WIDE:C3', desc:'CITY 15 to 20 km $15.5 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  C4:   { product:'CITY WIDE:C4', desc:'CITY 20-25 km SHOP SPECIFIC $16.5 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  C5:   { product:'CITY WIDE:C5', desc:'CITY WIDE SHOP SPECIFIC $17.5 + $3 PER EXTRA PIECE/OR AS QUOTED' },
+  CAN:  { product:'OUT OF TOWN:CAN', desc:'CANMORE $95 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  CAR:  { product:'OUT OF TOWN:CAR', desc:'CARSLAND BASE $60 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  CHE:  { product:'OUT OF TOWN:CHE', desc:'CHESTERMERE $29/1 PCE +$3 PER EXTRA PIECE OR AS QUOTED' },
+  COC:  { product:'OUT OF TOWN:COC', desc:'COCHRANE $32 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  COR:  { product:'CORPORATE:COR', desc:'PICK UP DELIVERY AND RETURN OF CORPORATE' },
+  CRO:  { product:'OUT OF TOWN:CRO', desc:'CROSSFIELD $45 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  DEW:  { product:'OUT OF TOWN:DEW', desc:'DEWINTON $25 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  DOC:  { product:'DOCUMENTS:DOC', desc:'DOCUMENT SERVICE PICK UP & DELIVERY $18 OR AS QUOTED' },
+  DVA:  { product:'OUT OF TOWN:DVA', desc:'DIAMOND VALLEY $50 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  ERV:  { product:'OUT OF TOWN:ERV', desc:'ELBOW RIVER ESTATES $25 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  EVA:  { product:'OUT OF TOWN:EVA', desc:'ELBOW VALLEY $25 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  FUN:  { product:'SPECIAL EVENTS:FUN', desc:'FUNERAL $17/1 PIECE + $3/EACH EXTRA PIECE' },
+  FUNO: { product:'SPECIAL EVENTS:FUNO', desc:'FUNERAL OUT OF TOWN $27+$3 EACH ADDITIONAL PIECE' },
+  HAR:  { product:'OUT OF TOWN:HAR', desc:'HARMONY $30 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  HOT:  { product:'CITY WIDE:HOT', desc:'HOT SHOT RATE $25 IN ADDITION TO BASE RATE / OR AS QUOTED' },
+  HPT:  { product:'OUT OF TOWN:HPT', desc:'HERITAGE POINT $25 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  HRV:  { product:'OUT OF TOWN:HRV', desc:'HIGH RIVER $50 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  INT:  { product:'INTERSTORE TRANSFER:INT', desc:'TRANSFER BETWEEN SHOPS IN SAME COMPANY $15 1 PCE/PLUS $2 EACH ADDITIONAL PIECE/ OR AS QUOTED' },
+  KAN:  { product:'OUT OF TOWN:KAN', desc:'KANANASKIS $65 OR AS QUOTED' },
+  LAN:  { product:'OUT OF TOWN:LAN', desc:'LANGDON $30 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  LKL:  { product:'OUT OF TOWN:LAKE LOUISE', desc:'LAKE LOUISE BASE RATE $200 OR AS QUOTED' },
+  LYA:  { product:'OUT OF TOWN:LYA', desc:'LYALTA $50 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  MDF:  { product:'OUT OF TOWN:MDF', desc:'MDFOOTHILLS DEWINTON $25 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  MIL:  { product:'OUT OF TOWN:MIL', desc:'MILLARVILLE $45 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  NAN:  { product:'OUT OF TOWN:NAN', desc:'NANTON $75' },
+  NCH:  { product:'NCH', desc:'NO CHARGE' },
+  OKO:  { product:'OUT OF TOWN:OKO', desc:'OKOTOKS $28' },
+  OLD:  { product:'OUT OF TOWN:OLD', desc:'OLDS $100 OR AS QUOTED' },
+  PRI:  { product:'OUT OF TOWN:PRI', desc:'PRIDDIS $30 + $3 PER EXTRA CASE OR AS QUOTED' },
+  QUOTE: { product:'QUOTES:QUOTE', desc:'AS QUOTED' },
+  RED:  { product:'OUT OF TOWN:RED', desc:'RED DEER $175 + $3/EACH EXTRA PIECE OR AS QUOTED' },
+  RURALKM: { product:'OUT OF TOWN:RURALKM', desc:'RURAL KM BASED 0R AS QUOTED' },
+  RVN:  { product:'OUT OF TOWN:RVN', desc:'ROCKY VIEW COUNTY NW NE $25 + $3 PER EXTRA CASE OR AS QUOTED' },
+  RVS:  { product:'OUT OF TOWN:RVS', desc:'ROCKY VIEW COUNTY SW SE $25 + $2 PER EXTRA CASE OR AS QUOTED' },
+  RWM:  { product:'RWM', desc:'REDWOOD MEADOWS $37 +$3 PER EXTRA PIECE OR AS QUOTED' },
+  SBK:  { product:'OUT OF TOWN:SBK', desc:'SPRINGBANK $27 + $2 PER EXTRA CASE OR AS QUOTED' },
   SC2:  { product:'SMARTCHOICE DELIVERY:SC2', desc:'SMART CHOICE DELIVERY SC2' },
-  SC3:  { product:'SMARTCHOICE DELIVERY:SC3', desc:'SMART CHOICE DELIVERY SC3' },
-  SET:  { product:'SPECIAL EVENTS:SET',       desc:'EVENT SET UP $35/HR/PERSON or any part thereof' },
-  SPEC: { product:'SPECIAL EVENTS:SPEC',      desc:'SPECIAL EVENTS $25 +$5 EACH ADDITIONAL PCE/ OR AS QUOTED' },
-  SPL:  { product:'SEASONAL PLANTERS:SPL',    desc:'SEASONAL PLANTERS $20 PLUS $5 EACH ADDITIONAL' },
-  SPO:  { product:'SEASONAL PLANTERS:SPO',    desc:'SEASONAL PLANTERS OUT OF TOWN: $25 OR AS QUOTED' },
-  STR:  { product:'OUT OF TOWN:STR',          desc:'STRATHMORE $35' },
-  TSA: { product:'OUT OF TOWN:TSA', desc:'TSUU TINA ADJACENT - ALPINE PARK DISTRICT $23' },
-  TSU:  { product:'OUT OF TOWN:TSU',          desc:'TSUU TSIINA' },
-  TVA:  { product:'OUT OF TOWN:TVA',          desc:'TURNER VALLEY $50' },
-  WAI:  { product:'WHOLESALE:WAI',            desc:'WHOLESALE PICK UP AIRDRIE $25 + $1.5 PER EXTRA CASE' },
-  WCH:  { product:'WHOLESALE:WCH',            desc:'WHOLESALE PICK UP CHESTERMERE $25 + $1.5 PER EXTRA CASE' },
-  WCO:  { product:'WHOLESALE:WCO',            desc:'WHOLESALE PICK UP COCHRANE $30 +$1.5 PER EXTRA CASE' },
-  WED:  { product:'SPECIAL EVENTS:WED',       desc:'WEDDING IN CITY $25 BASE + $5/EACH ADDITIONAL PIECE' },
-  WEDO: { product:'SPECIAL EVENTS:WEDO',      desc:'WEDDING OUT OF TOWN BASE RATE PLUS $5 PER EXTRA PCE / OR AS QUOTED' },
-  WHR:  { product:'WHOLESALE:WHR',            desc:'WHOLESALE PICK UP HIGH RIVER $40 BASE+ $1.5 PER EXTRA CASE' },
-  WLO:  { product:'WHOLESALE:WLO',            desc:'WHOLESALE PICK UP LONGVIEW $60 + $1.5 PER EXTRA CASE' },
-  WLY:  { product:'WHOLESALE:WLY',            desc:'OUT OF TOWN WHOLESALE - LYALTA BASE RATE $38 PLUS $1.5 FOR EACH ADDITIONAL CASE' },
-  WPH:  { product:'WHOLESALE:WPH',            desc:'WHOLESALE PICK UP AIRPORT $15 + $1 PER EXTRA CASE' },
-  WPO:  { product:'WHOLESALE:WPO',            desc:'WHOLESALE PICK UP OKOTOKS $25 + $1.5 EXTRA CASE' },
-  WPU:  { product:'WHOLESALE:WPU',            desc:'WHOLESALE PICK UP $15 + $1.5 EXTRA CASE +SEASONAL GREENS $1.5 PER EXTRA CASE' },
-  WST:  { product:'WHOLESALE:WST',            desc:'WHOLESALE PICK UP STRATHMORE $38 + $1.5 PER EXTRA CASE' },
-  WTV:  { product:'WHOLESALE:WTV',            desc:'WHOLESALE PICK UP TURNER VALLEY $50 + $1.5 PER EXTRA CASE' },
-  WBR:  { product:'WHOLESALE:WBR',            desc:'WHOLESALE PICK UP BRAGG CREEK $40 + $1.5 PER EXTRA CASE' },
+  SC3:  { product:'SMARTCHOICE DELIVERY:SC3', desc:'SMART CHOICE DELIVERY SC3' }, // inactive in QuickBooks until needed
+  SET:  { product:'SPECIAL EVENTS:SET', desc:'EVENT SET UP $35/HR/PERSON or any part thereof' },
+  SP2:  { product:'SEASONAL PLANTERS:SP2', desc:'SEASONAL PLANTERS PAIR PLUS $5 PER EXTRA' },
+  SPEC: { product:'SPECIAL EVENTS:SPEC', desc:'SPECIAL EVENTS $27 +$5 EACH ADDITIONAL PCE/ OR AS QUOTED' },
+  SPL:  { product:'SEASONAL PLANTERS:SPL', desc:'SEASONAL PLANTERS $20 PLUS $5 EACH ADDITIONAL' },
+  SPLO: { product:'SEASONAL PLANTERS:SPLO', desc:'SEASONAL PLANTERS OUT OF TOWN: ZONE RATE PLUS $5 EACH ADDITIONAL' },
+  SPO:  { product:'SPECIAL EVENTS:SPECIAL EVENTS - OUTOF TOWN', desc:'SPECIAL EVENTS OUT OF TOWN AS QUOTED' },
+  STR:  { product:'OUT OF TOWN:STR', desc:'STRATHMORE $38 +TSUUT\'INA WITHIN $10 KM OF CITY LIMITS OR RURAL KM BEYOND 10 KM + $2 PER EXTRA CASE OR AS QUOTED' },
+  TSA:  { product:'OUT OF TOWN:TSA', desc:'TSUUT\'INA ADJACENT COMMUNITIES $25 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  TSU:  { product:'OUT OF TOWN:TSU', desc:'TSUUT\'INA WITHIN $10 KM OF CITY LIMITS OR RURAL km beyond 10 KM + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WAI:  { product:'WHOLESALE:WAI', desc:'WHOLESALE PICK UP AIRDRIE $29 + $2 PER EXTRA CASE + $2 Seasonal Greens' },
+  WCH:  { product:'WHOLESALE:WCH', desc:'WHOLESALE PICK UP CHESTERMERE $29 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WCO:  { product:'WHOLESALE:WCO', desc:'WHOLESALE PICK UP COCHRANE $32 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WED:  { product:'SPECIAL EVENTS:WED', desc:'WEDDING IN CITY $27 BASE + $5/EACH ADDITIONAL PIECE or As Quoted' },
+  WEDO: { product:'SPECIAL EVENTS:WEDO', desc:'WEDDING OUT OF TOWN BASE RATE PLUS $5 PER EXTRA PCE / OR AS QUOTED' },
+  WHR:  { product:'WHOLESALE:WHR', desc:'WHOLESALE PICK UP HIGH RIVER $50 BASE+ $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WLO:  { product:'WHOLESALE:WLO', desc:'WHOLESALE PICK UP LONGVIEW $60 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WLY:  { product:'WHOLESALE:WLY', desc:'WHOLESALE OUT OF TOWN- LYALTA $50 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WPH:  { product:'WHOLESALE:WPH', desc:'WHOLESALE PICK HOLLAND $20 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WPO:  { product:'WHOLESALE:WPO', desc:'WHOLESALE PICK UP OKOTOKS $28 + $2 PER EXTRA CASE+$2 Seasonal Greens' },
+  WPU:  { product:'WHOLESALE:WPU', desc:'WHOLESALE PICK UP $17 + $2 EXTRA CASE +SEASONAL GREENS $2 PER EXTRA CASE' },
+  WRU:  { product:'WHOLESALE:WRU', desc:'WHOLESALE OVER 20 KM $20 PLUS $2 PER EXTRA CASE' },
+  WST:  { product:'WHOLESALE:WST', desc:'WHOLESALE PICK UP STRATHMORE $38 + $2 PER EXTRA CASE' },
 };
+
+var NO_DIRECT_BILL = { LB:1, MZ:1, SK:1, BE:1 };
 
 var QB_CUSTOMERS = {
   AC:'GROWER DIRECT ACADIA', AF:'AL FRACHE FLOWERS LTD', AL:"ALLAN'S FLOWERS",
   ALP:'ALPINE BLOOMS', AM:'AMAZING FLORAL WHOLESALE LTD', AMB:'Amborella Floral Studio Inc',
   AV:'AVENIDA FLOWERS', B9:'BLOOMS ON 9TH',
   BA:'BERNARD ANDERSON', BAD:'BLOOMS & DESIGN', BBB:'BLOOM BY BUNCHES',
-  BB:'BB BASKETS  INC',BE:'BLACK EARTH', BEN:'BENJI BLOOMS', BK:'BASKETS & BEYOND',
+  BB:'BB BASKETS  INC',BEN:'BENJI BLOOMS', BK:'BASKETS & BEYOND',
   BOP:'BIRD OF PARADISE FLORAL STUDIO', BQ:'BRIE & BANQUET', BV:'BONAVISTA FLOWERS',
   BY:'BLOSSOMS YYC', CE:'CREATIVE EDGE', CF:'CLAEREN FLOWERS',
   CH:'CASHYN HOMES', CK:'CHICKWEED FLORALS', CLF:'CALGARY LOCAL FLORIST',
@@ -94,31 +102,35 @@ var QB_CUSTOMERS = {
   DE:'DEEVINE', DF:'DAHLIA FLOWERS', DO:'DESIGNING ON THE EDGE', DV:'DEER VALLEY FLORIST',
   FN:'FLOWER AURA BY NATASHA', FA:'FLOWER ARTISTRY', FB:'FLOWERS & BEYOND',
   FCU:'FLOWER CULTURE', FC:'FLOWER CENTER', FHY:'FLORAL HAVEN YYC',
-  FI:'Finesse Flowers Inc.', FJ:'flowers by JANIE', FLO:'DEYAR FLOART STUDIO',
+  FI:'Finesse Flowers Inc.', FJ:"JANIE", FLO:'DEYAR FLOART STUDIO',
   FL:'FLEURISH', FM:'FLOWER MAGIC', FO:'FORGET ME NOT FLOWERS',
   FPA:'FUNKY PETALS AIRDRIE', FPK:'FUNKY PETALS KENSINGTON', FS:'FLORISTS SUPPLY',
   FV:'FOXGLOVE STUDIO', FW:'FLOWER WHISPERS', FX:'FLOWER CHIX',
   GF:'GARDENIA FLOWERS', GR:'GYPSY ROSE', HB:'HOUSE OF BLOOMS',
   HC:'LAURIE DAVIDGE', HH:'HOLLAND HOUSE FLOWERS', HP:'Hawthorn Plains',
   IF:'INCREDIBLE FLORIST GROUP', IT:'ITINERANTE FLOWERS', KF:'KENSINGTON FLORIST MK',
-  LB:'LAUREN BELL', LM:'LA MAISON FLOWER STUDIO', MA:'MANDALA FLORAL INC',
+  LM:'LA MAISON FLOWER STUDIO', MA:'MANDALA FLORAL INC',
   MB:'MBS CANADA', MFM:'MARLOW FLORAL WORKS MISSION', MFS:'MARLOW FLORAL WORKS SOUTH CENTRE',
   MM:'MICHELE MASTERSON BOTANICAL DESIGN', MR:'MAY ROSE FLORIST', MY:'MY FLORIST',
-  MZ:'MENZIES', NB:'NUTRITION & BEYOND', NR:'NECTARE & ROOT',
+  NB:'NUTRITION & BEYOND', NR:'NECTARE & ROOT',
   NW:'Northwest Florist Ltd.', OA:'OASIS FLOWER SHOP', OF:'OKOTOKS FLOWERS',
   OR:'OLIVER REAL ESTATE INC', OT:'Orso Trades Inc', PA:'PANDA 130',
   PCA:'PANDA CANADA', PCO:'PANDA COCHRANE', PCR:'TOUCH OF PETALS/PANDA CROWFOOT',
   PD:'POSH DESIGNS', PO:'PURPLE ORCHID', PS:'PRETTY SWEET',
   PSU:'PANDA SUNRIDGE', QF:'QFRESH LOGISTICS', SB:'SBe Wholesale Flowers',
-  SCV:'SWEET CAKES BY VERNZ', SF:'SMALL FLOWER BOUTIQUE', SK:'SK FLORIST',
+  SCV:'SWEET CAKES BY VERNZ', SF:'SMALL FLOWER BOUTIQUE', 
   SR:'SWEET ROOTS STUDIO', SRS:'SWEET ROOTS STUDIO', SV:'Savannah Flowers Corp',
-  SW:'SWEET WILLIAMS CO', SZ:'STEMZ FLORIST & TREASURES', TD:'TRIMS & DREAMS',
+  SW:'SWEET WILLIAMS CO FLORAL', SZ:'STEMZ FLORIST & TREASURES', TD:'TRIMS & DREAMS',
   TF:'THALEA FLOWERS', TH:'TREEHOUSE', TNX:'TNX TROPICAL',
-  TP:'TOUCH OF PETALS', TW:'TWIGS & COMPANY', UR:'Urban Roots Home',
-  VA:'VAVA BLOOM', VC:'VIOvar & CO', VCW:'VILLAGE CRAFT WINEMAKER',
+  TP:"TOUCH OF PETALS/PANDA CROWFOOT", TW:'TWIGS & COMPANY', UR:'Urban Roots Home',
+  VA:'VAVA BLOOM', VC:"VIOLET & CO", VCW:'VILLAGE CRAFT WINEMAKER',
   VT:'VINTAGE THISTLE STETTLER', WA:'WILD ABOUT FLOWERS',
   WF:'WILDFLOWERS AT KENSINGTON', WFW:'WEAVER FLORAL WHOLESALE', WO:'WILD ORCHID',
   YA:'YARA FLOWERS LTD', YR:'YRENE RAMIREZ',
+  // Added from the Nov 8 shop list. Matched to an existing QuickBooks customer, or (last block) a clean new name that QuickBooks creates on import.
+  EF:"ENCHANTED FLORIST LTD", EP:"ENCHANTED PETALS", FT:"FLOWERS AT THE MARKET", FNS:"FLOWER AURA BY NATASHA", FXN:"FLOWER CHIX", IG:"NATHAN REVOAL", LKB:"LUKES DRUGMART", LKK:"LUKES DRUGMART", MF:"MICHELLE",
+  // No QuickBooks customer found:
+  BC:"BETACUTS", BOB:"BOY O BOY", BU:"BLOOMS & BUTTERFLIES", DEV:"DEVOUR CATERING", FD:"FLORAL DELIVERY", FF:"FALL FOR FLORALS", FG:"FLOWER GALLERY", HV:"HOME VINTER", LFW:"LYNN FLETCHER WEDDINGS", LOT:"LOTTA FLOWERS", LP:"LAUREN PLANTE", LS:"LAUREN STUDIO", LU:"LUNA BLOOM", MJ:"MARKET JUNCTION", ML:"MANUEL LATRUWE", VBH:"SWEET CAKES BY VERNZ", WFC:"WILD FLORALS & CO", WH:"WHIPTT", WHF:"WHITE'S FLOWERS",
 };
 
 function formatDateQB(d) {
@@ -195,8 +207,8 @@ export default async (req) => {
     try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
     // Default rates fallback
-    var DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:20,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
-    var DEFAULT_SRATEX = { C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
+    var DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:25,RWM:37,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
+    var DEFAULT_SRATEX = { HPT:3,RWM:3,C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
  function parseOrderDate(o) {
@@ -240,6 +252,8 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         }
       }
 
+      // Clients of wholesalers: not billed directly, so no QuickBooks invoice (the wholesaler is billed through billing_party, handled above).
+      if (NO_DIRECT_BILL[shopCode]) return;
       if (!shopCode) return;
       if (!shopGroups[shopCode]) shopGroups[shopCode] = {};
 
@@ -258,8 +272,13 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         amount = srate + (pieces - 1) * sratex;
       }
 
-      if (!shopGroups[shopCode][zone]) shopGroups[shopCode][zone] = 0;
-      shopGroups[shopCode][zone] += amount;
+      // Christmas greens upcharge (a quoted delivery's price already includes everything).
+      if (!o.quote_id && !o.shop_pay_source && o.xmas_pieces) amount += o.xmas_pieces * (parseFloat(o.xmas_shop_rate) || 0);
+
+      // Deliveries on an event quote get their own invoice line, labelled with the quote number.
+      var gKey = o.quote_id ? zone + '|' + o.quote_id : zone;
+      if (!shopGroups[shopCode][gKey]) shopGroups[shopCode][gKey] = 0;
+      shopGroups[shopCode][gKey] += amount;
     });
 
     // Build QB invoice date info
@@ -267,9 +286,17 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var weekEndFormatted = `${months[weekEndDate.getMonth()]} ${weekEndDate.getDate()} ${weekEndDate.getFullYear()}`;
     var invoiceDate = formatDateQB(weekEndDate);
-    var memo = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`;
+    var memo = `WEEK ENDING ${weekEndFormatted}`;
+    var notes = `WEEK ENDING ${weekEndFormatted} Details Attached Thank you for your business.`; // the former Memo text, now in its own Notes column
 
-    var headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo',
+    var quoteNames = {};
+    try {
+      var qStore = getStore('flower-event-quotes');
+      var qIds = [...new Set(weekOrders.map(o => o.quote_id).filter(Boolean))];
+      await Promise.all(qIds.map(async id => { var qq = await qStore.get(id, { type: 'json' }).catch(() => null); if (qq && qq.event) quoteNames[id] = qq.event.name || ''; }));
+    } catch (e) {}
+
+    var headers = ['*InvoiceNo','*Customer','*InvoiceDate','*DueDate','Terms','Location','Memo','Notes',
       'Item(Product/Service)','ItemDescription','ItemQuantity','ItemRate','*ItemAmount','*ItemTaxCode','ItemTaxAmount'];
 
     var rows = [];
@@ -294,7 +321,9 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
 
         var amount = parseFloat(zones[zone].toFixed(2));
         if (amount <= 0) return;
-        var qb = QB_ZONE_MAP[zone] || { product: zone, desc: zone };
+        var zn = zone.split('|')[0], qid = zone.split('|')[1] || '';
+        var qb = QB_ZONE_MAP[zn] || { product: zn, desc: zn };
+        if (qid) qb = { product: (QB_ZONE_MAP.QUOTE ? QB_ZONE_MAP.QUOTE.product : qb.product), desc: ('QUOTE ' + qid + (quoteNames[qid] ? ' ' + quoteNames[qid] : '')).toUpperCase() };
 
        rows.push(toCSVRow([
           invoiceNo,
@@ -304,6 +333,7 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
           firstLine ? 'Due on receipt' : '',
           '',
           firstLine ? memo : '',
+          firstLine ? notes : '',
           qb.product,
           qb.desc,
           1,
