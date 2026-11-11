@@ -2,1907 +2,1000 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="SCD Driver">
-<meta name="theme-color" content="#0C769E">
-<link rel="manifest" id="manifestLink" href="/manifest.json">
-<script>
-// Point the manifest link at a per-driver manifest so "Add to Home Screen"
-// launches back into THIS driver's own /driver/:code page instead of the
-// generic /driver/ (no code) start_url a static manifest.json is stuck with.
-// Runs synchronously in <head>, before the browser evaluates installability.
-(function () {
-  var parts = location.pathname.split('/').filter(Boolean);
-  var code = parts[1] ? parts[1].toLowerCase() : '';
-  if (code) {
-    document.getElementById('manifestLink').setAttribute('href', '/api/manifest?code=' + encodeURIComponent(code));
-  }
-})();
-</script>
-<link rel="apple-touch-icon" href="/icon-180.png">
-<title>Smart Choice Delivery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calgary delivery quote tool</title>
 <style>
-:root{--bg:#FAF7F2;--card:#fff;--ink:#2B2620;--ink-soft:#6B6256;--border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;--radius:12px;--green:#2C6B2C;--green-soft:#EAF4EA;}
-*{box-sizing:border-box;}html,body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-[hidden]{display:none !important;}
-.topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
-.topbar h1{font-family:Georgia,serif;font-size:17px;font-weight:600;margin:0;flex:1;}
-.driver-badge{background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;}
-.container{max-width:540px;margin:0 auto;padding:16px;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
-.card h2{font-family:Georgia,serif;font-size:15px;font-weight:600;margin:0 0 14px;}
-.toggle-row{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.toggle-btn{flex:1;padding:8px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);font-weight:500;}
-.toggle-btn.active{background:var(--accent);color:#fff;font-weight:700;}
-.field{margin-bottom:14px;}
-.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.04em;}
-.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
-.field textarea{resize:vertical;min-height:70px;}
-.field-row{display:flex;gap:10px;}
-.field-row .field{flex:1;}
-.zone-result{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:6px;display:flex;align-items:center;justify-content:space-between;}
-.zone-code{font-size:20px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
-.zone-desc{font-size:12px;color:var(--ink-soft);}
-.zone-loading{color:var(--ink-soft);font-size:13px;padding:8px 0;}
-.pay-preview{background:var(--green-soft);border:1px solid #A8CFA8;border-radius:10px;padding:12px 14px;margin-top:10px;}
-.pay-amount{font-size:22px;font-weight:700;color:var(--green);font-family:Georgia,serif;}
-.pay-breakdown{font-size:12px;color:var(--green);margin-top:2px;}
-.zone-buttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.zone-btn{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;}
-.zone-btn:hover{border-color:var(--accent);color:var(--accent);}
-.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.status-btn{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:13px;cursor:pointer;text-align:center;}
-.status-btn.selected{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
-.btn{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;}
-.btn:disabled{opacity:0.5;cursor:default;}
-.btn-secondary{background:transparent;color:var(--accent);border:2px solid var(--accent);}
-.error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
-.success{background:var(--green-soft);border:1px solid #A8CFA8;color:var(--green);padding:16px;border-radius:10px;text-align:center;}
-.success h3{font-family:Georgia,serif;font-size:18px;margin:0 0 6px;}
-.loading-screen{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px;color:var(--ink-soft);}
-.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.shop-search-wrap{position:relative;}
-.shop-dd{position:absolute;z-index:200;background:#fff;border:1px solid var(--border);border-radius:10px;max-height:240px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.1);display:none;}
-.shop-dd-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
-.shop-dd-item:last-child{border-bottom:none;}
-.shop-dd-item:hover{background:var(--accent-soft);}
-.shop-dd-header{padding:5px 12px;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;background:var(--bg);}
-#submitBtn{background:var(--warm);}
+  :root{
+    --bg:#FAF7F2;--card:#FFFFFF;--ink:#2B2620;--ink-soft:#6B6256;
+    --border:#E6DECF;--accent:#0C769E;--accent-soft:#D6EEF7;--warm:#B8472B;--warm-soft:#F4DCC9;
+        --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  [hidden]{display:none !important;}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 4px;}
+  .topbar{background:var(--card);border-bottom:3px solid var(--warm);padding:14px 20px;display:flex;align-items:center;gap:12px;}
+  .topbar h1{font-size:19px;flex-shrink:0;}
+  .topbar span{color:var(--ink-soft);font-size:13px;}
+  .key-gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .key-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:480px;width:100%;}
+  .key-card p{color:var(--ink-soft);font-size:14px;line-height:1.6;}
+  .error{background:#FBEAEA;border:1px solid #E3B3AE;color:#7A2E22;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer;font-weight:600;}
+  .btn:hover{opacity:0.92;}.btn:disabled{opacity:0.5;cursor:default;}
+  .btn-sm{padding:6px 12px;font-size:13px;}
+  .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+  .layout{flex:1;display:flex;min-height:0;}
+  .sidebar{width:380px;flex-shrink:0;border-right:1px solid var(--border);background:var(--card);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;}
+  .panel{border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+  .panel h2{font-size:14px;}
+  .hint{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-top:6px;}
+  .shop-item-wrap{margin-bottom:8px;}
+  .shop-item{width:100%;text-align:left;background:none;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;font-size:13px;}
+  .shop-item.active{border-color:var(--accent);background:var(--accent-soft);}
+  .shop-item .addr{display:block;color:var(--ink-soft);font-size:11px;margin-top:2px;}
+  #addShopForm input,#destinationInput{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;}
+  .pricing-section h3{font-size:12px;color:var(--ink-soft);margin:10px 0 4px;padding-top:8px;border-top:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
+  .pricing-section h3:first-child{border-top:none;margin-top:0;}
+  .pricing-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;}
+  .pricing-group summary{padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg);list-style:none;display:flex;align-items:center;justify-content:space-between;}
+  .pricing-group summary::-webkit-details-marker{display:none;}
+  .pricing-group summary::after{content:'+';font-size:16px;color:var(--ink-soft);}
+  .pricing-group[open] summary::after{content:'\2212';}
+  .pricing-group[open] summary{border-bottom:1px solid var(--border);}
+  .pricing-group>table,.pricing-group>h3{margin:0 12px;}
+  .pricing-group>table{width:calc(100% - 24px);margin-top:8px;margin-bottom:10px;}
+  .pricing-group>div{margin:10px 12px;}
+  table.pricing{width:100%;border-collapse:collapse;font-size:13px;}
+  table.pricing th,table.pricing td{padding:5px 4px;border-bottom:1px solid var(--border);text-align:left;}
+  .swatch-box{width:13px;height:13px;border-radius:3px;display:inline-block;vertical-align:middle;}
+  table.pricing input[type=number]{width:68px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:13px;}
+  /* quote type toggle */
+  .toggle-row{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .toggle-row button{flex:1;padding:7px;font-size:13px;border:none;background:none;cursor:pointer;color:var(--ink-soft);}
+  .toggle-row button.active{background:var(--accent);color:#fff;font-weight:600;}
+  /* piece count row */
+  .piece-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;}
+  .piece-row label{color:var(--ink-soft);white-space:nowrap;}
+  .piece-row input{width:60px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+  /* wholesale badge */
+  .badge-ws{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#E8F4E8;color:#2C6B2C;margin-right:6px;}
+  .quote-result{margin-top:10px;font-size:13px;}
+  .quote-card{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--bg);}
+  .quote-price{font-size:26px;font-weight:700;color:var(--accent);font-family:Georgia,serif;}
+  .quote-meta{color:var(--ink-soft);font-size:12px;line-height:1.7;margin-top:4px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent);margin-right:6px;}
+  .quote-contact{background:#EAF4EA;border:1px solid #A8CFA8;color:#2C5F2C;padding:12px;border-radius:10px;font-size:13px;line-height:1.6;}
+  .quote-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .map-wrap{flex:1;position:relative;}
+  #map{position:absolute;inset:0;}
+  .legend{position:absolute;bottom:16px;left:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);max-height:70vh;overflow-y:auto;}
+  .legend-row{display:flex;align-items:center;gap:6px;margin:2px 0;}
+  .legend-section{font-weight:700;font-size:10px;color:var(--ink-soft);margin:6px 0 2px;text-transform:uppercase;letter-spacing:0.05em;}
+  .iw{font-size:13px;min-width:180px;}
+  .iw-title{font-weight:700;margin-bottom:4px;}
+  .iw-row{margin-bottom:6px;color:var(--ink-soft);}
+  .iw-row select{padding:4px;border-radius:6px;border:1px solid var(--border);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal{background:var(--card);border-radius:var(--radius);max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:28px;}
+  .modal h2{font-size:18px;margin-bottom:4px;}
+  .modal-sub{color:var(--ink-soft);font-size:13px;margin-bottom:16px;}
+  .modal table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;}
+  .modal table th{text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);}
+  .modal table td{padding:6px 8px;border-bottom:1px solid var(--border);}
+  .modal-actions{display:flex;gap:8px;margin-top:4px;}
+  .modal h3{font-size:13px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin:16px 0 6px;}
+  @media print{.modal-actions{display:none;}.topbar,.sidebar,.map-wrap{display:none;}.modal-bg{position:static;background:none;padding:0;}.modal{max-height:none;box-shadow:none;}}
+  @media(max-width:880px){.layout{flex-direction:column;}.sidebar{width:auto;border-right:none;border-bottom:1px solid var(--border);max-height:55vh;}}
 </style>
 </head>
 <body>
-
-<div id="loadingScreen" class="loading-screen">
-  <div class="spinner"></div>
-  <p>Loading...</p>
+<div class="topbar">
+  <h1>Calgary delivery quote tool</h1>
+  <span id="topbarSubtitle">Community-based zone pricing, per shop</span>
+  <span id="diagStatus" style="margin-left:auto;color:var(--accent);font-weight:600;font-size:12px;"></span>
 </div>
-
-<div id="notFound" hidden>
-  <div class="container" style="padding-top:40px;text-align:center;">
-    <p style="color:var(--ink-soft);">Driver link not found. Check your link or contact your dispatcher.</p>
+<div class="key-gate" id="keyGate">
+  <div class="key-card">
+    <h2>Loading&hellip;</h2>
+    <p id="loadingMsg" style="color:var(--ink-soft);">Connecting&hellip;</p>
+    <div class="error" id="keyError" hidden></div>
   </div>
 </div>
-
-<div id="app" hidden>
-  <div class="topbar">
-    <h1>Smart Choice Delivery</h1>
-    <span class="driver-badge" id="driverBadge"></span>
-  </div>
-  <div class="container">
-    <div id="errorMsg" class="error" hidden></div>
-    <div id="draftRestoredMsg" class="success" hidden></div>
-
-    <a href="#" id="backToRouteLink" class="btn btn-ghost" style="margin-bottom:6px;display:block;text-align:center;">&larr; My Route (scan more, or see your queue)</a>
-    <a href="#" id="clearFormLink" style="display:block;text-align:center;font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Clear form and start over</a>
-
-    <div class="toggle-row" id="deliveryTypeToggle" style="margin-bottom:16px;">
-      <button class="toggle-btn active" data-type="store">Store to Door</button>
-      <button class="toggle-btn" data-type="wholesale">Wholesale</button>
-      <button class="toggle-btn" data-type="events">Events / Seasonal</button>
-    </div>
-
-    <div class="card">
-      <h2>Delivery Details</h2>
-      <div class="field-row">
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="fDate">
+<div id="lookupNotFound" class="key-gate" hidden>
+  <div class="key-card"><h2>Shop not found</h2><p>This link does not match a shop on file.</p></div>
+</div>
+<div class="layout" id="mainApp" hidden>
+  <aside class="sidebar">
+   <section class="panel" id="lookupBanner" hidden></section>
+   <section class="panel" id="shopsPanel">
+      <h2>Shops</h2>
+      <input type="text" id="shopSearch" placeholder="Search shops..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;margin-bottom:8px;">
+      <div id="shopList"></div>
+      
+    </section>
+    <section class="panel" id="pricingPanel" hidden>
+      <h2>Zone pricing &mdash; <span id="pricingShopName"></span></h2>
+      <div style="margin-bottom:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+        <label style="display:block;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Copy zone setup from another shop</label>
+        <div style="display:flex;gap:6px;">
+          <select id="copyFromShopSelect" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;"></select>
+          <button class="btn btn-sm" id="copyFromShopBtn" style="flex-shrink:0;">Copy</button>
         </div>
-        <div class="field">
-          <label>Order ID</label>
-          <input type="text" id="fOrderId" placeholder="Tag code" inputmode="numeric" maxlength="9">
-        </div>
+        <p class="hint" style="margin-top:6px;">Copies zone prices, community overrides, and town rates. Overwrites this shop's current setup.</p>
       </div>
-      <div class="field" id="eventTypeField" hidden>
-        <label>Event Type</label>
-        <select id="fEventType">
-          <option value="" disabled selected>Select event type...</option>
-          <option value="SPEC">Special Event</option>
-          <option value="WED">Wedding</option>
-          <option value="FUN">Funeral</option>
-          <option value="SPL">Seasonal Planter</option>
-        </select>
-        <p id="eventTypeNote" hidden style="font-size:11px;color:var(--ink-soft);margin:4px 0 0;"></p>
+      <div class="pricing-section" id="pricingBody"></div>
+      <div style="margin-top:10px;display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" id="priceSheetBtn" style="flex:1;">View / print pricing sheet</button>
+        <button class="btn btn-sm btn-ghost" id="communityDistancesBtn" style="flex:1;">Community distances</button>
       </div>
-      <div class="field" id="quoteField" hidden>
-        <label>Quote # (only if this job was quoted)</label>
-        <input type="text" id="fQuote" placeholder="Q-2026-0001" autocapitalize="characters" autocomplete="off" maxlength="14">
-        <p style="font-size:11px;color:var(--ink-soft);margin:3px 0 0;">The year is filled in. Type just the quote number, e.g. 2 or 0002.</p>
-        <p id="quoteNote" hidden style="font-size:12px;margin:4px 0 0;"></p>
+      <button class="btn btn-sm btn-ghost" id="communityPriceListBtn" style="width:100%;margin-top:6px;">View / print community price list</button>
+      <p class="hint">Click any Calgary community on the map to override its zone.</p>
+    </section>
+    <section class="panel">
+      <h2>Get a quote</h2>
+      <div class="toggle-row" id="quoteTypeToggle">
+        <button class="active" data-type="retail">Retail</button>
+        <button data-type="wholesale">Wholesale</button>
+        <button data-type="wedding">Wedding</button>
+        <button data-type="funeral">Funeral</button>
+        <button data-type="event">Special event</button>
       </div>
-      <div class="field" id="wholesalerField" hidden>
-        <label>Pick Up From (Wholesaler)</label>
-        <select id="fWholesaler">
-          <option value="">Select wholesaler...</option>
-          <option value="AM">AM AMAZING FLORAL WHOLESALE</option>
-          <option value="WFW">WFW WEAVER FLORAL WHOLESALE</option>
-          <option value="BA">BA BERNARD ANDERSON</option>
-          <option value="FC">FC FLOWER CENTER</option>
-          <option value="FS">FS FLORISTS SUPPLY</option>
-          <option value="SV">SV SAVANAH</option>
-          <option value="QF">QF QFRESH LOGISTICS</option>
-          <option value="SB">SB SBE WHOLESALE</option>
+      <div class="piece-row" id="pieceRow" hidden>
+        <label id="pieceLabel">Number of pieces:</label>
+        <input type="number" id="pieceCount" min="1" value="1">
+      </div>
+      <div class="piece-row" id="funoRow" hidden>
+        <label for="funoPick">Cemetery (FUNO):</label>
+        <select id="funoPick">
+          <option value="">Not listed / use address</option>
+          <option value="edenbrook">Edenbrook (Springbank)</option>
+          <option value="choice">Choice Memorial Garden (Rocky View)</option>
+          <option value="mountainview">Mountain View (Rocky View)</option>
         </select>
       </div>
-      <div class="field" id="billingQueryField" hidden>
-        <label>Invoice To</label>
-        <p style="font-size:11px;color:var(--ink-soft);margin:4px 0 6px;">WFW, FS &amp; SV default to Wholesaler. All others default to Receiving Shop. Override only if billing differs.</p>
-        <div class="toggle-row" id="billingToggle" style="margin-top:4px;">
-          <button class="toggle-btn" data-billing="wholesaler">Wholesaler</button>
-          <button class="toggle-btn active" data-billing="shop">Receiving Shop</button>
-        </div>
+      <div class="piece-row" id="quotedRow" hidden>
+        <label for="eventQuoted">Quoted price, if agreed ($):</label>
+        <input type="number" id="eventQuoted" min="0" step="0.01" placeholder="Leave blank to use WED / WEDO guidelines">
       </div>
-      <div class="field">
-        <label id="shopLabel">Shop</label>
-        <div class="shop-search-wrap">
-          <input type="text" id="fShopSearch" placeholder="Search shop..." autocomplete="off">
-          <input type="hidden" id="fShop">
-          <div class="shop-dd" id="fShopDropdown"></div>
-        </div>
+      <div class="piece-row" id="setupRow" hidden>
+        <label>Setup crew (people):</label>
+        <input type="number" id="setupPeople" min="0" value="0">
+        <label>Setup hours each:</label>
+        <input type="number" id="setupHours" min="1" step="0.5" value="1">
       </div>
-      <div class="field" id="recipientNameField">
-        <label>Recipient Name</label>
-        <input type="text" id="fName" placeholder="Name or company">
-      </div>
-      <div class="field" id="recipientPhoneField">
-        <label>Recipient Phone (optional)</label>
-        <input type="tel" id="fPhone" inputmode="tel" autocomplete="off" placeholder="403-555-0123">
-      </div>
-      <div class="field" id="callRow" hidden>
-        <a id="callLink" href="#" style="display:block;text-align:center;padding:12px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);font-weight:700;font-size:15px;text-decoration:none;">&#9742; Call recipient</a>
-      </div>
-      <div class="field" id="textRow" hidden>
-        <label>Text recipient (opens your messages, you tap Send)</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <button type="button" data-sms="door" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left at door</button>
-          <button type="button" data-sms="neighbour" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with neighbour</button>
-          <button type="button" data-sms="reception" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Left with reception</button>
-          <button type="button" data-sms="address" style="padding:10px 8px;border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:10px;font-size:13px;font-weight:600;">Need correct address</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>Delivery Address</label>
-        <input type="text" id="fAddress" placeholder="Start typing address...">
-        <div class="field-row" style="margin-top:8px;">
-          <div class="field" style="margin-bottom:0;">
-            <input type="text" id="fUnit" placeholder="Unit / Suite / Apt #">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <input type="text" id="fTimeRequest" placeholder="Time req. e.g. <2, >3" maxlength="20">
-          </div>
-        </div>
-        <div id="zoneResult" hidden>
-          <div class="zone-result">
-            <div>
-              <div class="zone-code" id="zoneCode">-</div>
-              <div class="zone-desc" id="zoneDesc"></div>
-            </div>
-            <button onclick="overrideZone()" style="font-size:12px;color:var(--ink-soft);background:none;border:none;cursor:pointer;text-decoration:underline;">Change</button>
-          </div>
-          <div class="pay-preview" id="payPreview" hidden>
-            <div class="pay-amount" id="payAmount"></div>
-            <div class="pay-breakdown" id="payBreakdown"></div>
-          </div>
-        </div>
-        <div id="zoneLoading" class="zone-loading" hidden>Looking up zone...</div>
-        <div id="zoneManual" hidden>
-          <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 6px;">Select zone:</p>
-          <div class="zone-buttons" id="zoneButtons"></div>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Total Pieces</label>
-          <input type="number" id="fPieces" min="1" value="1">
-        </div>
-        <div class="field" id="xmasField" hidden>
-          <label>Xmas Greens</label>
-          <input type="number" id="fXmas" min="0" value="" placeholder="0" inputmode="numeric">
-        </div>
-        <div class="field">
-          <label>Delivery Time</label>
-          <input type="time" id="fTime">
-        </div>
-      </div>
-      <p id="xmasNote" hidden style="font-size:12px;color:var(--ink-soft);margin:-4px 0 10px;"></p>
-      <div class="field" style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="fRush" style="width:20px;height:20px;">
-        <label for="fRush" style="margin:0;font-weight:600;">Rush / Hotshot Delivery (adds premium)</label>
-      </div>
-    </div>
-
-    <div class="card" id="statusCard">
-      <h2>Delivery Status</h2>
-      <div class="status-grid" id="statusGrid">
-        <button class="status-btn" data-status="Direct to Address">Direct to Address</button>
-        <button class="status-btn" data-status="Neighboured">Neighboured</button>
-        <button class="status-btn" data-status="Redirect">Redirect</button>
-        <button class="status-btn" data-status="Undeliverable">Undeliverable</button>
-      </div>
-      <div id="directSubField" hidden style="margin-top:8px;">
-        <div class="status-grid" id="directSubGrid">
-          <button class="status-btn" data-sub="Concierge/Reception">Concierge/<wbr>Reception</button>
-          <button class="status-btn" data-sub="Mailroom">Mailroom</button>
-          <button class="status-btn" data-sub="Loading Dock">Loading Dock</button>
-          <button class="status-btn" data-sub="Doorstep">Doorstep</button>
-        </div>
-      </div>
-      <div class="field" id="neighbouredToField" hidden style="margin-top:10px;">
-        <label>Neighboured To</label>
-        <input type="text" id="fNeighbouredTo" placeholder="Left with...">
-      </div>
-      <div class="field" id="redirectField" hidden style="margin-top:10px;">
-        <label>Redirect Details</label>
-        <input type="text" id="fRedirectDetail" placeholder="Redirected to...">
-      </div>
-      <div id="undeliverableSubField" hidden style="margin-top:8px;">
-        <div class="status-grid" id="undeliverableSubGrid">
-          <button class="status-btn" data-unsub="Incorrect Address">Incorrect Address</button>
-          <button class="status-btn" data-unsub="Incorrect Contact Info">Incorrect Contact Info</button>
-        </div>
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label>Accepted By</label>
-        <input type="text" id="fAcceptedBy" placeholder="Name of person who accepted">
-      </div>
-      <div class="field" id="contactMethodField" hidden style="margin-top:10px;">
-        <label>Recipient Contact Method</label>
-        <div class="status-grid" id="contactMethodGrid">
-          <button class="status-btn" data-contact="In Person">In Person</button>
-          <button class="status-btn" data-contact="Direct By Phone">Direct By Phone</button>
-          <button class="status-btn" data-contact="Voicemail">Voicemail</button>
-          <button class="status-btn" data-contact="Text">Text</button>
-          <button class="status-btn" data-contact="Door Tag">Door Tag</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="wholesaleStatusCard" hidden>
-      <h2>Delivery Confirmation</h2>
-      <div class="field">
-        <div class="status-grid">
-          <button type="button" class="status-btn" id="wsDoorstepBtn">Doorstep</button>
-        </div>
-        <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Select if left at the door. A photo is required.</div>
-      </div>
-      <div class="field">
-        <label>Accepted By</label>
-        <input type="text" id="fWholesaleAcceptedBy" placeholder="Name of person who accepted">
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Notes &amp; Photo</h2>
-      <div class="field">
-        <label>Comments</label>
-        <textarea id="fComments" placeholder="Additional details..."></textarea>
-      </div>
-      <div class="field">
-        <label id="photoLabel">Photo (optional)</label>
-      <input type="file" id="fPhoto" accept="image/*">
-      <div id="photoButtonsAndroid" hidden style="display:flex;gap:8px;margin-top:4px;">
-        <button type="button" class="btn btn-ghost" id="photoTakeBtn" style="flex:1;">Take Photo</button>
-        <button type="button" class="btn btn-ghost" id="photoGalleryBtn" style="flex:1;">Choose from Gallery</button>
-      </div>
-      <div id="photoStatus" hidden style="display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;background:var(--green-soft);">
-        <img id="photoThumb" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;">
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;color:var(--green);font-size:14px;">&#10003; Photo attached</div>
-          <div id="photoStatusSub" style="font-size:12px;color:var(--ink-soft);">Uploads when you tap Submit</div>
-        </div>
-        <button type="button" id="photoRemoveBtn" style="background:transparent;border:1px solid var(--border);color:var(--ink-soft);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;">Remove</button>
-      </div>
-      <div id="photoRequired" hidden style="font-size:12px;color:var(--warm);margin-top:4px;font-weight:600;">📷 Photo required for Doorstep delivery — tap to take photo</div>
-      </div>
-    </div>
-
-    <button class="btn" id="submitBtn">Submit Delivery</button>
-    <button class="btn btn-secondary" id="summaryBtn">View Today's Summary</button>
-  </div>
+      <input id="destinationInput" placeholder="Destination address">
+      <button class="btn btn-sm" id="quoteBtn">Calculate price</button>
+      <div class="quote-result" id="quoteResult"></div>
+    </section>
+  </aside>
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </main>
 </div>
-
-<div id="successScreen" hidden>
-  <div class="container" style="padding-top:40px;">
-    <div class="success">
-      <h3>Delivery Submitted</h3>
-      <p id="successDetail"></p>
-      <p id="successPhoto" hidden style="margin-top:8px;font-weight:600;"></p>
-    </div>
-    <button class="btn" style="margin-top:16px;" id="myRouteBtn2">&larr; My Route</button>
-    <button class="btn btn-secondary" id="nextBtn">Next Delivery (Manual Entry)</button>
-    <button class="btn btn-secondary" id="summaryBtn2">View Today's Summary</button>
-  </div>
+<div class="modal-bg" id="priceSheetModal" hidden>
+  <div class="modal" id="priceSheetContent"></div>
 </div>
-
+<div class="modal-bg" id="communityDistancesModal" hidden>
+  <div class="modal" id="communityDistancesContent" style="max-width:720px;"></div>
+</div>
 <script>
-var driverCode = '';
-var driverName = '';
-var rates = {};
-var shops = [];
-var selectedZone = '';
-var eventType = '';
-var selectedStatuses = [];
-var formattedAddress = '';
-var lastPlaceLat = null, lastPlaceLng = null; // coords of the last picked autocomplete address, so a tab switch can redo the zone lookup
-var matchedCommunity = '';
-var matchedDistanceKm = null;
-var deliveryType = 'store';
-var currentStopId = null;
-
-// ===== DRAFT AUTO-SAVE/RESTORE =====
-// Mobile browsers commonly kill a backgrounded tab's memory to free up
-// RAM when the driver switches to take a call or check a text - on
-// return, the page isn't "resumed," it's freshly reloaded, silently
-// wiping any in-progress entry that only ever lived in JS memory. This
-// persists the form to localStorage as the driver fills it in, and
-// restores it automatically if the page reloads mid-entry. Cleared on
-// successful submission or "Next Delivery" so it never bleeds into the
-// next entry. The photo itself can't be persisted this way (file
-// references don't survive a reload) - if Doorstep was selected, the
-// driver is reminded to retake it.
-var recipientPhone = '';
-// Tap-to-call button for the recipient. The number comes from the tag scan (carried in the link from the
-// route page) or is typed in the Recipient Phone box; either way the button follows what is in the box.
-function updateCallLink() {
-  var inp = document.getElementById('fPhone'), row = document.getElementById('callRow'), link = document.getElementById('callLink');
-  if (!inp || !row || !link) return;
-  recipientPhone = String(inp.value || '').trim();
-  var dial = recipientPhone.replace(/[^0-9+]/g, '');
-  var textRow = document.getElementById('textRow');
-  if (dial.replace(/\D/g, '').length < 7) { row.hidden = true; if (textRow) textRow.hidden = true; return; }
-  if (textRow) textRow.hidden = false;
-  link.href = 'tel:' + dial;
-  link.innerHTML = '&#9742; Call recipient &mdash; ' + recipientPhone.replace(/[<>&"]/g, '');
-  row.hidden = false;
-}
-function setRecipientPhone(p) {
-  var inp = document.getElementById('fPhone');
-  if (inp) inp.value = String(p || '').trim();
-  updateCallLink();
-}
-
-// ---- Text the recipient: opens the driver's own messaging app with a ready-written note; the driver taps Send.
-// (A link cannot attach a photo, so the doorstep note says a photo was taken.)
-function buildSmsUrl(kind) {
-  var dial = String(document.getElementById('fPhone').value || '').replace(/[^0-9+]/g, '');
-  if (dial.replace(/\D/g, '').length < 7) return null;
-  var nm = String(document.getElementById('fName').value || '').trim();
-  var shopTxt = String(document.getElementById('fShopSearch').value || '').trim();
-  var who = (driverName || 'your driver');
-  var intro = 'Hi' + (nm ? ' ' + nm : '') + ', this is ' + who + ' with Smart Choice Delivery' + (shopTxt ? ', delivering your flowers from ' + shopTxt : ', delivering your flowers') + '. ';
-  var addr = String(document.getElementById('fAddress').value || '').trim();
-  var msg;
-  if (kind === 'door') {
-    msg = intro + 'I could not reach you at the door or by phone. As permitted, I left your delivery at your doorstep' + (addr ? ' at ' + addr : '') + ' and took a photo of it there for our records. Please bring it inside soon.';
-  } else if (kind === 'neighbour') {
-    var where = String(document.getElementById('fNeighbouredTo').value || '').trim();
-    if (!where) where = (window.prompt('Which neighbour (house or unit number)?', '') || '').trim();
-    if (!where) return null;
-    msg = intro + 'I could not reach you at the door or by phone, so I left your delivery with your neighbour at ' + where + '. Please collect it from them.';
-  } else if (kind === 'reception') {
-    var by = String(document.getElementById('fAcceptedBy').value || '').trim();
-    msg = intro + 'I left your delivery with the concierge/reception at your building' + (by ? ' (accepted by ' + by + ')' : '') + '. Please pick it up from them.';
-  } else if (kind === 'address') {
-    msg = intro + 'I could not complete your delivery because the address or access details we were given are incorrect or incomplete' + (addr ? ' (' + addr + ')' : '') + '. Please reply with the correct delivery address, unit number and any buzzer or access code so I can bring it to you.';
-  } else return null;
-  return 'sms:' + dial + '?&body=' + encodeURIComponent(msg);
-}
-document.addEventListener('click', function(e) {
-  var b = e.target.closest ? e.target.closest('[data-sms]') : null;
-  if (!b) return;
-  var url = buildSmsUrl(b.getAttribute('data-sms'));
-  if (url) window.location.href = url;
-});
-
-function draftStorageKey() {
-  return 'scd_driver_draft_' + (urlDriverCode || 'unknown');
-}
-
-function saveDraft() {
-  try {
-    var draft = {
-      savedAt: Date.now(),
-      deliveryType: deliveryType,
-      eventType: eventType,
-      selectedZone: selectedZone,
-      matchedCommunity: matchedCommunity,
-      matchedDistanceKm: matchedDistanceKm,
-      formattedAddress: formattedAddress,
-      selectedStatuses: selectedStatuses,
-      currentStopId: currentStopId,
-      recipientPhone: recipientPhone,
-      fields: {}
-    };
-    ['fDate','fOrderId','fPhone','fTimeRequest','fEventType','fWholesaler','fShopSearch','fShop','fName','fAddress','fUnit','fPieces','fXmas','fTime','fNeighbouredTo','fRedirectDetail','fAcceptedBy','fWholesaleAcceptedBy','fComments'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (el) draft.fields[id] = el.value;
-    });
-    draft.directSub = Array.from(document.querySelectorAll('#directSubGrid .status-btn.selected')).map(function(b){ return b.dataset.sub; });
-    draft.wsDoorstep = !!document.querySelector('#wsDoorstepBtn.selected');
-    draft.undeliverableSub = Array.from(document.querySelectorAll('#undeliverableSubGrid .status-btn.selected')).map(function(b){ return b.dataset.unsub; });
-    var contactSel = document.querySelector('#contactMethodGrid .status-btn.selected');
-    draft.contactMethod = contactSel ? contactSel.dataset.contact : '';
-    var billingSel = document.querySelector('#billingToggle .toggle-btn.active');
-    draft.billing = billingSel ? billingSel.dataset.billing : '';
-    localStorage.setItem(draftStorageKey(), JSON.stringify(draft));
-  } catch (e) { /* localStorage unavailable/full - draft recovery just won't work this time */ }
-}
-
-function clearDraft() {
-  try { localStorage.removeItem(draftStorageKey()); } catch (e) {}
-}
-
-function hasMeaningfulDraft(draft) {
-  // Don't bother restoring/notifying for a draft that's just default
-  // values with nothing actually entered yet.
-  return !!(draft.fields.fOrderId || draft.fields.fName || draft.fields.fAddress || draft.selectedZone);
-}
-
-function restoreDraftIfPresent() {
-  var raw;
-  try { raw = localStorage.getItem(draftStorageKey()); } catch (e) { return; }
-  if (!raw) return;
-  var draft;
-  try { draft = JSON.parse(raw); } catch (e) { return; }
-  if (!draft || !hasMeaningfulDraft(draft)) return;
-
-  if (draft.deliveryType && draft.deliveryType !== deliveryType) {
-    var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + draft.deliveryType + '"]');
-    if (typeBtn) typeBtn.click(); // reuses the existing toggle handler for correct field visibility; clears shop fields as a side effect, restored right after below
-  }
-
-  Object.keys(draft.fields).forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.value = draft.fields[id];
-  });
-
-  deliveryType = draft.deliveryType || deliveryType;
-  eventType = draft.eventType || '';
-  if (eventType) document.getElementById('fEventType').value = eventType;
-  formattedAddress = draft.formattedAddress || '';
-  matchedCommunity = draft.matchedCommunity || '';
-  matchedDistanceKm = (typeof draft.matchedDistanceKm === 'number') ? draft.matchedDistanceKm : null;
-  selectedZone = draft.selectedZone || '';
-  selectedStatuses = draft.selectedStatuses || [];
-  currentStopId = draft.currentStopId || null;
-  setRecipientPhone(draft.recipientPhone || '');
-
-  document.querySelectorAll('#statusGrid .status-btn').forEach(function(b) {
-    b.classList.toggle('selected', selectedStatuses.indexOf(b.dataset.status) >= 0);
-  });
-  (draft.directSub || []).forEach(function(sub) {
-    var b = document.querySelector('#directSubGrid .status-btn[data-sub="' + sub + '"]');
-    if (b) b.classList.add('selected');
-  });
-  (draft.undeliverableSub || []).forEach(function(sub) {
-    var b = document.querySelector('#undeliverableSubGrid .status-btn[data-unsub="' + sub + '"]');
-    if (b) b.classList.add('selected');
-  });
-  if (draft.contactMethod) {
-    var cb = document.querySelector('#contactMethodGrid .status-btn[data-contact="' + draft.contactMethod + '"]');
-    if (cb) cb.classList.add('selected');
-  }
-  if (draft.billing) {
-    document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.billing === draft.billing);
-    });
-  }
-  document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
-  document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
-  document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
-  document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
-  document.getElementById('contactMethodField').hidden = !document.getElementById('fAcceptedBy').value.trim();
-
-  if (selectedZone) { refreshZoneDisplay(); updatePay(); }
-
-  if (draft.wsDoorstep) document.getElementById('wsDoorstepBtn').classList.add('selected');
-  refreshPhotoUI();
-  var doorstepSelected = isDoorstepSelected();
-  var noteEl = document.getElementById('draftRestoredMsg');
-  noteEl.textContent = 'Restored your in-progress entry.' + (doorstepSelected ? ' Photo will need to be retaken.' : '');
-  noteEl.hidden = false;
-  setTimeout(function() { noteEl.hidden = true; }, 6000);
-}
-
-// Event-type pricing overlay. In-town Calgary zones (C1-C5) get the flat
-// SPEC/WED/FUN rate from the rate table directly. Anything else (border
-// communities, RVS/RVN, OUT1-4, etc.) is "out of town": pay is the
-// underlying zone's own drate+gdpi as base, with the per-extra-piece rate
-// overridden to the event's rate. The effective code shown/recorded
-// (WEDO/FUNO) exists mainly for tracking/reporting, not as its own flat
-// rate-table entry. Special Event has no out-of-town variant, so it always
-// uses the flat SPEC rate regardless of location.
-var EVENT_TYPES = {
-  SPEC: { label: 'Special Event', inTownCode: 'SPEC', outTownCode: null,    outTownExtraRate: null },
-  WED:  { label: 'Wedding',       inTownCode: 'WED',  outTownCode: 'WEDO', outTownExtraRate: 5 },
-  FUN:  { label: 'Funeral',       inTownCode: 'FUN',  outTownCode: 'FUNO', outTownExtraRate: 3 },
-  SPL:  { label: 'Seasonal Planter', inTownCode: 'SPL', outTownCode: 'SPLO', outTownExtraRate: 2.5 }
+function escapeHtml(s){if(s===null||s===undefined)return '';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
+const CALGARY_ZONES=['C1','C2','C3','C4','C5'];
+const OUTER_ZONES=['OUT1','OUT2','OUT3','OUT4'];
+// Zones selectable when overriding an individual community's zone (border
+// communities whose delivery radius bleeds into the city need C5 / border
+// zone codes available, not just the standard C1-C4 bands).
+const COMMUNITY_OVERRIDE_ZONES=['C1','C2','C3','C4','C5','TSA','HPT','RVN','RVS','BPW','SBK'];
+const ZONE_LABELS={
+  C1:'0-10 km',C2:'10-15 km',C3:'15-20 km',C4:'20km+',C5:'City limit edge',
+  OUT1:'Rural 0-20 km',OUT2:'Rural 20-40 km',OUT3:'Rural 40-70 km',OUT4:'Rural 70-100 km'
 };
-var IN_TOWN_ZONES = ['C1','C2','C3','C4','C5'];
-
-function isInTownZone(code) {
-  return IN_TOWN_ZONES.indexOf(code) >= 0;
-}
-
-// Returns the effective zone code to display/record/pay against, given the
-// currently selected geographic zone and event type. If no event type is
-// set, this is just a passthrough to the geographic zone.
-function getEffectiveZone() {
-  if (!eventType || !selectedZone || !EVENT_TYPES[eventType]) {
-    return { code: selectedZone, isEventOverride: false, baseZone: selectedZone };
-  }
-  var ev = EVENT_TYPES[eventType];
-  if (activeQuote || isInTownZone(selectedZone) || !ev.outTownCode) {
-    return { code: ev.inTownCode, isEventOverride: true, baseZone: selectedZone };
-  }
-  return { code: ev.outTownCode, isEventOverride: true, baseZone: selectedZone };
-}
-
-// Computes {base, extra, gdpi, total} pay for the current selection,
-// Base pay for a zone, handling RURALKM's distance formula (base + perkm x
-// distance) as a special case. All other zones just use their flat drate.
-function getZoneBasePay(zoneCode) {
-  var r = rates[zoneCode] || {};
-  if ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && matchedDistanceKm != null) {
-    return (r.drate || 0) + (r.perkm || 0) * matchedDistanceKm;
-  }
-  return r.drate || 0;
-}
-
-// Computes {base, extra, gdpi, total} pay for the current selection,
-// applying the event-type overlay if applicable.
-/* Christmas greens: shown only when the office switch is on and the delivery date is Nov 1 to Jan 31. */
-var xmasCfg = { enabled: false, driver_rate: 1.5 };
-function xmasActive() {
-  if (!xmasCfg.enabled || activeQuote) return false;
-  if (document.getElementById('fEventType').value === 'SPL') return false; // planters are greens already: plain base + extra pieces
-  var m = parseInt(String(document.getElementById('fDate').value || '').slice(5, 7), 10);
-  return m === 11 || m === 12 || m === 1;
-}
-function xmasCount() {
-  if (!xmasActive()) return 0;
-  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1;
-  return Math.max(0, Math.min(parseInt(document.getElementById('fXmas').value, 10) || 0, pieces));
-}
-function refreshXmas() {
-  var on = xmasActive(), f = document.getElementById('xmasField'), n = document.getElementById('xmasNote');
-  f.hidden = !on;
-  if (!on) { document.getElementById('fXmas').value = ''; n.hidden = true; return; }
-  var pieces = parseInt(document.getElementById('fPieces').value, 10) || 1, v = parseInt(document.getElementById('fXmas').value, 10) || 0;
-  if (v > pieces) { document.getElementById('fXmas').value = pieces; v = pieces; }
-  n.hidden = !v; n.textContent = v ? (v + ' of ' + pieces + ' pieces are Christmas greens: +$' + (v * (xmasCfg.driver_rate || 0)).toFixed(2) + ' pay') : '';
-}
-fetch('/api/seasonal').then(function(r) { return r.json(); }).then(function(c) {
-  if (c && c.xmas) { xmasCfg = { enabled: !!c.xmas.enabled, driver_rate: c.xmas.driver_rate }; refreshXmas(); if (selectedZone) updatePay(); }
-}).catch(function() {});
-document.addEventListener('input', function(e) { if (e.target && (e.target.id === 'fXmas' || e.target.id === 'fPieces')) { refreshXmas(); if (selectedZone) updatePay(); } });
-document.addEventListener('change', function(e) { if (e.target && (e.target.id === 'fDate' || e.target.id === 'fEventType')) { refreshXmas(); if (selectedZone) updatePay(); } });
-
-/* Event quote: a quoted job carries its quote number so the shop is billed the quote and the driver is paid what the quote says. */
-var activeQuote = null;
-function quotePrefix() {
-  var y; try { y = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', year: 'numeric' }).format(new Date()); } catch (e) { y = String(new Date().getFullYear()); }
-  return 'Q-' + y + '-';
-}
-function quoteTyped() { var v = document.getElementById('fQuote').value.trim().toUpperCase(); return v === quotePrefix() ? '' : v; } // the prefix alone is "nothing typed"
-function clearQuote() {
-  activeQuote = null; quoteZoneApplied = false; if (typeof refreshXmas === 'function') refreshXmas();
-  var f = document.getElementById('fQuote'), n = document.getElementById('quoteNote');
-  if (f) f.value = quotePrefix();
-  if (n) { n.hidden = true; n.textContent = ''; }
-}
-/* A quoted job needs no zone choice: its price and pay come from the quote, and it is filed under the flat event code. */
-var quoteZoneApplied = false;
-function applyQuoteZone() {
-  if (!activeQuote || deliveryType !== 'events') return;
-  var ev = EVENT_TYPES[eventType], code = ev ? ev.inTownCode : 'SPEC';
-  quoteZoneApplied = true; refreshXmas();
-  setZone(code, code + ' - from quote ' + activeQuote.id, true, null, null);
-}
-function quoteNote(text, ok) {
-  var n = document.getElementById('quoteNote'); n.hidden = !text; n.textContent = text || '';
-  n.style.color = ok ? 'var(--green)' : 'var(--warm)';
-}
-async function lookupQuote() {
-  var f = document.getElementById('fQuote'), id = f.value.trim().toUpperCase();
-  activeQuote = null; refreshXmas();
-  if (quoteZoneApplied) { quoteZoneApplied = false; selectedZone = ''; document.getElementById('zoneResult').hidden = true; document.getElementById('payPreview').hidden = true; }
-  if (/^\d{1,4}$/.test(id)) id = quotePrefix() + ('0000' + id).slice(-4);          // just the number: 2 or 0002
-  else if (/^Q-\d{4}-\d{1,4}$/.test(id)) { var qp = id.split('-'); id = 'Q-' + qp[1] + '-' + ('0000' + qp[2]).slice(-4); }   // Q-2026-2
-  f.value = id;
-  if (!id || id === quotePrefix()) { f.value = quotePrefix(); quoteNote(''); if (selectedZone) updatePay(); return; }
-  quoteNote('Checking ' + id + '\u2026', true);
-  try {
-    var r = await fetch('/api/event-quotes?lookup=' + encodeURIComponent(id));
-    var q = await r.json().catch(function() { return {}; });
-    if (!r.ok) { quoteNote(q.error || 'Could not check that quote.', false); if (selectedZone) updatePay(); return; }
-    if (!q.open) { quoteNote('Quote ' + q.id + ' already has all ' + q.trips + ' of its deliveries entered. Ask the office.', false); return; }
-    if (!q.shop_code) { quoteNote('Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.', false); return; }
-    activeQuote = q;
-    var sh = shops.find(function(s) { return String(s.name).split(/\s+/)[0].toUpperCase() === String(q.shop_code).toUpperCase(); });
-    if (sh) { document.getElementById('fShop').value = sh.id; document.getElementById('fShopSearch').value = sh.name; }
-    // Fill what the quote already knows: event type, recipient (the event) and delivery address (the venue). Anything already typed is left alone.
-    var evCode = ({ 'Wedding': 'WED', 'Funeral': 'FUN' })[q.event_type] || 'SPEC';
-    var evSel = document.getElementById('fEventType');
-    if (evSel.value !== evCode) { evSel.value = evCode; evSel.dispatchEvent(new Event('change')); }
-    var nameEl = document.getElementById('fName');
-    if (!nameEl.value.trim() && q.event) nameEl.value = q.event;
-    var addrEl = document.getElementById('fAddress');
-    if (!addrEl.value.trim() && q.venue) { addrEl.value = q.venue; formattedAddress = q.venue; lookupZone(q.venue); }
-    quoteNote(q.id + ': ' + (q.event || 'event') + ' for ' + q.customer + (q.venue ? ', ' + q.venue : '') + '. Delivery ' + (q.used + 1) + ' of ' + q.trips + (q.driver_pay > 0 ? '. Your pay for this delivery: $' + Number(q.driver_pay).toFixed(2) : '. No pay set on the quote, so the usual event pay applies') + '.', true);
-    applyQuoteZone();
-  } catch (e) { quoteNote('Could not check the quote. Check your signal and try again.', false); }
-}
-document.addEventListener('change', function(e) { if (e.target && e.target.id === 'fQuote') lookupQuote(); });
-document.addEventListener('focusin', function(e) { if (e.target && e.target.id === 'fQuote' && !e.target.value.trim()) e.target.value = quotePrefix(); });
-(function(){ var f = document.getElementById('fQuote'); if (f && !f.value) f.value = quotePrefix(); })();
-
-function computePay() {
-  if (!selectedZone) return null;
-  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
-  var eff = getEffectiveZone();
-  var base, extra, gdpi;
-  if (eff.isEventOverride && eff.code === (EVENT_TYPES[eventType] || {}).outTownCode) {
-    // Out-of-town event: base pay comes from the underlying geographic
-    // zone's own rate (RURALKM-aware), but the extra-piece rate is
-    // overridden to the event's rate.
-    var zr = rates[selectedZone] || {};
-    var ev = EVENT_TYPES[eventType];
-    base = getZoneBasePay(selectedZone);
-    gdpi = zr.gdpi || 0;
-    extra = (pieces - 1) * (ev.outTownExtraRate || 0);
-  } else {
-    // Flat rate (in-town event code, or no event type at all), or
-    // RURALKM's distance formula via getZoneBasePay - straight lookup
-    // otherwise.
-    var r = rates[eff.code] || {};
-    base = getZoneBasePay(eff.code);
-    extra = (pieces - 1) * (r.dratex || 0);
-    gdpi = r.gdpi || 0;
-  }
-  var byPremium = 0;
-  if (deliveryType === 'wholesale') {
-    var shopId = document.getElementById('fShop').value;
-    var receivingShop = shops.find(function(s){ return s.id === shopId; });
-    if (receivingShop && receivingShop.name.toUpperCase().startsWith('BY')) { byPremium = 1.5; }
-  }
-  var rushPremium = 0;
-  if (document.getElementById('fRush').checked) {
-    rushPremium = (rates['HOT'] || {}).drate || 0;
-  }
-  var xmasPay = xmasCount() * (xmasCfg.driver_rate || 0);
-  var res = { xmasPay: xmasPay, effCode: eff.code, isEventOverride: eff.isEventOverride, baseZone: eff.baseZone, base: base, extra: extra, gdpi: gdpi, byPremium: byPremium, rushPremium: rushPremium, total: base + extra + gdpi + byPremium + rushPremium + xmasPay, pieces: pieces };
-  if (activeQuote && deliveryType === 'events' && activeQuote.driver_pay > 0) { res.total = activeQuote.driver_pay; res.quoteId = activeQuote.id; }
-  return res;
-}
-
-var pathParts = location.pathname.split('/').filter(Boolean);
-var urlDriverCode = pathParts[1] ? pathParts[1].toUpperCase() : '';
-
-function showNotFound() {
-  document.getElementById('loadingScreen').hidden = true;
-  document.getElementById('notFound').hidden = false;
-}
-
-// Event codes the driver can always pick by hand as a fallback when the
-// automatic zone / Events path misses. WED and WEDO start with W but are
-// event codes, not wholesale zones.
-var EVENT_ZONE_CODES = ['FUN', 'FUNO', 'WED', 'WEDO', 'SPEC', 'SPL', 'SPLO'];
-
-function isWholesaleZone(code) {
-  if (!code) return false;
-  var u = code.toUpperCase();
-  if (EVENT_ZONE_CODES.indexOf(u) >= 0) return false;
-  return u.startsWith('W');
-}
-
-var WHOLESALER_BILLING = {
-  WFW: 'wholesaler', FS: 'wholesaler',
-  AM: 'shop', FC: 'shop', BA: 'shop', SB: 'shop', SV: 'wholesaler', QF: 'shop'
+const ZONE_COLORS={
+  C1:'#F4DCC9',C2:'#E8AE8C',C3:'#D67D52',C4:'#B8472B',C5:'#8B2500',
+  TSA:'#9B4D00',DEW:'#C9E4CA',HPT:'#88C08A',RVS:'#4A90A4',RVN:'#2C5F8A',
+  EVA:'#6B8E8E',COC:'#5B7FA6',AIR:'#3D6B8A',CHE:'#88A0B8',OKO:'#4A7A6A',
+  BPW:'#8A6D4B',SBK:'#6B8E5A',RWM:'#7A5C3E',
+  OUT1:'#C9E4CA',OUT2:'#88C08A',OUT3:'#4A90A4',OUT4:'#2C5F8A'
 };
+// Zone color resolution, in order: a color explicitly set in the Rate
+// Table (admin.html) for this zone, then the hardcoded map above (legacy
+// zones that predate the Rate Table color picker), then a safe grey
+// fallback. This means adding a new zone via admin's Add Zone + color
+// picker never needs a code change here, and an unrecognized zone can
+// never silently render as undefined/blank on the map again.
+function getZoneColor(code){
+  if(state.rates&&state.rates[code]&&state.rates[code].color)return state.rates[code].color;
+  if(ZONE_COLORS[code])return ZONE_COLORS[code];
+  return '#999999';
+}
+// Named towns - each gets a colored pin on the map
+const NAMED_TOWNS=[
+  {name:'Airdrie',zone:'OUT1',lat:51.2920,lng:-114.0144,radiusKm:8,color:'#4CAF50'},
+  {name:'Cochrane',zone:'OUT1',lat:51.1897,lng:-114.4672,radiusKm:8,color:'#4CAF50'},
+  {name:'Chestermere',zone:'OUT1',lat:51.0487,lng:-113.8225,radiusKm:7,color:'#4CAF50'},
+  {name:'Okotoks',zone:'OUT1',lat:50.7258,lng:-113.9758,radiusKm:8,color:'#4CAF50'},
+  {name:'Bragg Creek',zone:'BRG',lat:50.9500,lng:-114.5700,radiusKm:7,color:'#6D4C41'},
+  {name:'Harmony',zone:'HAR',lat:51.1130,lng:-114.3930,radiusKm:4,color:'#7B1FA2'},
+  {name:'Strathmore',zone:'OUT1',lat:51.0378,lng:-113.4003,radiusKm:8,color:'#4CAF50'},
+  {name:'High River',zone:'OUT1',lat:50.5808,lng:-113.8747,radiusKm:8,color:'#4CAF50'},
+  {name:'Kananaskis',zone:'OUT2',lat:50.9311,lng:-115.0986,radiusKm:15,color:'#2196F3'},
+  {name:'Canmore',zone:'OUT2',lat:51.0894,lng:-115.3582,radiusKm:8,color:'#2196F3'},
+  {name:'Banff',zone:'OUT3',lat:51.1784,lng:-115.5708,radiusKm:10,color:'#1565C0'},
+  {name:'Lake Louise',zone:'OUT4',lat:51.4254,lng:-116.1773,radiusKm:12,color:'#0D47A1'},
+  // Border communities that sit outside the Calgary community map: without these they fell through to the distance band (HPT quoted as OUT2).
+  {name:'Heritage Pointe',zone:'HPT',lat:50.8500,lng:-113.9500,radiusKm:3,color:'#88C08A'},
+  {name:'Redwood Meadows',zone:'RWM',lat:50.9880,lng:-114.5090,radiusKm:3,color:'#7A5C3E'}
+];
 
-function setBillingDefault(code) {
-  var billing = WHOLESALER_BILLING[code] || 'shop';
-  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.billing === billing);
-  });
+// Wholesale config
+const WS_INTOWN_BASE=17;   // first piece, in-town wholesale
+const WS_EXTRA_PER_PIECE=2; // per additional piece, all zones
+const WED_INTOWN_BASE=27;   // in-town wedding (WED), includes first case
+const WED_EXTRA_PER_CASE=5; // per additional case (in and out of town); out-of-town base = zone rate (WEDO)
+const WED_SETUP_RATE=35;    // per person per hour, 1 hr minimum
+const FUN_INTOWN_BASE=17;   // in-town funeral, includes first piece
+const FUN_OUT_BASE=27;      // FUNO cemeteries (Edenbrook, Choice Memorial Garden, Mountain View) flat base, includes first piece; other out-of-town funerals = zone rate
+const FUNO_PATTERNS=[/edenbrook/i,/choice\s+memorial/i,/mountain\s*-?\s*view/i];
+const FUN_EXTRA_PER_PIECE=3;
+
+function outerBandForDistance(km){
+  if(km<=20)return'OUT1';
+  if(km<=40)return'OUT2';
+  if(km<=70)return'OUT3';
+  if(km<=100)return'OUT4';
+  return null;
 }
 
-function getAllNonWholesaleZones() {
-  var list = Object.keys(rates).filter(function(z) { return !isWholesaleZone(z); });
-  EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
-  return list.sort();
-}
+const COMMUNITY_GEOJSON_URL='https://raw.githubusercontent.com/camstark/calgis/gh-pages/community-2016-simple.json';
+var state={map:null,communities:[],shops:[],selectedShopId:null,markers:{shop:null,dest:null},townMarkers:[],infoWindow:null,lastDestination:null,quoteType:'retail',rates:{}};
+function parseRoute(){const p=location.pathname.split('/').filter(Boolean);if(p[0]==='shop'&&p[1])return{mode:'lookup',shopId:decodeURIComponent(p[1])};return{mode:'admin',shopId:null};}
+const ROUTE=parseRoute();
 
-function getNeighbourZones(code) {
-  if (deliveryType === 'wholesale') {
-    return Object.keys(rates).filter(isWholesaleZone).sort();
+/* geometry */
+function getCommunityName(props){const keys=['name','NAME','comm_name','COMM_NAME'];for(const k of keys)if(props&&props[k])return String(props[k]);if(props){const ks=Object.keys(props);if(ks.length)return String(props[ks[0]]);}return'Unknown';}
+function computeCentroid(g){if(!g)return null;const c=[];const col=rings=>rings.forEach(r=>r.forEach(p=>c.push(p)));if(g.type==='Polygon')col(g.coordinates);else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>col(p));if(!c.length)return null;const s=c.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]);return{lng:s[0]/c.length,lat:s[1]/c.length};}
+function pointInRing(pt,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>pt.lat)!==(yj>pt.lat))&&(pt.lng<(xj-xi)*(pt.lat-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function pointInGeometry(pt,g){if(!g)return false;if(g.type==='Polygon')return pointInRing(pt,g.coordinates[0]);if(g.type==='MultiPolygon')return g.coordinates.some(p=>pointInRing(pt,p[0]));return false;}
+function findCommunity(pt){return state.communities.find(c=>c.geometry&&pointInGeometry(pt,c.geometry))||null;}
+function haversineKm(a,b){const R=6371,r=d=>d*Math.PI/180;const dLat=r(b.lat-a.lat),dLng=r(b.lng-a.lng);const x=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function bandForDistance(km){if(km<=10)return'C1';if(km<=15)return'C2';if(km<=20)return'C3';return'C4';}
+function findNamedTown(pt){let best=null,bd=Infinity;for(const t of NAMED_TOWNS){const d=haversineKm(pt,{lat:t.lat,lng:t.lng});if(d<=t.radiusKm&&d<bd){best=t;bd=d;}}return best;}
+
+/* wholesale price calc */
+function calcEventPrice(kind,qty,isInTown,zoneRate,people,hours,funo,quoted){
+  const n=Math.max(1,parseInt(qty)||1);
+  if(kind==='funeral'){
+    const useFuno=!!funo&&!isInTown;
+    const base=isInTown?FUN_INTOWN_BASE:useFuno?FUN_OUT_BASE:(Number(zoneRate)||0);
+    const delivery=base+(n-1)*FUN_EXTRA_PER_PIECE;
+    return {kind,qty:n,isInTown,base,baseKind:(isInTown||useFuno)?'base':'zone',extra:FUN_EXTRA_PER_PIECE,unit:'piece',people:0,hours:0,delivery,setup:0,total:delivery,code:isInTown?'Funeral':useFuno?'Funeral (FUNO)':'Funeral (out of town)'};
   }
-  var city = ['C1','C2','C3','C4','C5'];
-  var idx = city.indexOf(code);
-  if (idx >= 0) {
-    // Suggested zone is a Calgary zone: show its immediate neighbours plus
-    // the two adjacent reserve/border codes. Kept short and relevant -
-    // matches the original scope (3-4 quick options), not the full rate table.
-    var n = city.slice(Math.max(0,idx-1), Math.min(city.length,idx+2));
-    return n.concat(['TSU','TSA']);
-  }
-  // Suggested zone is a named out-of-town zone: offer it plus a small set
-  // of commonly-adjacent out-of-town codes. "Show all zones" (below the
-  // buttons) covers anything not in this short list.
-  var out = ['TSA','TSU','DEW','HPT','RWM','RVS','RVN','C5'];
-  var base = [code];
-  out.forEach(function(z) { if (base.indexOf(z) < 0) base.push(z); });
-  return base;
+  const base=isInTown?WED_INTOWN_BASE:(Number(zoneRate)||0);
+  const p=Math.max(0,parseInt(people)||0);
+  const h=p>0?Math.max(1,parseFloat(hours)||1):0;
+  const delivery=base+(n-1)*WED_EXTRA_PER_CASE;
+  const setup=p*h*WED_SETUP_RATE;
+  const guide=delivery+setup;const q=parseFloat(quoted);const hasQ=kind==='event'&&q>0;
+  return {kind,qty:n,isInTown,base,baseKind:isInTown?'base':'zone',extra:WED_EXTRA_PER_CASE,unit:'case',people:p,hours:h,delivery,setup,guide,quoted:hasQ?q:null,total:hasQ?q:guide,code:isInTown?'WED':'WEDO'};
 }
-
-function haversineKm(a, b) {
-  var R=6371, rd=function(d){return d*Math.PI/180;};
-  var dLat=rd(b.lat-a.lat), dLng=rd(b.lng-a.lng);
-  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(rd(a.lat))*Math.cos(rd(b.lat))*Math.sin(dLng/2)*Math.sin(dLng/2);
-  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-}
-
-// Calgary reference point for measuring wholesale-rural distance - there's
-// no real wholesaler address on file to measure from (just a code/display
-// name in the dropdown), so this uses the same city-center approximation
-// suggest-zone.mjs falls back to for retail deliveries.
-var CALGARY_CENTER = { lat: 51.0447, lng: -114.0719 };
-
-// Returns {zone, distanceKm}. distanceKm is only meaningful for WRU
-// (Wholesale Rural) - the true catch-all when a delivery doesn't match
-// citywide or any named wholesale town. This is an infrequent case, but
-// still needs real distance-based pay (base + perkm x distance), same
-// formula as retail's RURALKM, rather than a flat rate.
-function getWholesaleZoneForPoint(lat, lng) {
-  if (lat == null || lng == null) return { zone: 'WPU', distanceKm: null };
-  if (lat > 50.840 && lat < 51.215 && lng > -114.215 && lng < -113.800) return { zone: 'WPU', distanceKm: null };
-  var towns = [
-    {zone:'WAI', lat:51.2920, lng:-114.0144, r:8},
-    {zone:'WCO', lat:51.1897, lng:-114.4672, r:9},
-    {zone:'WCH', lat:51.0487, lng:-113.8225, r:7},
-    {zone:'WPO', lat:50.7258, lng:-113.9758, r:8},
-    {zone:'WST', lat:51.0378, lng:-113.4003, r:8},
-    {zone:'WHR', lat:50.5808, lng:-113.8747, r:8},
-    {zone:'WLY', lat:51.1000, lng:-113.5000, r:6},
-    {zone:'WLO', lat:50.5400, lng:-114.0800, r:10},
-  ];
-  for (var i=0; i<towns.length; i++) {
-    var t = towns[i];
-    if (haversineKm({lat:lat,lng:lng},{lat:t.lat,lng:t.lng}) <= t.r) return { zone: t.zone, distanceKm: null };
-  }
-  var distanceKm = haversineKm(CALGARY_CENTER, { lat: lat, lng: lng });
-  return { zone: 'WRU', distanceKm: Math.round(distanceKm * 10) / 10 };
-}
-
-function getWholesaleZoneForShop(shop) {
-  if (!shop || !shop.lat || !shop.lng) return { zone: 'WPU', distanceKm: null };
-  return getWholesaleZoneForPoint(shop.lat, shop.lng);
-}
-
-function buildZoneButtons(suggested, showAll) {
-  var list;
-  if (deliveryType === 'wholesale') {
-    list = Object.keys(rates).filter(isWholesaleZone).sort();
-  } else if (showAll) {
-    list = getAllNonWholesaleZones();
-  } else {
-    list = suggested ? getNeighbourZones(suggested) : getAllNonWholesaleZones();
-    // Always offer the event codes as a manual fallback, even in the short list.
-    EVENT_ZONE_CODES.forEach(function(z) { if (list.indexOf(z) < 0) list.push(z); });
-  }
-  var container = document.getElementById('zoneButtons');
-  container.innerHTML = '';
-  list.forEach(function(z) {
-    var r = rates[z];
-    var btn = document.createElement('button');
-    btn.className = 'zone-btn';
-    btn.textContent = z + (r ? ' $'+r.drate : '');
-    if (z === suggested) {
-      btn.style.borderColor = 'var(--accent)';
-      btn.style.background = 'var(--accent-soft)';
-      btn.style.fontWeight = '700';
-    }
-    btn.onclick = function() { setZone(z, 'Manual selection', true); };
-    container.appendChild(btn);
-  });
-  // Only offer "show all" when the current list is a narrowed-down subset -
-  // avoids a redundant link when everything is already being shown (e.g.
-  // no suggestion at all, so there's no anchor to narrow around).
-  if (deliveryType !== 'wholesale' && !showAll && list.length < getAllNonWholesaleZones().length) {
-    var moreBtn = document.createElement('button');
-    moreBtn.className = 'zone-btn';
-    moreBtn.style.fontStyle = 'italic';
-    moreBtn.style.color = 'var(--ink-soft)';
-    moreBtn.textContent = 'Show all zones…';
-    moreBtn.onclick = function() { buildZoneButtons(suggested, true); };
-    container.appendChild(moreBtn);
+function calcWholesalePrice(basePrice,pieces,isInTown){
+  const p=Math.max(1,parseInt(pieces)||1);
+  if(isInTown){
+    return WS_INTOWN_BASE + (p-1)*WS_EXTRA_PER_PIECE;
+  }else{
+    return basePrice + (p-1)*WS_EXTRA_PER_PIECE;
   }
 }
 
-function setZone(code, desc, manual, community, distanceKm) {
-  selectedZone = code;
-  matchedCommunity = manual ? '' : (community || '');
-  matchedDistanceKm = manual ? null : (typeof distanceKm === 'number' ? distanceKm : null);
-  refreshZoneDisplay(desc);
-  updatePay();
-  trackStop();
-}
+/* api */
+async function fetchMapsKey(){const r=await fetch('/api/config');if(!r.ok)throw new Error('Could not load configuration.');const d=await r.json();if(d.error)throw new Error(d.error);return d.key;}
+function loadGoogleMaps(key){return new Promise((res,rej)=>{if(window.google&&window.google.maps)return res();window.__gmapsReady=()=>res();const s=document.createElement('script');s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady`;s.onerror=()=>rej(new Error('Could not load Google Maps.'));document.head.appendChild(s);setTimeout(()=>rej(new Error('Timed out.')),10000);});}
+async function loadCommunities(){const r=await fetch(COMMUNITY_GEOJSON_URL);if(!r.ok)throw new Error('Could not load Calgary community data.');const t=await r.text();let g;try{g=JSON.parse(t);}catch(e){throw new Error('Invalid community GeoJSON.');}if(!g.features||!g.features.length)throw new Error('No community features found.');return g.features.map(f=>{const name=getCommunityName(f.properties);f.properties=f.properties||{};f.properties.quoteToolName=name;return{name,raw:f,geometry:f.geometry,centroid:computeCentroid(f.geometry)};});}
+async function geocodeAddress(address){const r=await fetch('/api/geocode?address='+encodeURIComponent(address+', Alberta, Canada'));const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not find that address.');return d;}
+async function drivingDistanceKm(origin,dest){const p=new URLSearchParams({origin_lat:origin.lat,origin_lng:origin.lng,dest_lat:dest.lat,dest_lng:dest.lng});const r=await fetch('/api/distance?'+p);const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not calculate driving distance.');return d.km;}
 
-// Creates a pending stop the first time a zone resolves for this entry, or
-// updates the existing one if the address/shop gets corrected before
-// submission - same trigger point regardless of whether the delivery was
-// started via Scan Tag or manual entry, so reconciliation coverage is
-// consistent either way. Best-effort: a network hiccup here shouldn't
-// block the driver from continuing their delivery.
-function trackStop() {
-  var shopId = document.getElementById('fShop').value;
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  var now = new Date();
-  var payload = {
-    driver: driverCode,
-    shop_code: shop ? shop.name.split(' ')[0] : null,
-    address: formattedAddress || document.getElementById('fAddress').value.trim(),
-    name: document.getElementById('fName').value.trim(),
-    phone: (document.getElementById('fPhone').value || '').replace(/[^0-9+() .-]/g, '').trim() || null,
-    order_id: document.getElementById('fOrderId').value.trim() || null,
-    delivery_type: deliveryType,
-    local_date: now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0')
+/* shop model */
+function defaultPrices(){return{C1:13,C2:14.50,C3:16.5,C4:18.5,C5:14.95,TSA:14.95,HPT:25,RWM:37,RVN:14.95,OUT1:45,OUT2:55,OUT3:75,OUT4:95};}
+// Shop price for a zone; zones a shop has no price for yet (e.g. HAR, BRG) fall back to the Rate Table shop rate.
+const ZONE_FALLBACK_PRICE={HPT:25,RWM:37}; // used only when neither the shop nor the Rate Table has a price for the zone
+function zonePriceFor(shop,zone){const v=shop.zonePrices&&shop.zonePrices[zone];if(v!==undefined&&v!==null)return v;const r=state.rates&&state.rates[zone];if(r&&Number(r.srate)>0)return Number(r.srate);return ZONE_FALLBACK_PRICE[zone]||0;}
+function defaultTownPrices(){const p={};NAMED_TOWNS.forEach(t=>{p[t.name]=null;});return p;}
+function seedCommunityZones(shop){if(!shop.communityZones)shop.communityZones={};if(!shop.townPrices)shop.townPrices=defaultTownPrices();state.communities.forEach(c=>{if(!c.centroid||(c.name in shop.communityZones))return;const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);shop.communityZones[c.name]=bandForDistance(km);});}
+function getSelectedShop(){return state.shops.find(s=>s.id===state.selectedShopId)||null;}
+
+/* backend */
+async function apiListShops(){const r=await fetch('/api/shops');if(!r.ok)throw new Error('Could not load shops.');return r.json();}
+async function apiGetShop(id){const r=await fetch('/api/shops/'+encodeURIComponent(id));if(r.status===404)return null;if(!r.ok)throw new Error('Could not load shop.');return r.json();}
+async function apiCreateShop(payload){const r=await fetch('/api/shops',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||'Could not create shop.');}return r.json();}
+/* Onboarding email: builds a ready-written email with clickable links. Copy it, then paste into your own mail program (nothing is sent from here). */
+const ONBOARD_SIGNATURE_LINES=['Kevin Michaud','Smart Choice Delivery','403-880-9822'];
+const ONBOARD_DECK_URL='https://quotes.smartchoicedelivery.ca/Shop-Quote-Walkthrough.pdf';
+const ONBOARD_SUBJECT='Your delivery price lookup from Smart Choice Delivery';
+function escHtml(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function buildOnboardEmail(shop,contact,shopName){
+  const link=location.origin+'/shop/'+encodeURIComponent(shop.id);
+  const hi='Hi'+(contact?' '+contact:'')+',';
+  const intro="We've set up a simple online tool so "+shopName+' can see its Smart Choice Delivery price for any address in seconds, without calling or waiting on a quote.';
+  const steps=['Open your link and choose the delivery type (Retail, Wholesale, Wedding, Funeral or Special event).','Type the delivery address and tap Calculate price.',"You'll see the price, the delivery zone and the driving distance. You can copy or print the quote for your records."];
+  const pricing="Your full pricing sheet is on the same page if you'd like to print it for the counter.";
+  const closing='If anything looks off or you have a question, just reply to this email or call me.';
+  const p='margin:0 0 12px';
+  const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">'
+    +'<p style="'+p+'">'+escHtml(hi)+'</p>'
+    +'<p style="'+p+'">'+escHtml(intro)+'</p>'
+    +'<p style="'+p+'"><b>Your personal link:</b><br><a href="'+escHtml(link)+'">Open your '+escHtml(shopName)+' price tool</a></p>'
+    +'<p style="'+p+'"><b>How it works:</b></p>'
+    +'<ol style="margin:0 0 12px 20px;padding:0">'+steps.map(t=>'<li>'+escHtml(t)+'</li>').join('')+'</ol>'
+    +'<p style="'+p+'">'+escHtml(pricing)+'</p>'
+    +'<p style="'+p+'">A short walkthrough is here if you\'d like to see it first:<br><a href="'+escHtml(ONBOARD_DECK_URL)+'">Watch the walkthrough (PDF)</a></p>'
+    +'<p style="'+p+'">'+escHtml(closing)+'</p>'
+    +'<p style="margin:0">Thank you,<br>'+ONBOARD_SIGNATURE_LINES.map(escHtml).join('<br>')+'</p>'
+    +'</div>';
+  const text=[hi,'',intro,'','Your personal link:',link,'','How it works:'].concat(steps.map((t,i)=>(i+1)+'. '+t),['',pricing,'',"A short walkthrough is here if you'd like to see it first:",ONBOARD_DECK_URL,'',closing,'','Thank you,'],ONBOARD_SIGNATURE_LINES).join('\n');
+  return {html,text};
+}
+function emailShopOnboarding(shopId){
+  const shop=state.shops.find(s=>s.id===shopId);
+  if(!shop)return;
+  const parts=String(shop.name||'').trim().split(/\s+/);
+  const shopName=parts.length>1?parts.slice(1).join(' '):shop.name; // the first word is the shop code
+  const old=document.getElementById('onboardModal');if(old)old.remove();
+  const m=document.createElement('div');
+  m.id='onboardModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const inp='style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #bbb;border-radius:6px;font-size:14px"';
+  m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
+    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b>'
+    +'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">'
+    +'<label style="flex:1;min-width:180px;font-size:12px;color:#555">Contact name (optional)<input id="obName" type="text" '+inp+'></label>'
+    +'<label style="flex:1;min-width:220px;font-size:12px;color:#555">Shop email<input id="obEmail" type="email" '+inp+'></label></div>'
+    +'<div id="obSaved" style="font-size:12px;color:#2a7a3b;min-height:16px;margin-top:4px"></div>'
+    +'<div style="font-size:13px;color:#555">1) Copy address &nbsp; 2) Copy subject &nbsp; 3) Copy email &nbsp; then paste each into a new email in your own mail program. Links stay clickable.</div></div>'
+    +'<div id="onboardPreview" style="padding:14px 18px;overflow:auto;flex:1"></div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #ddd;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">'
+    +'<button type="button" id="obAddr" class="btn">Copy address</button>'
+    +'<button type="button" id="obSubj" class="btn">Copy subject</button>'
+    +'<button type="button" id="obCopy" class="btn btn-primary">Copy email</button>'
+    +'<button type="button" id="obOpen" class="btn">Open email program</button>'
+    +'<button type="button" id="obClose" class="btn">Close</button></div></div>';
+  document.body.appendChild(m);
+  const nameEl=m.querySelector('#obName'),emailEl=m.querySelector('#obEmail'),pv=m.querySelector('#onboardPreview');
+  nameEl.value=shop.contactName||'';emailEl.value=shop.contactEmail||'';
+  let mail;
+  const refresh=()=>{mail=buildOnboardEmail(shop,nameEl.value.trim(),shopName);pv.innerHTML=mail.html;};
+  refresh();
+  nameEl.addEventListener('input',refresh);
+  const saveContact=async()=>{
+    const n=nameEl.value.trim(),e=emailEl.value.trim();
+    if(n===(shop.contactName||'')&&e===(shop.contactEmail||''))return;
+    const prevN=shop.contactName,prevE=shop.contactEmail;
+    shop.contactName=n;shop.contactEmail=e;
+    const note=m.querySelector('#obSaved');
+    try{await apiSaveShop(shop);note.style.color='#2a7a3b';note.textContent='Saved for next time';setTimeout(()=>{note.textContent='';},2000);}
+    catch(err){shop.contactName=prevN;shop.contactEmail=prevE;note.style.color='#b00020';note.textContent='Could not save contact: '+err.message;}
   };
-  if (currentStopId) {
-    fetch('/api/stops/' + encodeURIComponent(currentStopId), {
-      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
-    }).catch(function() { /* best-effort */ });
-  } else {
-    fetch('/api/stops', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); })
-      .then(function(stop) { if (stop && stop.id) currentStopId = stop.id; })
-      .catch(function() { /* best-effort */ });
-  }
-}
-
-function refreshZoneDisplay(baseDesc) {
-  var eff = getEffectiveZone();
-  var desc = baseDesc || '';
-  if (eff.isEventOverride) {
-    var ev = EVENT_TYPES[eventType];
-    desc = (eff.code === ev.outTownCode)
-      ? (ev.label + ' — out of town (underlying zone: ' + eff.baseZone + ')')
-      : (ev.label + ' — flat rate');
-  }
-  document.getElementById('zoneCode').textContent = eff.code;
-  document.getElementById('zoneDesc').textContent = desc;
-  document.getElementById('zoneResult').hidden = false;
-  document.getElementById('zoneManual').hidden = true;
-}
-
-function overrideZone() {
-  document.getElementById('zoneManual').hidden = false;
-  buildZoneButtons(selectedZone);
-}
-
-function updatePay() {
-  var pay = computePay();
-  if (!pay) return;
-  document.getElementById('payAmount').textContent = '$' + pay.total.toFixed(2);
-  var breakdown = pay.quoteId ? ('Pay set by quote ' + pay.quoteId) : ('Base $' + pay.base.toFixed(2) +
-    (pay.extra > 0 ? ' + ' + (pay.pieces-1) + ' extra x $' + (pay.extra/(pay.pieces-1)).toFixed(2) : '') +
-    ' + fuel $' + pay.gdpi.toFixed(2) +
-    (pay.byPremium > 0 ? ' + BY premium $' + pay.byPremium.toFixed(2) : '') +
-    (pay.rushPremium > 0 ? ' + Rush premium $' + pay.rushPremium.toFixed(2) : '') +
-    (pay.xmasPay > 0 ? ' + Xmas greens ' + xmasCount() + ' x $' + (xmasCfg.driver_rate || 0).toFixed(2) : ''));
-  document.getElementById('payBreakdown').textContent = breakdown;
-  document.getElementById('payPreview').hidden = false;
-}
-
-function lookupZone(address, placeLat, placeLng) {
-  if (activeQuote && deliveryType === 'events') { document.getElementById('zoneLoading').hidden = true; applyQuoteZone(); return; }
-  document.getElementById('zoneResult').hidden = true;
-  document.getElementById('zoneLoading').hidden = false;
-  document.getElementById('zoneManual').hidden = true;
-  selectedZone = '';
-
-  if (deliveryType === 'wholesale') {
-    var wShopId = document.getElementById('fShop').value;
-    var wShop = shops.find(function(s) { return s.id === wShopId; });
-    document.getElementById('zoneLoading').hidden = true;
-    if (wShop) {
-      // Registered shop selected - unchanged behavior, zone from shop location.
-      var wResultShop = getWholesaleZoneForShop(wShop);
-      setZone(wResultShop.zone, wResultShop.zone + ' - auto from ' + wShop.name, false, null, wResultShop.distanceKm);
-      return;
+  nameEl.addEventListener('change',saveContact);emailEl.addEventListener('change',saveContact);
+  const flash=(btn,t)=>{const r=btn.dataset.label||(btn.dataset.label=btn.textContent);btn.textContent=t;setTimeout(()=>btn.textContent=r,1800);};
+  const copyText=t=>{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);return Promise.reject();};
+  m.querySelector('#obAddr').onclick=function(){
+    const e=emailEl.value.trim();
+    if(!e){emailEl.focus();flash(this,'Enter an email first');return;}
+    saveContact();copyText(e).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this address:',e));
+  };
+  m.querySelector('#obSubj').onclick=function(){copyText(ONBOARD_SUBJECT).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',ONBOARD_SUBJECT));};
+  m.querySelector('#obCopy').onclick=async function(){
+    const btn=this;
+    saveContact();
+    try{
+      await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([mail.html],{type:'text/html'}),'text/plain':new Blob([mail.text],{type:'text/plain'})})]);
+      flash(btn,'Copied! Now paste');
+    }catch(e){
+      const r=document.createRange();r.selectNodeContents(pv);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+      let ok=false;try{ok=document.execCommand('copy');}catch(_){ }
+      sel.removeAllRanges();
+      flash(btn,ok?'Copied! Now paste':'Select the text and copy');
     }
-    if (typeof placeLat === 'number' && typeof placeLng === 'number') {
-      // No registered shop - client not in our shop database (e.g. Safeway,
-      // a home-based shop). Determine wholesale zone from the actual
-      // delivery address instead.
-      var wResultAddr = getWholesaleZoneForPoint(placeLat, placeLng);
-      setZone(wResultAddr.zone, wResultAddr.zone + ' - based on delivery address', false, null, wResultAddr.distanceKm);
-      return;
-    }
-    // No shop and no coordinates yet (e.g. typed and tabbed away without
-    // picking an autocomplete suggestion) - fall back to manual selection.
-    document.getElementById('zoneManual').hidden = false;
-    buildZoneButtons(null);
-    return;
-  }
-
-  var shopId = document.getElementById('fShop').value;
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  var params = 'address=' + encodeURIComponent(address);
-  if (shop) { params += '&shop_lat=' + shop.lat + '&shop_lng=' + shop.lng; }
-
-  fetch('/api/suggest-zone-v2?' + params)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      document.getElementById('zoneLoading').hidden = true;
-      if (data.suggested) {
-        setZone(data.suggested, data.message, false, data.community, data.distance_km);
-      } else {
-        document.getElementById('zoneManual').hidden = false;
-        buildZoneButtons(null);
-      }
-    })
-    .catch(function() {
-      document.getElementById('zoneLoading').hidden = true;
-      document.getElementById('zoneManual').hidden = false;
-      buildZoneButtons(null);
-    });
+  };
+  m.querySelector('#obOpen').onclick=()=>{saveContact();const e=emailEl.value.trim();window.location.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
+  m.querySelector('#obClose').onclick=()=>m.remove();
+  m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 }
 
-/* Shop search dropdown */
-function populateShopDropdown(preserveShop) {
-  if (deliveryType === 'wholesale') {
-    document.getElementById('shopLabel').textContent = 'Deliver To (Receiving Shop) — optional';
-    document.getElementById('wholesalerField').hidden = false;
-    document.getElementById('fAddress').placeholder = 'Auto-fills from shop, or type address directly';
-    document.getElementById('recipientNameField').hidden = false;
-    document.getElementById('billingQueryField').hidden = true;
-    document.getElementById('statusCard').hidden = true;
-    document.getElementById('wholesaleStatusCard').hidden = false;
-    document.getElementById('eventTypeField').hidden = true;
-    document.getElementById('quoteField').hidden = true; clearQuote();
-  } else {
-    document.getElementById('wholesalerField').hidden = true;
-    document.getElementById('shopLabel').textContent = 'Shop';
-    document.getElementById('fAddress').placeholder = 'Start typing address...';
-    document.getElementById('recipientNameField').hidden = false;
-    document.getElementById('billingQueryField').hidden = true;
-    document.getElementById('statusCard').hidden = false;
-    document.getElementById('wholesaleStatusCard').hidden = true;
-    document.getElementById('eventTypeField').hidden = deliveryType !== 'events';
-    document.getElementById('quoteField').hidden = deliveryType !== 'events';
-    if (deliveryType !== 'events') clearQuote(); else if (!quoteTyped()) document.getElementById('fQuote').value = quotePrefix();
-  }
-  if (!preserveShop) {
-    document.getElementById('fShopSearch').value = '';
-    document.getElementById('fShop').value = '';
-  }
-  document.getElementById('fShopDropdown').style.display = 'none';
+function copyShopLink(shopId,btn){
+  const url=location.origin+'/shop/'+encodeURIComponent(shopId);
+  const r=btn.textContent;
+  const done=()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent=r,1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(done).catch(()=>window.prompt('Copy this link:',url));
+  else window.prompt('Copy this link:',url);
 }
 
-function renderShopDropdown(search) {
-  var dd = document.getElementById('fShopDropdown');
-  var s = (search || '').toLowerCase();
-  var featured = shops.filter(function(sh){ return sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
-  var others = shops.filter(function(sh){ return !sh.featured && (!s || sh.name.toLowerCase().includes(s)); });
-  var html = '';
-  if (featured.length && !s) {
-    html += '<div class="shop-dd-header">Frequently Used</div>';
-    featured.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
-      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+/* copy zone setup between shops */
+function renderCopyFromShopSelect(currentShop){
+  const sel=document.getElementById('copyFromShopSelect');
+  if(!sel)return;
+  const others=state.shops.filter(s=>s.id!==currentShop.id).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!others.length){sel.innerHTML='<option value="">No other shops yet</option>';sel.disabled=true;return;}
+  sel.disabled=false;
+  sel.innerHTML='<option value="">Select a shop&hellip;</option>'+others.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+
+async function copyZoneSetupFromShop(){
+  const target=getSelectedShop();
+  const sourceId=document.getElementById('copyFromShopSelect').value;
+  if(!target||!sourceId)return;
+  const source=state.shops.find(s=>s.id===sourceId);
+  if(!source)return;
+  if(!window.confirm(`Copy zone prices, community overrides, and town rates from ${source.name} to ${target.name}? This overwrites ${target.name}'s current setup.`))return;
+  const btn=document.getElementById('copyFromShopBtn');
+  const orig=btn.textContent;btn.disabled=true;btn.textContent='Copying...';
+  target.zonePrices={...source.zonePrices};
+  target.communityZones={...source.communityZones};
+  target.townPrices={...source.townPrices};
+  try{
+    await apiSaveShop(target);
+    styleCommunities();renderPricingTable();renderLegend();if(state.map)drawTownPins();
+  }catch(e){alert('Could not copy setup: '+e.message);}
+  finally{btn.disabled=false;btn.textContent=orig;}
+}
+
+/* pricing table */
+function renderPricingTable(){
+  const shop=getSelectedShop();
+  const panel=document.getElementById('pricingPanel');
+  if(!shop){panel.hidden=true;return;}
+  panel.hidden=false;
+  document.getElementById('pricingShopName').textContent=shop.name;
+  renderCopyFromShopSelect(shop);
+  const body=document.getElementById('pricingBody');
+
+  // Border zones = everything in ZONE_COLORS that isn't a core Calgary zone
+  // or a rural/outer band (C5, TSA, HPT, RVN, RVS, and the rest).
+  const BORDER_ZONES=Object.keys(ZONE_COLORS).filter(z=>!CALGARY_ZONES.includes(z)&&!OUTER_ZONES.includes(z));
+
+  const zoneRow=z=>`<tr><td><span class="swatch-box" style="background:${getZoneColor(z)}"></span></td><td>${z} <span style="color:var(--ink-soft);font-size:11px;">${ZONE_LABELS[z]||''}</span></td><td>$<input type="number" min="0" step="0.5" data-zone="${z}" value="${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}"></td></tr>`;
+  const cRows=CALGARY_ZONES.map(zoneRow).join('');
+  const bRows=BORDER_ZONES.map(zoneRow).join('');
+  const oRows=OUTER_ZONES.map(zoneRow).join('');
+  const tRows=NAMED_TOWNS.map(t=>{const v=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:'';return`<tr><td><span class="swatch-box" style="background:${t.color}"></span></td><td>${escapeHtml(t.name)} <span style="color:var(--ink-soft);font-size:11px;">${t.zone}</span></td><td>$<input type="number" min="0" step="0.5" data-town="${escapeHtml(t.name)}" placeholder="zone" value="${v}"></td></tr>`;}).join('');
+  const wsNote=`<div style="background:#EAF4EA;border:1px solid #A8CFA8;border-radius:8px;padding:8px 10px;font-size:12px;color:#2C5F2C;"><strong>Wholesale rates:</strong> In-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece.</div>`;
+
+  body.innerHTML=`
+    <details class="pricing-group" open>
+      <summary>Calgary zones</summary>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${cRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Border communities</summary>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${bRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Out of town</summary>
+      <h3 style="margin-top:0;">Rural / outer zones</h3>
+      <table class="pricing"><thead><tr><th></th><th>Zone</th><th>Retail price</th></tr></thead><tbody>${oRows}</tbody></table>
+      <h3>Town flat rates <span style="font-weight:400;">(blank = use zone price)</span></h3>
+      <table class="pricing"><thead><tr><th></th><th>Town</th><th>Retail price</th></tr></thead><tbody>${tRows}</tbody></table>
+    </details>
+    <details class="pricing-group">
+      <summary>Wholesale</summary>
+      ${wsNote}
+    </details>`;
+  body.querySelectorAll('input[data-zone]').forEach(i=>{i.addEventListener('change',()=>{const z=i.dataset.zone,v=parseFloat(i.value);shop.zonePrices[z]=isNaN(v)?0:v;styleCommunities();renderLegend();apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
+  body.querySelectorAll('input[data-town]').forEach(i=>{i.addEventListener('change',()=>{if(!shop.townPrices)shop.townPrices={};const t=i.dataset.town,v=parseFloat(i.value);shop.townPrices[t]=isNaN(v)?null:v;apiSaveShop(shop).catch(e=>alert('Price not saved: '+e.message));});});
+}
+
+/* legend */
+function renderLegend(){
+  const shop=getSelectedShop();
+  const legend=document.getElementById('legend');
+  if(!shop){legend.innerHTML='';return;}
+  const cH=CALGARY_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  const oH=OUTER_ZONES.map(z=>`<div class="legend-row"><span class="swatch-box" style="background:${getZoneColor(z)}"></span>${z} &mdash; $${shop.zonePrices[z]||0} <span style="color:var(--ink-soft)">(${ZONE_LABELS[z]})</span></div>`).join('');
+  legend.innerHTML=`<div class="legend-section">Calgary</div>${cH}<div class="legend-section">Rural / outer</div>${oH}`;
+}
+
+/* map */
+function initMap(){
+  state.map=new google.maps.Map(document.getElementById('map'),{center:{lat:51.0447,lng:-114.0719},zoom:9,streetViewControl:false,mapTypeControl:false});
+  state.map.data.setStyle(()=>({fillOpacity:0.5,strokeWeight:0.6,strokeColor:'#FFFFFF'}));
+  const fc={type:'FeatureCollection',features:state.communities.map(c=>c.raw)};
+  state.map.data.addGeoJson(fc);
+  state.map.data.addListener('click',onCommunityClick);
+  drawTownPins();
+}
+
+function makePinSvg(color){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.27 0 0 6.27 0 14c0 9.625 14 22 14 22S28 23.625 28 14C28 6.27 21.73 0 14 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>`;
+  return'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
+}
+
+function drawTownPins(){
+  state.townMarkers.forEach(m=>m.setMap(null));
+  state.townMarkers=[];
+  const shop=getSelectedShop();
+  NAMED_TOWNS.forEach(town=>{
+    const retailPrice=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:zonePriceFor(shop,town.zone)):null;
+    const marker=new google.maps.Marker({
+      map:state.map,
+      position:{lat:town.lat,lng:town.lng},
+      title:town.name,
+      icon:{url:makePinSvg(town.color),scaledSize:new google.maps.Size(28,36),anchor:new google.maps.Point(14,36)},
+      label:{text:town.name,color:'#1A1A1A',fontSize:'11px',fontWeight:'600',className:'town-label'},
+      zIndex:10
     });
-  }
-  var allShops = s ? featured.concat(others) : others;
-  if (allShops.length) {
-    if (!s) html += '<div class="shop-dd-header">All Shops</div>';
-    allShops.sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(sh) {
-      html += '<div class="shop-dd-item" data-id="'+sh.id+'">'+sh.name+'</div>';
+    marker.addListener('click',()=>{
+      const content=document.createElement('div');
+      content.className='iw';
+      const price=shop?(shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:zonePriceFor(shop,town.zone)):'-';
+      const wsPrice=shop?calcWholesalePrice(Number(price),1,false):'-';
+      content.innerHTML=`<div class="iw-title">${escapeHtml(town.name)}</div><div class="iw-row">Zone: <strong>${town.zone}</strong></div><div class="iw-row">Retail: <strong>$${Number(price).toFixed(2)}</strong></div><div class="iw-row">Wholesale (1 pc): <strong>$${Number(wsPrice).toFixed(2)}</strong></div>`;
+      if(state.infoWindow)state.infoWindow.close();
+      state.infoWindow=new google.maps.InfoWindow({content,position:{lat:town.lat,lng:town.lng}});
+      state.infoWindow.open(state.map);
     });
+    state.townMarkers.push(marker);
+  });
+}
+
+function styleCommunities(){
+  const shop=getSelectedShop();
+  if(!state.map)return;
+  state.map.data.setStyle(feature=>{
+    const name=feature.getProperty('quoteToolName');
+    let fill='#E4DDD0';
+    if(shop){const code=shop.communityZones[name]||'C4';fill=getZoneColor(code);}
+    return{fillColor:fill,fillOpacity:0.55,strokeWeight:0.6,strokeColor:'#FFFFFF',zIndex:1};
+  });
+}
+
+function onCommunityClick(e){
+  const shop=getSelectedShop();if(!shop)return;
+  const name=e.feature.getProperty('quoteToolName');
+  const current=shop.communityZones[name]||'C4';
+  if(ROUTE.mode!=='admin'){
+    const content=document.createElement('div');
+    content.className='iw';
+    const wsBase=calcWholesalePrice(shop.zonePrices[current]||0,1,true);
+    content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone ${current} &mdash; Retail $${shop.zonePrices[current]||0}</div><div class="iw-row">Wholesale (1 pc): $${wsBase}</div>`;
+    if(state.infoWindow)state.infoWindow.close();
+    state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
+    state.infoWindow.open(state.map);return;
   }
-  if (!featured.length && !allShops.length) {
-    html = '<div style="padding:10px 14px;color:var(--ink-soft);font-size:13px;">No shops found</div>';
-  }
-  dd.innerHTML = html;
-  dd.querySelectorAll('.shop-dd-item').forEach(function(item) {
-    item.addEventListener('mousedown', function(e) {
-      e.preventDefault();
-      var id = this.dataset.id;
-      var shop = shops.find(function(sh){ return sh.id === id; });
-      if (!shop) return;
-      document.getElementById('fShop').value = id;
-      document.getElementById('fShopSearch').value = shop.name;
-      document.getElementById('fShopDropdown').style.display = 'none';
-      if (deliveryType === 'wholesale') {
-        var addr = shop.address || '';
-        document.getElementById('fAddress').value = addr;
-        formattedAddress = addr;
-        var wResult = getWholesaleZoneForShop(shop);
-        setZone(wResult.zone, wResult.zone + ' - auto from ' + shop.name, false, null, wResult.distanceKm);
-      }
+  const content=document.createElement('div');
+  content.className='iw';
+  content.innerHTML=`<div class="iw-title">${escapeHtml(name)}</div><div class="iw-row">Zone for ${escapeHtml(shop.name)}:<br><select id="iwZoneSelect" style="margin-top:4px;">${COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===current?'selected':''}>${z} &mdash; $${shop.zonePrices[z]!=null?shop.zonePrices[z]:0}</option>`).join('')}</select></div><button class="btn btn-sm" id="iwApply" style="margin-top:4px;">Set zone</button>`;
+  if(state.infoWindow)state.infoWindow.close();
+  state.infoWindow=new google.maps.InfoWindow({content,position:e.latLng});
+  state.infoWindow.open(state.map);
+  google.maps.event.addListenerOnce(state.infoWindow,'domready',()=>{
+    document.getElementById('iwApply').addEventListener('click',()=>{
+      shop.communityZones[name]=document.getElementById('iwZoneSelect').value;
+      styleCommunities();renderLegend();state.infoWindow.close();
+      apiSaveShop(shop).catch(e=>alert('Zone not saved: '+e.message));
     });
   });
 }
 
-// Marks the current stop fulfilled and links it to the real order, or
-// abandoned if the driver resets without ever submitting - either way
-// clears currentStopId so the next delivery starts its own fresh stop.
-var lastFulfilledStopId = null;
-
-function fulfillStop(orderId) {
-  if (!currentStopId) return Promise.resolve();
-  var id = currentStopId;
-  currentStopId = null;
-  lastFulfilledStopId = id;
-  return fetch('/api/stops/' + encodeURIComponent(id), {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status: 'fulfilled', order_id: orderId })
-  }).catch(function() { /* best-effort - the stop may still show as pending until the next sync, but this no longer risks being cancelled mid-flight by navigation */ });
+function placeQuoteMarkers(shop,dest){
+  if(state.markers.shop)state.markers.shop.setMap(null);
+  if(state.markers.dest)state.markers.dest.setMap(null);
+  state.markers.shop=new google.maps.Marker({position:{lat:shop.lat,lng:shop.lng},map:state.map,title:shop.name,icon:{path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:'#2B2620',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
+  state.markers.dest=new google.maps.Marker({position:{lat:dest.lat,lng:dest.lng},map:state.map,title:dest.address});
+  const b=new google.maps.LatLngBounds();b.extend(state.markers.shop.getPosition());b.extend(state.markers.dest.getPosition());state.map.fitBounds(b,80);
 }
 
-function abandonStop() {
-  if (!currentStopId) return Promise.resolve();
-  var id = currentStopId;
-  currentStopId = null;
-  return fetch('/api/stops/' + encodeURIComponent(id), {
-    method: 'PUT', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status: 'abandoned' })
-  }).catch(function() { /* best-effort */ });
+function selectShop(id){
+  state.selectedShopId=id;
+  renderShopList();renderPricingTable();styleCommunities();renderLegend();
+  if(state.map) drawTownPins();
+}
+function enterLookupView(shop){
+  seedCommunityZones(shop);
+  state.shops=[shop];state.selectedShopId=shop.id;
+  document.getElementById('shopsPanel').hidden=true;
+  document.getElementById('pricingPanel').hidden=true;
+  document.getElementById('diagStatus').hidden=true;
+  document.getElementById('topbarSubtitle').textContent='Quote lookup';
+  const banner=document.getElementById('lookupBanner');
+  banner.hidden=false;
+  banner.innerHTML=`<h2>${escapeHtml(shop.name)}</h2><p class="hint">${escapeHtml(shop.address)}</p><button class="btn btn-sm btn-ghost" id="lookupSheetBtn" style="margin-top:8px;">Print price sheet</button> <button class="btn btn-sm btn-ghost" id="lookupCplBtn" style="margin-top:8px;">Community price list</button>`;
+  document.getElementById('lookupSheetBtn').addEventListener('click',showPricingSheet);
+  document.getElementById('lookupCplBtn').addEventListener('click',showCommunityPriceList);
+  styleCommunities();renderLegend();if(state.map)drawTownPins();
 }
 
-function resetForm() {
-  clearDraft();
-  abandonStop();
-  setRecipientPhone('');
-  selectedZone = ''; selectedStatuses = []; formattedAddress = ''; lastPlaceLat = null; lastPlaceLng = null; eventType = ''; matchedCommunity = ''; matchedDistanceKm = null;
-  document.getElementById('fEventType').value = '';
-  document.getElementById('eventTypeNote').hidden = true;
-  clearQuote();
-  document.getElementById('fOrderId').value = '';
-  document.getElementById('fName').value = '';
-  document.getElementById('fAddress').value = '';
-  document.getElementById('fUnit').value = '';
-  document.getElementById('fTimeRequest').value = '';
-  document.getElementById('fRush').checked = false;
-  document.getElementById('fPieces').value = '1';
-  document.getElementById('fXmas').value = '';
-  refreshXmas();
-  document.getElementById('fComments').value = '';
-  document.getElementById('fAcceptedBy').value = '';
-  document.getElementById('fWholesaleAcceptedBy').value = '';
-  document.getElementById('fNeighbouredTo').value = '';
-  document.getElementById('fPhoto').value = '';
-  document.getElementById('fShopSearch').value = '';
-  document.getElementById('fShop').value = '';
-  document.getElementById('fShopDropdown').style.display = 'none';
-  document.getElementById('fWholesaler').value = '';
-  document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.getElementById('contactMethodField').hidden = true;
-  document.getElementById('billingQueryField').hidden = true;
-  document.getElementById('directSubField').hidden = true;
-  document.getElementById('redirectField').hidden = true;
-  document.getElementById('undeliverableSubField').hidden = true;
-  document.getElementById('fRedirectDetail').value = '';
-  document.querySelectorAll('#contactMethodGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-  document.querySelectorAll('#directSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-  document.querySelectorAll('#undeliverableSubGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-  document.getElementById('zoneResult').hidden = true;
-  document.getElementById('zoneManual').hidden = true;
-  document.getElementById('payPreview').hidden = true;
-  document.getElementById('errorMsg').hidden = true;
-  document.querySelectorAll('.status-btn').forEach(function(b) { b.classList.remove('selected'); });
-  document.getElementById('neighbouredToField').hidden = true;
-  var now = new Date();
-  document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  document.getElementById('successScreen').hidden = true;
-  document.getElementById('successPhoto').hidden = true;
-  document.getElementById('app').hidden = false;
-  refreshPhotoUI();
+function setupAutocomplete(input){
+  const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'ca'},fields:['formatted_address','geometry']});
+  ac.addListener('place_changed',()=>{const p=ac.getPlace();if(p.geometry)state.lastDestination={address:p.formatted_address,lat:p.geometry.location.lat(),lng:p.geometry.location.lng()};});
 }
 
-// Resizes and re-compresses a photo file via canvas before upload - a raw
-// phone camera photo can be several MB, which is slow/costly on a driver's
-// mobile connection and unnecessary for proof-of-delivery purposes. Caps
-// the longest side at 1200px and re-encodes as JPEG at moderate quality.
-function getExifOrientation(arrayBuffer) {
-  var view = new DataView(arrayBuffer);
-  if (view.byteLength < 4 || view.getUint16(0, false) !== 0xFFD8) return 1;
-  var offset = 2, length = view.byteLength;
-  while (offset + 4 <= length) {
-    var marker = view.getUint16(offset, false);
-    offset += 2;
-    if (marker === 0xFFE1) {
-      if (offset + 10 > length || view.getUint32(offset + 2, false) !== 0x45786966) return 1;
-      var tiffOffset = offset + 8;
-      var little = view.getUint16(tiffOffset, false) === 0x4949;
-      var firstIFDOffset = view.getUint32(tiffOffset + 4, little);
-      var dirStart = tiffOffset + firstIFDOffset;
-      if (dirStart + 2 > length) return 1;
-      var entries = view.getUint16(dirStart, little);
-      for (var i = 0; i < entries; i++) {
-        var entryOffset = dirStart + 2 + i * 12;
-        if (entryOffset + 10 > length) break;
-        if (view.getUint16(entryOffset, little) === 0x0112) return view.getUint16(entryOffset + 8, little);
-      }
-      return 1;
-    } else if ((marker & 0xFF00) !== 0xFF00) {
-      break;
-    } else {
-      if (offset + 2 > length) break;
-      offset += view.getUint16(offset, false);
-    }
-  }
-  return 1;
-}
-
-var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-// Android's file input can't offer both camera and gallery access at once
-// the way iOS's single picker can - capture=environment forces
-// camera-only, its absence forces gallery-only, with no combined
-// chooser. Two explicit buttons give Android drivers real choice; iOS
-// keeps its native input visible as-is since it already handles both.
-if (!isIOS) {
-  document.getElementById('fPhoto').style.display = 'none';
-  document.getElementById('photoButtonsAndroid').hidden = false;
-  document.getElementById('photoTakeBtn').addEventListener('click', function() {
-    var input = document.getElementById('fPhoto');
-    input.setAttribute('capture', 'environment');
-    input.click();
-  });
-  document.getElementById('photoGalleryBtn').addEventListener('click', function() {
-    var input = document.getElementById('fPhoto');
-    input.removeAttribute('capture');
-    input.click();
-  });
-}
-
-// ---- Photo area: one function decides everything it shows -----------------------------
-var photoPreviewUrl = null;
-var photoPreviewFile = null;
-
-// Doorstep counts only where it is actually in effect. On the Wholesale tab that is
-// its own Doorstep button. On Store/Events it is the Doorstep sub-choice, and only
-// while "Direct to Address" is still selected: un-choosing Direct to Address hides the
-// sub-choices, and a hidden Doorstep must not keep demanding a photo (or get saved).
-function isDoorstepSelected() {
-  if (deliveryType === 'wholesale') {
-    var wb = document.getElementById('wsDoorstepBtn');
-    return !!(wb && wb.classList.contains('selected'));
-  }
-  return selectedStatuses.indexOf('Direct to Address') >= 0 &&
-    !!document.querySelector('#directSubGrid .status-btn[data-sub="Doorstep"].selected');
-}
-
-// The statuses that actually apply to this delivery. Only choices belonging to the
-// current tab and to a still-selected parent status are included, so selections left
-// over on another tab (or under a status that was un-chosen) can't leak into the order.
-function collectDeliveryStatuses() {
-  if (deliveryType === 'wholesale') {
-    return isDoorstepSelected() ? ['Direct to Address', 'Doorstep'] : [];
-  }
-  var statuses = selectedStatuses.slice();
-  if (statuses.indexOf('Direct to Address') >= 0) {
-    document.querySelectorAll('#directSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.sub); });
-  }
-  if (statuses.indexOf('Undeliverable') >= 0) {
-    document.querySelectorAll('#undeliverableSubGrid .status-btn.selected').forEach(function(b){ statuses.push(b.dataset.unsub); });
-  }
-  var rd = document.getElementById('fRedirectDetail').value.trim();
-  if (rd && statuses.indexOf('Redirect') >= 0) statuses.push('Redirect: ' + rd);
-  return statuses;
-}
-
-function refreshPhotoUI() {
-  var input = document.getElementById('fPhoto');
-  var file = (input.files && input.files.length) ? input.files[0] : null;
-  var doorstep = isDoorstepSelected();
-  document.getElementById('photoLabel').textContent = doorstep ? 'Photo (required)' : 'Photo (optional)';
-  if (doorstep) input.setAttribute('required', 'required'); else input.removeAttribute('required');
-  // The red warning shows only while a photo is still missing.
-  document.getElementById('photoRequired').hidden = !(doorstep && !file);
-
-  var box = document.getElementById('photoStatus');
-  var thumb = document.getElementById('photoThumb');
-  if (!file) {
-    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
-    photoPreviewUrl = null; photoPreviewFile = null;
-    thumb.removeAttribute('src');
-    box.hidden = true;
-    return;
-  }
-  if (file !== photoPreviewFile) {
-    if (photoPreviewUrl) { try { URL.revokeObjectURL(photoPreviewUrl); } catch (e) {} }
-    photoPreviewFile = file;
-    photoPreviewUrl = null;
-    thumb.style.display = '';
-    try {
-      photoPreviewUrl = URL.createObjectURL(file);
-      thumb.onerror = function() { thumb.style.display = 'none'; }; // keep the text confirmation even if a preview can't render
-      thumb.src = photoPreviewUrl;
-    } catch (e) { thumb.style.display = 'none'; }
-  }
-  document.getElementById('photoStatusSub').textContent = doorstep
-    ? 'Doorstep photo ready. Uploads when you tap Submit'
-    : 'Uploads when you tap Submit';
-  box.hidden = false;
-}
-
-// Called after any Doorstep-related tap. Opens the camera/picker straight away only
-// when Doorstep itself was just turned ON and no photo is attached yet - tapping some
-// other sub-choice (Mailroom etc.) or re-toggling with a photo already attached must
-// not re-prompt.
-function onDoorstepToggled(turnedOn) {
-  var input = document.getElementById('fPhoto');
-  var hadPhoto = !!(input.files && input.files.length);
-  refreshPhotoUI();
-  if (turnedOn && isDoorstepSelected() && !hadPhoto) {
-    if (!isIOS) input.setAttribute('capture', 'environment');
-    input.click();
-  }
-}
-
-// After a successful submit: say what actually happened to the photo. "Saved" is only
-// claimed when the server confirmed it stored the photo.
-function showSuccessPhotoStatus(sentPhoto, resData) {
-  var el = document.getElementById('successPhoto');
-  if (!sentPhoto || !resData) { el.hidden = true; return; }
-  if (resData.has_photo === false) {
-    el.textContent = '\u26A0 Delivery saved, but the photo did not upload. Please let dispatch know.';
-    el.style.color = 'var(--warm)';
-  } else if (resData.has_photo === true) {
-    el.textContent = '\uD83D\uDCF7 Photo saved';
-    el.style.color = 'var(--green)';
-  } else {
-    el.textContent = '\uD83D\uDCF7 Photo sent with this delivery';
-    el.style.color = 'var(--ink-soft)';
-  }
-  el.hidden = false;
-}
-
-// One listener covers every way a photo can arrive: the Doorstep auto-prompt, Take Photo,
-// Choose from Gallery, and the iPhone picker all end in a change event on this input.
-document.getElementById('fPhoto').addEventListener('change', refreshPhotoUI);
-document.getElementById('photoRemoveBtn').addEventListener('click', function() {
-  document.getElementById('fPhoto').value = '';
-  refreshPhotoUI();
+/* quote type toggle */
+document.getElementById('quoteTypeToggle').addEventListener('click',function(e){
+  const btn=e.target.closest('button');if(!btn)return;
+  state.quoteType=btn.dataset.type;
+  this.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));
+  document.getElementById('pieceRow').hidden=state.quoteType==='retail';
+  document.getElementById('setupRow').hidden=!['wedding','event'].includes(state.quoteType);
+  document.getElementById('quotedRow').hidden=state.quoteType!=='event';
+  document.getElementById('funoRow').hidden=state.quoteType!=='funeral';
+  document.getElementById('pieceLabel').textContent=['wedding','event'].includes(state.quoteType)?'Number of cases:':'Number of pieces:';
+  document.getElementById('quoteResult').innerHTML='';
 });
 
-// Does this browser rotate photos by their EXIF orientation tag by itself when it loads
-// them? Modern ones do (Safari from iOS 13.4, Chrome, Firefox); older ones don't. Rotating
-// by hand ON TOP of a browser that already did it turns the photo the wrong way up - on a
-// modern iPhone that sent portrait tags to the AI sideways and the other way up sideways,
-// depending on how the phone was held. So rotate by hand only when the browser does not.
-// Found out by loading a tiny JPEG tagged "rotate 90 degrees": a browser that applies the
-// tag reports it as 1 wide by 2 tall instead of 2 wide by 1 tall. The answer is remembered.
-var exifAppliedPromise = null;
-function browserAppliesExifOrientation() {
-  if (exifAppliedPromise) return exifAppliedPromise;
-  exifAppliedPromise = new Promise(function(resolve) {
-    var settled = false;
-    function done(v) { if (!settled) { settled = true; resolve(v); } }
-    // If the check can't run or hangs, assume a modern browser - nearly every phone in use.
-    setTimeout(function() { done(true); }, 2000);
-    try {
-      var c = document.createElement('canvas'); c.width = 2; c.height = 1;
-      var ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 2, 1);
-      var bin = atob(c.toDataURL('image/jpeg', 0.9).split(',')[1]);
-      // EXIF segment: orientation = 6 (rotate 90 degrees)
-      var exif = [0xFF,0xE1,0x00,0x22, 0x45,0x78,0x69,0x66,0x00,0x00, 0x4D,0x4D,0x00,0x2A,0x00,0x00,0x00,0x08,
-                  0x00,0x01, 0x01,0x12,0x00,0x03,0x00,0x00,0x00,0x01, 0x00,0x06,0x00,0x00, 0x00,0x00,0x00,0x00];
-      var bytes = new Uint8Array(bin.length + exif.length);
-      bytes[0] = 0xFF; bytes[1] = 0xD8;
-      for (var e = 0; e < exif.length; e++) bytes[2 + e] = exif[e];
-      for (var i = 2; i < bin.length; i++) bytes[i + exif.length] = bin.charCodeAt(i);
-      var url = URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' }));
-      var img = new Image();
-      img.onload = function() { URL.revokeObjectURL(url); done(img.naturalWidth === 1 && img.naturalHeight === 2); };
-      img.onerror = function() { URL.revokeObjectURL(url); done(true); };
-      img.src = url;
-    } catch (err) { done(true); }
+function showQuoteError(msg){document.getElementById('quoteResult').innerHTML=`<div class="error">${escapeHtml(msg)}</div>`;}
+async function apiSaveShop(shop){const r=await fetch('/api/shops/'+encodeURIComponent(shop.id),{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(shop)});if(!r.ok)throw new Error('Could not save shop.');return r.json();}
+  function renderShopList(){
+  const el=document.getElementById('shopList');
+  const search=(document.getElementById('shopSearch').value||'').toLowerCase().trim();
+  const words=search?search.split(/\s+/):[];
+  const filtered=state.shops.filter(s=>{
+    if(!words.length)return true;
+    const haystack=(s.name+' '+(s.address||'')).toLowerCase();
+    return words.every(w=>haystack.includes(w));
   });
-  return exifAppliedPromise;
+  if(!filtered.length){el.innerHTML='<p class="hint">No shops found.</p>';return;}
+  el.innerHTML=filtered.map(s=>`
+    <div class="shop-item-wrap">
+      <button class="shop-item ${s.id===state.selectedShopId?'active':''}" data-id="${s.id}">${escapeHtml(s.name)}<span class="addr">${escapeHtml(s.address)}</span></button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-ghost" data-copy="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Copy lookup link</button>
+        <button class="btn btn-sm btn-ghost" data-onboard="${s.id}" style="flex:1;font-size:11px;padding:4px 8px;">Email onboarding</button>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('.shop-item').forEach(b=>b.addEventListener('click',()=>selectShop(b.dataset.id)));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>copyShopLink(b.dataset.copy,b)));
+  el.querySelectorAll('[data-onboard]').forEach(b=>b.addEventListener('click',()=>emailShopOnboarding(b.dataset.onboard)));
 }
-if (isIOS) browserAppliesExifOrientation(); // start early so the answer is ready for the first photo
+  function setQuoteLoading(on){document.getElementById('quoteBtn').disabled=on;if(on)document.getElementById('quoteResult').innerHTML='<p class="hint">Calculating&hellip;</p>';}
 
-// The straightforward path: draw the photo as the browser decodes it (what Android has always done).
-function compressPhotoSimple(file) {
-    return new Promise(function(resolve, reject) {
-      var img = new Image();
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        img.onload = function() {
-          var maxSide = 1200;
-          var w = img.width, h = img.height;
-          if (w > maxSide || h > maxSide) {
-            if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
-            else { w = Math.round(w * (maxSide / h)); h = maxSide; }
-          }
-          var canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.72));
-        };
-        img.onerror = function() { reject(new Error('Could not read photo.')); };
-        img.src = e.target.result;
-      };
-      reader.onerror = function() { reject(new Error('Could not read photo file.')); };
-      reader.readAsDataURL(file);
-    });
-  
+async function generateQuote(){
+  const shop=getSelectedShop();
+  if(!shop){showQuoteError('Select or add a shop first.');return;}
+  const input=document.getElementById('destinationInput');
+  const pieces=parseInt(document.getElementById('pieceCount').value)||1;
+  const isWholesale=state.quoteType==='wholesale';
+  const isWedding=['wedding','funeral','event'].includes(state.quoteType);
+  const evKind=state.quoteType;
+  const evQuoted=document.getElementById('eventQuoted').value;
+  const funoPick=document.getElementById('funoPick').value;
+  const funoName=(input.value||'');
+  const evPeople=document.getElementById('setupPeople').value,evHours=document.getElementById('setupHours').value;
+  let dest=state.lastDestination&&state.lastDestination.address===input.value?state.lastDestination:null;
+  setQuoteLoading(true);
+  try{
+    if(!dest){const g=await geocodeAddress(input.value);dest={address:g.formatted,lat:g.lat,lng:g.lng};}
+
+    // 1. Calgary community?
+    const community=findCommunity(dest);
+    if(community){
+      const zoneCode=shop.communityZones[community.name]||'C4';
+      const retailPrice=shop.zonePrices[zoneCode]||0;
+      let wedding=null;
+      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+      if(isWedding)wedding=calcEventPrice(evKind,pieces,!funoHit,shop.zonePrices[shop.communityZones[community.name]||'C4']||0,evPeople,evHours,funoHit,evQuoted);
+      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,true):retailPrice;
+      let driveKm;try{driveKm=await drivingDistanceKm(shop,dest);}catch(e){}
+      renderQuote({shop,dest,label:community.name,sublabel:'Calgary community',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:true,communityName:community.name});
+      placeQuoteMarkers(shop,dest);return;
+    }
+
+    // 2. Named town?
+    const town=findNamedTown(dest);
+    if(town){
+      const flat=shop.townPrices&&shop.townPrices[town.name]!=null?shop.townPrices[town.name]:null;
+      const retailPrice=flat!==null?flat:(zonePriceFor(shop,town.zone));
+      const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+      const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
+      const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+      renderQuote({shop,dest,label:town.name,sublabel:flat!==null?'flat rate':'zone rate',zoneCode:town.zone,retailPrice,finalPrice,isWholesale,wedding,pieces,isInTown:false});
+      placeQuoteMarkers(shop,dest);return;
+    }
+
+    // 3. Rural distance fallback
+    const driveKm=await drivingDistanceKm(shop,dest);
+    const zoneCode=outerBandForDistance(driveKm);
+    if(!zoneCode){
+      document.getElementById('quoteResult').innerHTML=`<div class="quote-contact"><strong>Outside standard delivery area</strong><br>${driveKm.toFixed(1)} km driving distance &mdash; beyond standard zones.<br>Please contact the shop directly for a custom quote.</div>`;
+      placeQuoteMarkers(shop,dest);return;
+    }
+    const retailPrice=shop.zonePrices[zoneCode]||0;
+    const funoHit=evKind==='funeral'&&(funoPick!==''||FUNO_PATTERNS.some(r=>r.test(funoName)||r.test(dest.address)));
+    const wedding=isWedding?calcEventPrice(evKind,pieces,false,retailPrice,evPeople,evHours,funoHit,evQuoted):null;
+    const finalPrice=isWedding?wedding.total:isWholesale?calcWholesalePrice(retailPrice,pieces,false):retailPrice;
+    renderQuote({shop,dest,label:'Rural / acreage',sublabel:'distance-based',zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown:false});
+    placeQuoteMarkers(shop,dest);
+  }catch(err){showQuoteError(err.message);}
+  finally{setQuoteLoading(false);}
 }
 
-// For old browsers only: reads the EXIF orientation tag itself and rotates the photo to match.
-function compressPhotoWithManualRotation(file) {
-  return new Promise(function(resolve, reject) {
-    var bufReader = new FileReader();
-    bufReader.onload = function(bufEvent) {
-      var orientation = 1;
-      try { orientation = getExifOrientation(bufEvent.target.result); } catch (e) { orientation = 1; }
+function renderQuote({shop,dest,label,sublabel,zoneCode,retailPrice,finalPrice,isWholesale,wedding,pieces,driveKm,isInTown,communityName}){
+  const wsDetail=isWholesale?(isInTown
+    ?`Wholesale: $${WS_INTOWN_BASE} base + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`
+    :`Wholesale: $${retailPrice} zone + ${pieces-1} extra &times; $${WS_EXTRA_PER_PIECE}`):'';
+  const wedLabel=wedding?(wedding.kind==='funeral'?wedding.code:wedding.kind==='event'?`Special event (${wedding.code})`:`Wedding (${wedding.code})`):'';
+  const wedBaseTxt=wedding?(wedding.baseKind==='base'?`$${wedding.base} base`:`$${wedding.base} zone rate`):'';
+  const wedDetail=wedding?`${wedLabel}: ${wedBaseTxt} + ${wedding.qty-1} extra ${wedding.unit}${wedding.qty-1===1?'':'s'} &times; $${wedding.extra} = $${wedding.delivery.toFixed(2)}`+(wedding.kind!=='funeral'?(wedding.people>0?`<br>Setup: ${wedding.people} ${wedding.people===1?'person':'people'} &times; ${wedding.hours} hr &times; $${WED_SETUP_RATE}/hr = $${wedding.setup.toFixed(2)}`:`<br>Setup not included ($${WED_SETUP_RATE}/hr per person, 1 hr minimum)`)+(wedding.quoted!==null?`<br><strong>As quoted: $${wedding.quoted.toFixed(2)}</strong> (guideline would be $${wedding.guide.toFixed(2)})`:''):''):'';
+  const quoteText=[
+    `Delivery quote - ${shop.name}`,
+    `Type: ${wedding?`${wedLabel} (${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''})`:isWholesale?`Wholesale (${pieces} piece${pieces>1?'s':''})`:'Retail'}`,
+    wedding&&wedding.setup>0?`Delivery: $${wedding.delivery.toFixed(2)}`:'',
+    wedding&&wedding.people>0?`Setup (${wedding.people} x ${wedding.hours} hr x $${WED_SETUP_RATE}): $${wedding.setup.toFixed(2)}`:'',
+    `Destination: ${dest.address}`,
+    `Zone: ${zoneCode} (${label} - ${sublabel})`,
+    isWholesale?`Retail base: $${Number(retailPrice).toFixed(2)}`:'',
+    `Delivery price: $${Number(finalPrice).toFixed(2)}`,
+    driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:'',
+    `Generated: ${new Date().toLocaleString()}`
+  ].filter(Boolean).join('\n');
 
-      var img = new Image();
-      var urlReader = new FileReader();
-      urlReader.onload = function(e) {
-        img.onload = function() {
-          var maxSide = 1200;
-          var w = img.width, h = img.height;
-          if (w > maxSide || h > maxSide) {
-            if (w > h) { h = Math.round(h * (maxSide / w)); w = maxSide; }
-            else { w = Math.round(w * (maxSide / h)); h = maxSide; }
-          }
-          var swapDims = orientation >= 5 && orientation <= 8;
-          var canvas = document.createElement('canvas');
-          canvas.width = swapDims ? h : w;
-          canvas.height = swapDims ? w : h;
-          var ctx = canvas.getContext('2d');
-          switch (orientation) {
-            case 2: ctx.transform(-1, 0, 0, 1, w, 0); break;
-            case 3: ctx.transform(-1, 0, 0, -1, w, h); break;
-            case 4: ctx.transform(1, 0, 0, -1, 0, h); break;
-            case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
-            case 6: ctx.transform(0, 1, -1, 0, h, 0); break;
-            case 7: ctx.transform(0, -1, -1, 0, h, w); break;
-            case 8: ctx.transform(0, -1, 1, 0, 0, w); break;
-            default: break;
-          }
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.72));
-        };
-        img.onerror = function() { reject(new Error('Could not read photo.')); };
-        img.src = e.target.result;
-      };
-      urlReader.onerror = function() { reject(new Error('Could not read photo file.')); };
-      urlReader.readAsDataURL(file);
-    };
-    bufReader.onerror = function() { reject(new Error('Could not read photo file.')); };
-    bufReader.readAsArrayBuffer(file);
+  // Save-as-default is only meaningful when the quote matched an actual
+  // Calgary community polygon (communityName set) - that's the only case
+  // where shop.communityZones has a matching key to override.
+  const showSaveZone = !!communityName;
+
+  document.getElementById('quoteResult').innerHTML=`
+    <div class="quote-card">
+      <div class="quote-price">$${Number(finalPrice).toFixed(2)}</div>
+      <div class="quote-meta">
+        ${wedding?`<span class="badge-ws">${wedLabel} &mdash; ${wedding.qty} ${wedding.unit}${wedding.qty>1?'s':''}</span><br><span style="color:var(--ink-soft)">${wedDetail}</span><br>`:''}
+        ${isWholesale?`<span class="badge-ws">Wholesale &mdash; ${pieces} pc${pieces>1?'s':''}</span><br>`:''}
+       <span class="badge" style="background:${getZoneColor(zoneCode)};color:${['C1','C2'].includes(zoneCode)?'#2B2620':'#fff'}">${zoneCode}</span>${escapeHtml(label)}
+        ${isWholesale?`<span style="color:var(--ink-soft)">${wsDetail}</span><br>`:''}
+        ${escapeHtml(dest.address)}<br>
+        ${driveKm!==undefined?`Driving distance: ${driveKm.toFixed(1)} km`:''}
+      </div>
+      <div class="quote-actions">
+        <button class="btn btn-sm btn-ghost" id="copyQuoteBtn">Copy quote</button>
+        <button class="btn btn-sm btn-ghost" id="printQuoteBtn">Print quote</button>
+        ${showSaveZone?`<button class="btn btn-sm btn-ghost" id="saveZoneBtn">Save zone as default</button>`:''}
+      </div>
+    </div>`;
+
+  document.getElementById('copyQuoteBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copyQuoteBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(quoteText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy quote',1500);}).catch(()=>window.prompt('Copy:',quoteText));
+    else window.prompt('Copy:',quoteText);
   });
-}
-
-function compressPhotoToBase64(file) {
-  // Android: unchanged. iPhone: rotate by hand only if this browser doesn't already.
-  if (!isIOS) return compressPhotoSimple(file);
-  return browserAppliesExifOrientation().then(function(applied) {
-    return applied ? compressPhotoSimple(file) : compressPhotoWithManualRotation(file);
+  document.getElementById('printQuoteBtn').addEventListener('click',()=>{
+    const w=window.open('','_blank','width=520,height=460');
+    w.document.write(`<html><head><title>Delivery quote</title><style>body{font-family:sans-serif;padding:24px;color:#222;}h2{margin-bottom:4px;font-family:Georgia,serif;}.price{font-size:30px;font-weight:700;color:#B8472B;margin:8px 0;font-family:Georgia,serif;}p{margin:4px 0;font-size:14px;}.ws{background:#EAF4EA;border:1px solid #A8CFA8;padding:6px 10px;border-radius:6px;font-size:13px;color:#2C5F2C;margin:8px 0;}</style></head><body><h2>Delivery quote &mdash; ${escapeHtml(shop.name)}</h2><div class="price">$${Number(finalPrice).toFixed(2)}</div>${isWholesale?`<div class="ws">Wholesale &mdash; ${pieces} piece${pieces>1?'s':''} | ${wsDetail}</div>`:''}${wedding?`<div class="ws">${wedDetail}</div>`:''}<p><strong>Zone:</strong> ${zoneCode} &mdash; ${escapeHtml(label)} (${escapeHtml(sublabel)})</p><p><strong>Destination:</strong> ${escapeHtml(dest.address)}</p>${driveKm!==undefined?`<p><strong>Driving distance:</strong> ${driveKm.toFixed(1)} km</p>`:''}<p><strong>Generated:</strong> ${new Date().toLocaleString()}</p><script>window.print();<\/script></body></html>`);
+    w.document.close();
   });
-}
-
-// Scans a delivery tag photo via the vision API and auto-fills Order ID,
-// Recipient Name, and Delivery Address for the driver to review/edit
-// before submitting - never submits automatically, since OCR-style
-// extraction across many different tag layouts/handwriting can be wrong.
-
-/* Activity log: tells the office what happened on this phone (opened, tried to save, saved, failed). Silent and best-effort. */
-function logAct(ev, detail, tid) {
-  try {
-    var code = (typeof driverCode !== 'undefined' && driverCode) || (typeof urlDriverCode !== 'undefined' && urlDriverCode) || '';
-    if (!code) return;
-    fetch('/api/activity-log', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ driver: code, event: ev, page: 'form', tid: tid || '', detail: String(detail || '').slice(0, 160), online: navigator.onLine !== false }) }).catch(function() {});
-  } catch (e) {}
-}
-function newTid() { return Math.random().toString(36).slice(2, 10); }
-
-async function submitDelivery() {
-  var btn = document.getElementById('submitBtn');
-  var errEl = document.getElementById('errorMsg');
-  errEl.hidden = true;
-  var address = formattedAddress || document.getElementById('fAddress').value.trim();
-  var shopId = document.getElementById('fShop').value;
-  if (!address) { errEl.textContent = 'Enter a delivery address.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
-  if (deliveryType === 'wholesale') {
-    if (!shopId && !document.getElementById('fName').value.trim()) {
-      errEl.textContent = 'Select a receiving shop, or enter a recipient name.';
-      errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
-    }
-  } else if (!shopId) {
-    errEl.textContent = 'Select a shop.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
-  }
-  if (deliveryType === 'events' && quoteTyped() && !activeQuote) {
-    errEl.textContent = 'The quote number was not accepted. Fix it or clear the box.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
-  }
-  if (deliveryType === 'events' && !eventType) {
-    errEl.textContent = 'Select an event type (Special Event, Wedding, or Funeral).';
-    errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return;
-  }
-  if (!selectedZone) { errEl.textContent = 'Zone not determined. Please select manually.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
-  if (deliveryType !== 'wholesale' && !selectedStatuses.length) { errEl.textContent = 'Select a delivery status.'; errEl.hidden = false; logAct('submit_blocked', errEl.textContent); return; }
-  var photoFile = document.getElementById('fPhoto').files[0];
-  var doorstepSelected = isDoorstepSelected();
-  if (doorstepSelected && !photoFile) {
-    errEl.textContent = 'Photo required for Doorstep delivery. Please take a photo.';
-    errEl.hidden = false;
-    return;
-  }
-  btn.disabled = true; btn.textContent = 'Submitting...';
-  var shop = shops.find(function(s) { return s.id === shopId; });
-  var pay = computePay() || { effCode: selectedZone, isEventOverride: false, baseZone: selectedZone, total: 0 };
-  var pieces = parseInt(document.getElementById('fPieces').value) || 1;
-  var driverPay = pay.total;
-  var billingParty = '';
-  var wsName = document.getElementById('fName').value.trim();
-  var wsAddress = address;
-  var wsShopName = shop ? shop.name : shopId;
-  var wsShopCode = shop ? shop.name.split(' ')[0] : '';
-  if (deliveryType === 'wholesale') {
-    var active = document.querySelector('#billingToggle .toggle-btn.active');
-    var billing = active ? active.dataset.billing : 'shop';
-    if (!shop) billing = 'wholesaler'; // no shop exists to bill under 'shop' billing
-    var w = document.getElementById('fWholesaler').value;
-    var wOpt = document.querySelector('#fWholesaler option[value="' + w + '"]');
-    var wholesalerDisplayName = wOpt ? wOpt.textContent : w;
-    billingParty = billing === 'wholesaler' ? w : (shop ? shop.name : '');
-    if (billing === 'wholesaler') {
-      // Wholesaler is billed - DSHOP = wholesaler (who gets invoiced).
-      // name/address show the receiving shop as reference info on that
-      // invoice (or a direct recipient if there's no receiving shop).
-      wsShopName = wholesalerDisplayName;
-      wsShopCode = w;
-      wsName = shop ? shop.name : document.getElementById('fName').value.trim();
-      wsAddress = shop ? shop.address : address;
-    } else {
-      // Shop is billed - DSHOP = receiving shop (who gets invoiced).
-      // name/address show the sending wholesaler as reference info. No
-      // wholesaler address is on file anywhere in the system currently, so
-      // the wholesaler's name is used in the address field as a fallback
-      // reference rather than leaving it blank.
-      wsShopName = shop ? shop.name : '';
-      wsShopCode = shop ? shop.name.split(' ')[0] : '';
-      wsName = wholesalerDisplayName;
-      wsAddress = wholesalerDisplayName;
-    }
-  }
-  var photoBase64 = null;
-  if (photoFile) {
-    try {
-      btn.textContent = 'Processing photo...';
-      photoBase64 = await compressPhotoToBase64(photoFile);
-      btn.textContent = 'Submitting...';
-    } catch (e) {
-      errEl.textContent = 'Could not process photo: ' + e.message;
-      errEl.hidden = false;
-      btn.disabled = false; btn.textContent = 'Submit Delivery';
-      return;
-    }
-  }
-  var payload = {
-    date: document.getElementById('fDate').value,
-    order_id: document.getElementById('fOrderId').value.trim() || '1',
-    name: wsName,
-    address: wsAddress,
-    unit: document.getElementById('fUnit').value.trim(),
-    time_request: document.getElementById('fTimeRequest').value.trim(),
-    rush: document.getElementById('fRush').checked,
-    shop: wsShopName,
-    shop_code: wsShopCode,
-    driver: driverCode,
-    driver_name: driverName,
-    total_pieces: pieces,
-    zone: pay.effCode,
-    community: matchedCommunity || '',
-    distance_km: matchedDistanceKm,
-    event_type: eventType || '',
-    underlying_zone: pay.isEventOverride ? pay.baseZone : '',
-    delivery_type: deliveryType,
-    delivery_status: collectDeliveryStatuses(),
-    delivery_time: document.getElementById('fTime').value,
-    accepted_by: deliveryType === 'wholesale' ? document.getElementById('fWholesaleAcceptedBy').value.trim() : document.getElementById('fAcceptedBy').value.trim(),
-    neighboured_to: document.getElementById('fNeighbouredTo').value.trim(),
-    comments: document.getElementById('fComments').value.trim(),
-    driver_pay: driverPay,
-    contact_method: (function(){
-      var sel = document.querySelector('#contactMethodGrid .status-btn.selected');
-      return sel ? sel.dataset.contact : '';
-    })(),
-    billing_party: billingParty,
-    xmas_pieces: xmasCount(),
-    quote_id: (activeQuote && deliveryType === 'events') ? activeQuote.id : '',
-    wholesaler: document.getElementById('fWholesaler').value,
-    source: 'driver_form',
-    photo_base64: photoBase64
-  };
-  var tid = newTid(); logAct('submit_try', (payload.order_id || '') + ' ' + (payload.address || '').slice(0, 60), tid);
-  try {
-    var res = await fetch('/api/orders', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
-    });
-    var resData = await res.json();
-    if (resData.queued) {
-      logAct('submit_queued', '', tid);
-      clearDraft();
-      await fulfillStop(null);
-      showSuccessPhotoStatus(null, null); // can't confirm what an offline queue does with a photo, so say nothing
-      document.getElementById('successDetail').textContent = 'Saved offline — will upload automatically when signal returns.';
-      document.getElementById('app').hidden = true;
-      document.getElementById('successScreen').hidden = false;
-      return;
-    }
-    if (!res.ok) throw new Error('Status ' + res.status);
-    logAct('submit_ok', resData.order_id || '', tid);
-    clearDraft();
-    reportDelivered(payload.formatted_address || payload.address || '');
-    await fulfillStop(resData.order_id);
-    showSuccessPhotoStatus(photoBase64, resData);
-    document.getElementById('successDetail').textContent = pay.effCode + ' - ' + (shop ? shop.name : '') + ' - $' + driverPay.toFixed(2) + ' driver pay';
-    document.getElementById('app').hidden = true;
-    document.getElementById('successScreen').hidden = false;
-  } catch(e) {
-    logAct('submit_fail', e.message, tid);
-    errEl.textContent = 'Could not submit: ' + e.message;
-    errEl.hidden = false;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Submit Delivery';
-  }
-}
-
-/* Dispatch status: after a delivery is submitted, tell the office where it was (and where the phone is, if it will say).
-   Best-effort and silent - it must never slow down or break a submit. */
-function reportDelivered(addr) {
-  try {
-    if (!driverCode) return;
-    var send = function(lat, lng) {
-      fetch('/api/driver-status', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ driver: driverCode, kind: 'delivered', address: addr || '', lat: lat, lng: lng })
-      }).catch(function() {});
-    };
-    if (!navigator.geolocation) { send(null, null); return; }
-    var done = false;
-    var t = setTimeout(function() { if (!done) { done = true; send(null, null); } }, 3500);
-    navigator.geolocation.getCurrentPosition(
-      function(p) { if (done) return; done = true; clearTimeout(t); send(p.coords.latitude, p.coords.longitude); },
-      function() { if (done) return; done = true; clearTimeout(t); send(null, null); },
-      { timeout: 3000, maximumAge: 120000 }
-    );
-  } catch (e) { /* ignore */ }
-}
-
-async function init() {
-  try {
-    var res = await fetch('/api/drivers?code=' + encodeURIComponent(urlDriverCode));
-    if (!res.ok) { logAct('bad_link', 'driver code not found'); showNotFound(); return; }
-    var driver = await res.json();
-    driverCode = driver.code;
-    driverName = driver.name;
-    logAct('opened', '');
-    document.getElementById('driverBadge').textContent = driver.name;
-    document.title = 'Smart Choice - ' + driver.name;
-
-    var now = new Date();
-    document.getElementById('fDate').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-    document.getElementById('fTime').value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-
-    // Every interactive element gets wired up immediately here, completely
-    // independent of rates/shops/Maps loading below. Previously all of
-    // this was gated behind four sequential fetches (including an
-    // external Google Maps script load) - if any one of those hung or was
-    // slow, NOTHING in the form responded to taps at all. The form must
-    // be usable right away regardless of how long background data takes.
-
-    // Shop search
-    document.getElementById('fShopSearch').addEventListener('input', function() {
-      var s = this.value.trim();
-      document.getElementById('fShopDropdown').style.display = 'block';
-      renderShopDropdown(s);
-    });
-    document.getElementById('fShopSearch').addEventListener('focus', function() {
-      document.getElementById('fShopDropdown').style.display = 'block';
-      renderShopDropdown(this.value.trim());
-    });
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('#fShopSearch') && !e.target.closest('#fShopDropdown')) {
-        document.getElementById('fShopDropdown').style.display = 'none';
-      }
-    });
-
-    document.getElementById('deliveryTypeToggle').addEventListener('click', function(e) {
-      var btn = e.target.closest('.toggle-btn');
-      if (!btn) return;
-      var prevType = deliveryType;
-      deliveryType = btn.dataset.type;
-      document.querySelectorAll('#deliveryTypeToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
-      // Store to Door and Events use the shop identically (the sending
-      // shop), so switching between them must not wipe it - special
-      // events always originate from a registered shop, and a tag scanned
-      // as Store to Door and then switched to Events was losing its shop
-      // every time. Wholesale is different: the field there means the
-      // RECEIVING shop, so crossing that boundary in either direction
-      // still clears it.
-      var crossesWholesale = (prevType === 'wholesale') !== (deliveryType === 'wholesale');
-      populateShopDropdown(!crossesWholesale);
-      selectedZone = '';
-      if (deliveryType !== 'events') {
-        eventType = '';
-        document.getElementById('fEventType').value = '';
-        document.getElementById('eventTypeNote').hidden = true;
-      }
-      document.getElementById('zoneResult').hidden = true;
-      document.getElementById('zoneManual').hidden = true;
-      document.getElementById('payPreview').hidden = true;
-      // The zone belongs to the address, not to the tab. Clearing it above is
-      // right (wholesale zones differ), but if an address is already entered
-      // the zone must be looked up again - otherwise a driver who typed the
-      // address first and then switched to Events (or any tab) is left with
-      // no zone and cannot submit.
-      var addrNow = formattedAddress || document.getElementById('fAddress').value.trim();
-      if (addrNow) {
-        if (!formattedAddress) formattedAddress = addrNow;
-        lookupZone(addrNow, lastPlaceLat === null ? undefined : lastPlaceLat, lastPlaceLng === null ? undefined : lastPlaceLng);
-      }
-      refreshPhotoUI(); // the red "photo required" note must follow the tab you are now on
-    });
-
-    document.getElementById('statusGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var status = this.dataset.status;
-        if (status === 'Undeliverable') {
-          selectedStatuses = ['Undeliverable'];
-          document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){ b.classList.remove('selected'); });
-          this.classList.add('selected');
-        } else {
-          var unIdx = selectedStatuses.indexOf('Undeliverable');
-          if (unIdx >= 0) {
-            selectedStatuses.splice(unIdx, 1);
-            document.querySelectorAll('#statusGrid .status-btn').forEach(function(b){
-              if (b.dataset.status === 'Undeliverable') b.classList.remove('selected');
-            });
-          }
-          var idx = selectedStatuses.indexOf(status);
-          if (idx >= 0) { selectedStatuses.splice(idx,1); this.classList.remove('selected'); }
-          else { selectedStatuses.push(status); this.classList.add('selected'); }
-        }
-        document.getElementById('directSubField').hidden = selectedStatuses.indexOf('Direct to Address') < 0;
-        document.getElementById('neighbouredToField').hidden = selectedStatuses.indexOf('Neighboured') < 0;
-        document.getElementById('redirectField').hidden = selectedStatuses.indexOf('Redirect') < 0;
-        document.getElementById('undeliverableSubField').hidden = selectedStatuses.indexOf('Undeliverable') < 0;
-        refreshPhotoUI();
-      });
-    });
-
-    document.getElementById('directSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        this.classList.toggle('selected');
-        onDoorstepToggled(this.dataset.sub === 'Doorstep' && this.classList.contains('selected'));
-      });
-    });
-
-    document.getElementById('wsDoorstepBtn').addEventListener('click', function() {
-      this.classList.toggle('selected');
-      onDoorstepToggled(this.classList.contains('selected'));
-    });
-
-    document.getElementById('undeliverableSubGrid').querySelectorAll('.status-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() { this.classList.toggle('selected'); });
-    });
-
-    document.getElementById('fEventType').addEventListener('change', function() {
-      eventType = this.value;
-      var note = document.getElementById('eventTypeNote');
-      if (eventType && EVENT_TYPES[eventType]) {
-        var ev = EVENT_TYPES[eventType];
-        note.hidden = false;
-        note.textContent = ev.outTownCode
-          ? (ev.label + ': in-town = flat rate, out-of-town = zone rate + $' + ev.outTownExtraRate + '/extra pc (tracked as ' + ev.outTownCode + ')')
-          : (ev.label + ': flat rate regardless of location.');
-      } else {
-        note.hidden = true;
-      }
-      if (selectedZone) { refreshZoneDisplay(); updatePay(); }
-    });
-
-    document.getElementById('fPieces').addEventListener('change', updatePay);
-    document.getElementById('fPieces').addEventListener('input', updatePay);
-    document.getElementById('fPhone').addEventListener('input', updateCallLink);
-    // Keep the saved stop in step once the number is entered (best-effort; only after the stop exists).
-    document.getElementById('fPhone').addEventListener('change', function() { if (currentStopId && typeof trackStop === 'function') trackStop(); });
-    document.getElementById('fRush').addEventListener('change', updatePay);
-
-    document.getElementById('fAcceptedBy').addEventListener('input', function() {
-      document.getElementById('contactMethodField').hidden = !this.value.trim();
-    });
-
-    document.getElementById('contactMethodGrid').addEventListener('click', function(e) {
-  var btn = e.target.closest('.status-btn');
-  if (!btn) return;
-  btn.classList.toggle('selected');
-});
-  
-
-    document.getElementById('billingToggle').addEventListener('click', function(e) {
-      var btn = e.target.closest('.toggle-btn');
-      if (!btn) return;
-      document.querySelectorAll('#billingToggle .toggle-btn').forEach(function(b){ b.classList.toggle('active', b===btn); });
-    });
-
-    document.getElementById('fWholesaler').addEventListener('change', function() {
-      var code = this.value;
-      if (code) { setBillingDefault(code); document.getElementById('billingQueryField').hidden = false; }
-      else { document.getElementById('billingQueryField').hidden = true; }
-    });
-
-    document.getElementById('fAddress').addEventListener('blur', function() {
-      if (this.value.trim() && !selectedZone) {
-        formattedAddress = this.value.trim();
-        lookupZone(this.value.trim());
-      }
-    });
-
-    document.getElementById('submitBtn').addEventListener('click', submitDelivery);
-    document.getElementById('backToRouteLink').href = '/route/' + driverCode.toLowerCase();
-    document.getElementById('myRouteBtn2').addEventListener('click', function() {
-      var url = '/route/' + driverCode.toLowerCase();
-      if (lastFulfilledStopId) url += '?just_completed=' + encodeURIComponent(lastFulfilledStopId);
-      window.location.href = url;
-    });
-    document.getElementById('clearFormLink').addEventListener('click', function(e) {
-      e.preventDefault();
-      if (confirm('Clear this form and start over? Anything entered so far will be lost.')) {
-        resetForm();
-      }
-    });
-    document.getElementById('summaryBtn').addEventListener('click', function() {
-      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
-    });
-    document.getElementById('nextBtn').addEventListener('click', resetForm);
-    document.getElementById('summaryBtn2').addEventListener('click', function() {
-      window.location.href = '/driver-summary/' + driverCode.toLowerCase();
-    });
-
-    // Delegated listener - saves on any field edit anywhere in the form,
-    // rather than wiring up individual listeners per field.
-    document.getElementById('app').addEventListener('input', saveDraft);
-    document.getElementById('app').addEventListener('change', saveDraft);
-    document.getElementById('app').addEventListener('click', function(e) {
-      if (e.target.closest('.status-btn') || e.target.closest('.toggle-btn')) saveDraft();
-    });
-
-    document.getElementById('loadingScreen').hidden = true;
-    document.getElementById('app').hidden = false;
-
-    // Everything below loads in the background, without blocking any of
-    // the interactivity wired up above. Shop-dependent logic (the shop
-    // dropdown, the Complete-link pre-fill, and draft restore) waits
-    // specifically for shops data to arrive, but nothing else does.
-    (async function() {
+  if(showSaveZone){
+    document.getElementById('saveZoneBtn').addEventListener('click', async function() {
+      var btn = this;
+      var shopId = shop.id;
+      var updatedZones = Object.assign({}, shop.communityZones || {}, { [communityName]: zoneCode });
+      btn.disabled = true; var origText = btn.textContent; btn.textContent = 'Saving...';
       try {
-        var rRes = await fetch('/api/rates');
-        rates = await rRes.json();
-
-        var sRes = await fetch('/api/shops');
-        shops = await sRes.json();
-        populateShopDropdown();
-
-        var urlParams = new URLSearchParams(location.search);
-        var linkedStopId = urlParams.get('stop_id');
-        if (linkedStopId) {
-          clearDraft();
-          currentStopId = linkedStopId;
-          var linkedType = urlParams.get('delivery_type');
-          if (linkedType && linkedType !== deliveryType) {
-            var typeBtn = document.querySelector('#deliveryTypeToggle .toggle-btn[data-type="' + linkedType + '"]');
-            if (typeBtn) typeBtn.click(); // reuses the real toggle handler so field visibility (Wholesaler/Event Type fields, shop label, etc.) is set up correctly for the restored type
-          }
-          if (urlParams.get('order_id')) document.getElementById('fOrderId').value = urlParams.get('order_id');
-          if (urlParams.get('name')) document.getElementById('fName').value = urlParams.get('name');
-          setRecipientPhone(urlParams.get('phone') || '');
-          // Shop first, THEN the zone lookup: lookupZone reads the selected
-          // shop to pass its coordinates, and the C1-C5 bands are driving
-          // distance from the shop. With the order reversed, the lookup
-          // fired with no shop selected and measured from a fallback
-          // downtown point instead of the actual pickup location.
-          if (urlParams.get('shop_code')) {
-            var linkedShop = shops.find(function(s) { return s.name.split(' ')[0].toUpperCase() === urlParams.get('shop_code').toUpperCase(); });
-            if (linkedShop) {
-              document.getElementById('fShop').value = linkedShop.id;
-              document.getElementById('fShopSearch').value = linkedShop.name;
-            }
-          }
-          if (urlParams.get('address')) {
-            var addr = urlParams.get('address');
-            document.getElementById('fAddress').value = addr;
-            formattedAddress = addr;
-            lookupZone(addr);
-          }
-        } else {
-          restoreDraftIfPresent();
-        }
-      } catch (e) {
-        console.error('Background data load error:', e.message);
+        var res = await fetch('/api/shops/' + encodeURIComponent(shopId), {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ communityZones: updatedZones })
+        });
+        if (!res.ok) { const b = await res.json().catch(()=>({})); throw new Error(b.error || 'Could not save.'); }
+        shop.communityZones = updatedZones;
+        // Re-render the map/legend if this shop is the one currently selected.
+        if (getSelectedShop() && getSelectedShop().id === shopId) { styleCommunities(); renderLegend(); }
+        btn.textContent = 'Saved!';
+        setTimeout(()=>{btn.textContent = origText; btn.disabled = false;}, 1500);
+      } catch(e) {
+        alert('Could not save: ' + e.message);
+        btn.textContent = origText; btn.disabled = false;
       }
-    })();
-
-    // Maps/Places autocomplete loads fully independently - this is an
-    // enhancement to address entry, not a requirement for the rest of the
-    // form, and was previously the single most likely point of failure
-    // for the entire form going unresponsive (an external script load
-    // with no timeout).
-    fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
-      loadMaps(cfg.key);
-    }).catch(function(e) { console.error('Could not load maps config:', e.message); });
-
-  } catch(e) {
-    console.error('init error:', e.message);
-    showNotFound();
+    });
   }
 }
 
-function loadMaps(key) {
-  window.__mapsReady = function() {
-    var input = document.getElementById('fAddress');
-    var ac = new google.maps.places.Autocomplete(input, {
-      componentRestrictions: { country: 'ca' },
-      fields: ['formatted_address', 'geometry']
-    });
-    ac.addListener('place_changed', function() {
-      var place = ac.getPlace();
-      if (place.geometry) {
-        formattedAddress = place.formatted_address;
-        var loc = place.geometry.location;
-        lastPlaceLat = loc.lat(); lastPlaceLng = loc.lng();
-        lookupZone(place.formatted_address, loc.lat(), loc.lng());
-      }
-    });
+/* pricing sheet */
+function showCommunityDistances(){
+  const shop=getSelectedShop();if(!shop)return;
+  const modal=document.getElementById('communityDistancesModal');
+  const content=document.getElementById('communityDistancesContent');
+
+  const rows=state.communities
+    .filter(c=>c.centroid)
+    .map(c=>{
+      const km=haversineKm({lat:shop.lat,lng:shop.lng},c.centroid);
+      const currentZone=shop.communityZones[c.name]||'C4';
+      return {name:c.name,km,currentZone};
+    })
+    .sort((a,b)=>a.km-b.km);
+
+  const zoneRowHtml=r=>{
+    const opts=COMMUNITY_OVERRIDE_ZONES.map(z=>`<option value="${z}" ${z===r.currentZone?'selected':''}>${z}</option>`).join('');
+    return `<tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td style="text-align:right;">${r.km.toFixed(1)} km</td>
+      <td><select data-community="${escapeHtml(r.name)}" onchange="quickSetCommunityZone(this)" style="padding:4px 6px;border:1px solid var(--border);border-radius:6px;">${opts}</select></td>
+    </tr>`;
   };
-  var s = document.createElement('script');
-  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&libraries=places&callback=__mapsReady';
-  document.head.appendChild(s);
+
+  content.innerHTML=`
+    <h2>Community distances &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">Straight-line distance from the shop, nearest first. Change a zone directly here &mdash; saves immediately, same as clicking the community on the map.</p>
+    <div style="max-height:60vh;overflow-y:auto;">
+      <table><thead><tr><th>Community</th><th style="text-align:right;">Distance</th><th>Zone</th></tr></thead>
+      <tbody>${rows.map(zoneRowHtml).join('')}</tbody></table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('communityDistancesModal').hidden=true">Close</button>
+    </div>`;
+  modal.hidden=false;
 }
 
-init();
+async function quickSetCommunityZone(selectEl){
+  const shop=getSelectedShop();if(!shop)return;
+  const community=selectEl.dataset.community;
+  const newZone=selectEl.value;
+  shop.communityZones[community]=newZone;
+  try{
+    await apiSaveShop(shop);
+    styleCommunities();renderLegend();if(state.map)drawTownPins();
+  }catch(e){alert('Could not save zone: '+e.message);}
+}
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js').catch(function(e) {
-      console.log('SW registration failed:', e);
-    });
+function showPricingSheet(){
+  const shop=getSelectedShop();if(!shop)return;
+  const modal=document.getElementById('priceSheetModal');
+  const content=document.getElementById('priceSheetContent');
+  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  const cRows=CALGARY_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>$${WS_INTOWN_BASE} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const oRows=OUTER_ZONES.map(z=>`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${getZoneColor(z)};vertical-align:middle;margin-right:6px;"></span>${z}</td><td>${ZONE_LABELS[z]}</td><td>$${shop.zonePrices[z]||0}</td><td>Zone rate + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`).join('');
+  const tRows=NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));const note=flat!==null?'flat':'zone';return`<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.color};vertical-align:middle;margin-right:6px;"></span>${escapeHtml(t.name)}</td><td>${t.zone} (${note})</td><td>$${Number(price).toFixed(2)}</td><td>$${Number(price).toFixed(2)} + $${WS_EXTRA_PER_PIECE}/extra pc</td></tr>`;}).join('');
+
+  content.innerHTML=`
+    <h2>Delivery pricing &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">${escapeHtml(shop.address)} &bull; As of ${date}</p>
+    <h3>Calgary zones</h3>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${cRows}</tbody></table>
+    <h3>Rural / outer zones</h3>
+    <table><thead><tr><th>Zone</th><th>Coverage</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${oRows}</tbody></table>
+    <h3>Named town rates</h3>
+    <table><thead><tr><th>Town</th><th>Zone / type</th><th>Retail</th><th>Wholesale</th></tr></thead><tbody>${tRows}</tbody></table>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px;">Wholesale: in-town $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece. Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece. Addresses beyond 100 km require a custom quote - please call for a price.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Weddings:</strong> in Calgary (WED) $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case. Out of town (WEDO) zone rate + $${WED_EXTRA_PER_CASE} per additional case. Setup, if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Special events:</strong> follow the wedding guidelines above (WED / WEDO, plus setup) and/or are priced as quoted.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Funerals:</strong> in Calgary $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. FUNO (Edenbrook, Choice Memorial Garden, Mountain View) $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece. Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere and similar): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece.</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:6px;"><strong>Prices as of ${date}.</strong> Rates can change, and a community's zone depends on the address. There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community. Extra piece rates apply to all zones. Always confirm the final price for each delivery on your shop quote link; the quote link is the final word.</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="window.print()">Print</button>
+      <button class="btn btn-sm btn-ghost" id="copySheetBtn">Copy as text</button>
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
+    </div>`;
+
+  const plainText=[
+    `DELIVERY PRICING - ${shop.name}`,shop.address,`As of ${date}`,
+    'There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.',
+    'Extra piece rates apply to all zones.','',
+    'RETAIL PRICES',
+    'Calgary zones:',
+    ...CALGARY_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
+    'Rural/outer zones:',
+    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0}`),
+    'Named towns:',
+    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));return`  ${t.name} (${t.zone}${flat!==null?' flat':' zone'}): $${Number(price).toFixed(2)}`;}),
+    '','WEDDINGS',`In Calgary (WED): $${WED_INTOWN_BASE} base + $${WED_EXTRA_PER_CASE} per additional case`,`Out of town (WEDO): zone rate + $${WED_EXTRA_PER_CASE} per additional case`,`Setup if required: $${WED_SETUP_RATE}/hr per person, 1 hour minimum`,'','SPECIAL EVENTS','Follow the wedding guidelines above (WED / WEDO, plus setup) and/or as quoted','','FUNERALS',`In Calgary: $${FUN_INTOWN_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`FUNO (Edenbrook, Choice Memorial Garden, Mountain View): $${FUN_OUT_BASE} base + $${FUN_EXTRA_PER_PIECE} per additional piece`,`Further out (Airdrie, Cochrane, Bragg Creek, Okotoks, Chestermere, etc.): zone rate + $${FUN_EXTRA_PER_PIECE} per additional piece`,
+    '','WHOLESALE PRICES',
+    `In-town: $${WS_INTOWN_BASE} base + $${WS_EXTRA_PER_PIECE} per additional piece`,
+    `Out-of-town: zone rate + $${WS_EXTRA_PER_PIECE} per additional piece`,
+    'Out-of-town zone rates:',
+    ...OUTER_ZONES.map(z=>`  ${z} (${ZONE_LABELS[z]}): $${shop.zonePrices[z]||0} base`),
+    ...NAMED_TOWNS.map(t=>{const flat=shop.townPrices&&shop.townPrices[t.name]!=null?shop.townPrices[t.name]:null;const price=flat!==null?flat:(zonePriceFor(shop,t.zone));return`  ${t.name}: $${Number(price).toFixed(2)} base`;})
+  ].join('\n');
+
+  document.getElementById('copySheetBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copySheetBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
+    else window.prompt('Copy:',plainText);
   });
+  modal.hidden=false;
 }
+
+/* Community price list: every Calgary community A-Z with this shop's zone and retail price.
+   Same data the map is coloured from (shop.communityZones), so the two always agree. */
+function titleCaseCommunity(n){return String(n).toLowerCase().replace(/(^|[\s\-\/'(])([a-z])/g,(m,a,b)=>a+b.toUpperCase()).replace(/\bMc([a-z])/g,(m,c)=>'Mc'+c.toUpperCase());}
+function showCommunityPriceList(){
+  const shop=getSelectedShop();if(!shop)return;
+  seedCommunityZones(shop);
+  const modal=document.getElementById('priceSheetModal');
+  const content=document.getElementById('priceSheetContent');
+  const date=new Date().toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});
+  const rows=state.communities
+    .filter(c=>c&&c.name)
+    .map(c=>{const zone=shop.communityZones[c.name]||'C4';return{name:titleCaseCommunity(c.name),zone,price:Number(shop.zonePrices[zone]||0)};})
+    .filter((r,i,a)=>a.findIndex(x=>x.name===r.name)===i)
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  const note1=`Prices as of ${date}.`;
+  const note2='There are scenarios where the zone assignment for an address may be one level up or down from the zone shown for its community.';
+  const note3='Extra piece rates apply to all zones.';
+  const rowHtml=r=>`<div class="cpl-row" data-name="${escapeHtml(r.name.toLowerCase())}"><span class="cpl-name">${escapeHtml(r.name)}</span><span class="cpl-zone"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${getZoneColor(r.zone)};vertical-align:middle;margin-right:4px;"></span>${r.zone}</span><span class="cpl-price">$${r.price.toFixed(2)}</span></div>`;
+  const zoneSummary=CALGARY_ZONES.map(z=>`${z} $${Number(shop.zonePrices[z]||0).toFixed(2)}`).join(' &bull; ');
+
+  content.innerHTML=`
+    <style>
+      .cpl-list{column-count:2;column-gap:28px;font-size:12px;margin-top:8px;}
+      .cpl-row{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border);break-inside:avoid;}
+      .cpl-name{flex:1;}
+      .cpl-zone{width:52px;color:var(--ink-soft);}
+      .cpl-price{width:60px;text-align:right;font-variant-numeric:tabular-nums;}
+      .cpl-head{font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);}
+      @media(max-width:600px){.cpl-list{column-count:1;}}
+      @media print{.cpl-search{display:none;}.cpl-list{column-count:3;font-size:9.5px;}.cpl-row{padding:1px 0;}}
+    </style>
+    <h2>Community price list &mdash; ${escapeHtml(shop.name)}</h2>
+    <p class="modal-sub">${escapeHtml(shop.address||'')} &bull; As of ${date}</p>
+    <p style="font-size:12px;margin:6px 0;">Calgary retail delivery by community. Zone prices: ${zoneSummary}</p>
+    <p style="font-size:12px;color:var(--ink-soft);margin:6px 0;"><strong>${note1}</strong> ${note2} ${note3} Always confirm the final price for each delivery on your shop quote link.</p>
+    <input class="cpl-search" id="cplSearch" type="search" placeholder="Find a community&hellip;" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-top:6px;">
+    <div class="cpl-list" id="cplList"><div class="cpl-row cpl-head"><span class="cpl-name">Community</span><span class="cpl-zone">Zone</span><span class="cpl-price">Retail</span></div>${rows.map(rowHtml).join('')}</div>
+    <p style="font-size:11px;color:var(--ink-soft);margin-top:8px;">${rows.length} communities. Addresses outside Calgary are priced by rural zone or named town; see the pricing sheet.</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" onclick="window.print()">Print</button>
+      <button class="btn btn-sm btn-ghost" id="copyCplBtn">Copy as text</button>
+      <button class="btn btn-sm btn-ghost" onclick="document.getElementById('priceSheetModal').hidden=true">Close</button>
+    </div>`;
+
+  document.getElementById('cplSearch').addEventListener('input',function(){
+    const q=this.value.trim().toLowerCase();
+    document.querySelectorAll('#cplList .cpl-row[data-name]').forEach(el=>{el.hidden=!!q&&!el.dataset.name.includes(q);});
+  });
+  const plainText=[
+    `COMMUNITY PRICE LIST - ${shop.name}`,shop.address||'',`As of ${date}`,'',
+    note2,note3,'Always confirm the final price for each delivery on your shop quote link.','',
+    ...rows.map(r=>`${r.name}: ${r.zone} $${r.price.toFixed(2)}`)
+  ].join('\n');
+  document.getElementById('copyCplBtn').addEventListener('click',()=>{
+    const btn=document.getElementById('copyCplBtn');
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(plainText).then(()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy as text',1500);}).catch(()=>window.prompt('Copy:',plainText));
+    else window.prompt('Copy:',plainText);
+  });
+  modal.hidden=false;
+}
+
+document.getElementById('priceSheetModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
+document.getElementById('communityDistancesModal').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
+
+/* boot */
+async function boot(){
+  const errEl=document.getElementById('keyError');
+  const loadingMsg=document.getElementById('loadingMsg');
+  try{
+    loadingMsg.textContent='Fetching configuration...';
+    const key=await fetchMapsKey();
+    loadingMsg.textContent='Loading map...';
+    await loadGoogleMaps(key);
+    loadingMsg.textContent='Loading zone colors...';
+    try{const rRes=await fetch('/api/rates');if(rRes.ok)state.rates=await rRes.json();}catch(e){/* fall back to hardcoded ZONE_COLORS if this fails */}
+    loadingMsg.textContent='Loading Calgary communities...';
+    state.communities=await loadCommunities();
+    initMap();
+    document.getElementById('keyGate').hidden=true;
+    document.getElementById('mainApp').hidden=false;
+    setupAutocomplete(document.getElementById('destinationInput'));
+    if(ROUTE.mode==='lookup'){
+      const shop=await apiGetShop(ROUTE.shopId);
+      if(!shop){document.getElementById('mainApp').hidden=true;document.getElementById('lookupNotFound').hidden=false;return;}
+      enterLookupView(shop);
+    }else{
+      state.shops=await apiListShops();
+      state.shops.forEach(seedCommunityZones);
+       renderShopList();
+document.getElementById('shopSearch').addEventListener('input', renderShopList);
+if(state.shops.length)selectShop(state.shops[0].id);
+          }
+  }catch(err){errEl.textContent=err.message;errEl.hidden=false;loadingMsg.hidden=true;}
+}
+
+document.getElementById('quoteBtn').addEventListener('click',generateQuote);
+document.getElementById('priceSheetBtn').addEventListener('click',showPricingSheet);
+document.getElementById('copyFromShopBtn').addEventListener('click',copyZoneSetupFromShop);
+document.getElementById('communityDistancesBtn').addEventListener('click',showCommunityDistances);
+document.getElementById('communityPriceListBtn').addEventListener('click',showCommunityPriceList);
+
+boot();
 </script>
 </body>
 </html>
