@@ -64,7 +64,7 @@ const OUT_OF_TOWN_ZONES = [
   { code:'TSA', name:'Tsuu Tina Adjacent',                   lat:50.9175, lng:-114.1615, radiusKm:4  },
   { code:'TSU', name:'Tsuu Tina Nation',                     lat:50.9800, lng:-114.2600, radiusKm:4  },
   { code:'BAL', name:'Balzac',                               lat:51.2100, lng:-114.0200, radiusKm:3  },
-  { code:'HPT', name:'Heritage Pointe',                      lat:50.8500, lng:-113.9500, radiusKm:3  },
+  { code:'HPT', name:'Heritage Pointe',                      lat:50.8410, lng:-114.0040, radiusKm:3.5  },
   { code:'RWM', name:'Redwood Meadows',                      lat:50.9880, lng:-114.5090, radiusKm:3  },
   { code:'DEW', name:'DeWinton',                             lat:50.8200, lng:-113.9800, radiusKm:6  },
   { code:'EVA', name:'Elbow Valley / Elbow River Estates',   lat:51.0190, lng:-114.2820, radiusKm:8  },
