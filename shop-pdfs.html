@@ -241,7 +241,7 @@ async function getRoot(){
       showMsg('Permission to the remembered folder was not granted ('+perm+'). Choose the folder again.','info');
     }catch(e){ showMsg('The remembered folder could not be reused ('+e.name+': '+e.message+'). Choose the folder again.','info'); }
   }
-  h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+  h=await window.showDirectoryPicker({mode:'readwrite'});
   if(!rootOk(h)){ var e=new Error('wrong folder'); e.name='AbortError'; throw e; }
   await putSavedHandle(key,h);
   return h;
@@ -256,7 +256,7 @@ async function resetFolder(){
 async function changeFolder(){
   if(!HAS_FS){showMsg('This browser cannot pick a folder - use Download zip instead (Edge or Chrome can).','err');return;}
   try{
-    var h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
+    var h=await window.showDirectoryPicker({mode:'readwrite'});
     if(!rootOk(h)){ showMsg('Folder not changed. Choose the folder named '+rootName()+'.','err'); return; }
     await putSavedHandle('root-'+type,h);
     showMsg('Folder set to "'+h.name+'". PDFs will be saved into '+h.name+'\\MONTH YY\\CODE NAME\\. Choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
