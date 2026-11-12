@@ -55,6 +55,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
         <button class="btn" id="saveBtn">Save to folder</button>
         <button class="btn btn-ghost" id="zipBtn">Download zip</button>
         <button class="btn btn-ghost" id="folderBtn" title="Pick the folder the PDFs are saved into">Change folder</button>
+        <button class="btn btn-ghost" id="resetBtn" title="Forget the remembered folder and start fresh">Reset folder</button>
         <button class="btn btn-ghost" id="checkBtn" title="Show which folder the PDFs are going into and what is already in it">Where are my PDFs?</button>
       </div>
     </div>
@@ -244,6 +245,13 @@ async function getRoot(){
   await putSavedHandle(key,h);
   return h;
 }
+async function resetFolder(){
+  try{
+    var db=await idb(); var tx=db.transaction('h','readwrite'); tx.objectStore('h').clear();
+    await new Promise(function(res){tx.oncomplete=res;tx.onerror=res;tx.onabort=res;});
+  }catch(e){}
+  showMsg('Reset. The remembered folder is cleared. Press Save to folder and choose the folder named '+rootName()+' (the one that holds the month folders).','ok');
+}
 async function changeFolder(){
   if(!HAS_FS){showMsg('This browser cannot pick a folder - use Download zip instead (Edge or Chrome can).','err');return;}
   try{
@@ -338,6 +346,7 @@ document.getElementById('loadBtn').addEventListener('click',load);
 document.getElementById('saveBtn').addEventListener('click',saveToFolder);
 document.getElementById('zipBtn').addEventListener('click',downloadZip);
 document.getElementById('folderBtn').addEventListener('click',changeFolder);
+document.getElementById('resetBtn').addEventListener('click',resetFolder);
 document.getElementById('checkBtn').addEventListener('click',checkFolder);
 document.getElementById('allChk').addEventListener('change',function(){var v=this.checked;document.querySelectorAll('#rows input[type=checkbox]').forEach(function(c){c.checked=v;});});
 document.getElementById('rows').addEventListener('click',function(e){
