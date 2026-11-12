@@ -238,7 +238,8 @@ async function getRoot(){
       var perm=await h.queryPermission({mode:'readwrite'});
       if(perm!=='granted') perm=await h.requestPermission({mode:'readwrite'});
       if(perm==='granted') return h;
-    }catch(e){}
+      showMsg('Permission to the remembered folder was not granted ('+perm+'). Choose the folder again.','info');
+    }catch(e){ showMsg('The remembered folder could not be reused ('+e.name+': '+e.message+'). Choose the folder again.','info'); }
   }
   h=await window.showDirectoryPicker({mode:'readwrite',id:'scd-'+type});
   if(!rootOk(h)){ var e=new Error('wrong folder'); e.name='AbortError'; throw e; }
@@ -305,7 +306,8 @@ async function saveToFolder(){
   var btn=document.getElementById('saveBtn');
   if(!HAS_FS){showMsg('This browser cannot write to a folder directly - use Download zip instead (Edge or Chrome can save straight to the folder).','err');return;}
   var root;
-  try{ root=await getRoot(); }catch(e){ if(e&&e.name==='AbortError'){return;} showMsg('Could not open the folder: '+e.message,'err'); return; }
+  try{ root=await getRoot(); }catch(e){ showMsg('Could not use the folder ('+(e&&e.name)+': '+(e&&e.message)+'). '+(e&&e.message==='wrong folder'?'Choose the folder named '+rootName()+'.':'If you cancelled the folder window, press Save to folder again.'),'err'); return; }
+  showMsg('Using folder "'+root.name+'"\u2026','info');
   btn.disabled=true; var we=data.week_end, done=0, failed=[];
   try{
     var mDir=await findMonthDir(root,we,true);
