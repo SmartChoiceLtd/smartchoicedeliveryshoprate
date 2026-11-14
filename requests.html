@@ -52,6 +52,7 @@ body{padding-bottom:70px;}
     <button class="tab" data-f="new">New only</button>
     <button class="tab" data-f="done">Done</button>
     <button class="tab" data-f="all">All</button>
+    <button class="tab" data-f="usage">Link usage</button>
     <button class="tab" id="selAll" type="button">Select first 40 new</button>
     <select id="shopSel"><option value="">All shops</option></select>
   </div>
@@ -73,7 +74,32 @@ function updateBar(){
   document.getElementById('barN').textContent = ids.length + ' selected';
 }
 function dayLabel(d){ if (d === today) return 'Today, ' + d; var x = new Date(d + 'T12:00:00'); return x.toLocaleDateString('en-CA', {weekday:'long', month:'short', day:'numeric'}); }
+var usage = null;
+function ago(iso){ if(!iso) return '-'; var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); if (m < 60) return m + ' min ago'; if (m < 1440) return Math.round(m / 60) + ' h ago'; var d = Math.round(m / 1440); return d + ' day' + (d === 1 ? '' : 's') + ' ago'; }
+async function loadUsage(){
+  var out = document.getElementById('out'); out.innerHTML = '<div class="empty">Loading&hellip;</div>';
+  try {
+    var r = await fetch('/api/requests?usage=1'); var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not load');
+    usage = d.rows; renderUsage();
+  } catch (e) { out.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+function renderUsage(){
+  var out = document.getElementById('out');
+  var using = usage.filter(function(u){ return u.requests_30d > 0; }).length;
+  var opened = usage.filter(function(u){ return u.last_opened; }).length;
+  var linked = usage.filter(function(u){ return u.has_link; }).length;
+  var html = '<p class="hint"><strong>' + using + '</strong> of ' + usage.length + ' shops sent a request in the last 30 days &middot; ' + opened + ' have opened their link &middot; ' + linked + ' have a link made. &ldquo;Last opened&rdquo; starts counting from when this was added.</p>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;background:#fff;"><tr style="text-align:left;color:var(--ink-soft);"><th style="padding:8px">Shop</th><th>Link</th><th>Last opened</th><th>Requests (30 days)</th><th>Last request</th></tr>';
+  usage.forEach(function(u){
+    html += '<tr style="border-top:1px solid var(--border);"><td style="padding:8px"><strong>' + esc(u.code) + '</strong> ' + esc(u.name.split(' ').slice(1).join(' ')) + '</td>' +
+      '<td>' + (u.has_link ? '<span class="tag t-ok">made</span>' : '<span class="tag t-warn">not made</span>') + '</td>' +
+      '<td>' + esc(ago(u.last_opened)) + '</td><td>' + u.requests_30d + '</td><td>' + esc(ago(u.last_request)) + '</td></tr>';
+  });
+  out.innerHTML = html + '</table>';
+}
 function render(){
+  if (filter === 'usage'){ if (usage) renderUsage(); else loadUsage(); return; }
   var shop = document.getElementById('shopSel').value;
   var list = rows.filter(function(r){
     if (shop && r.shop_code !== shop) return false;
@@ -127,7 +153,7 @@ async function load(){
     var sel = document.getElementById('shopSel'), cur = sel.value, codes = {};
     rows.forEach(function(q){ codes[q.shop_code] = 1; });
     sel.innerHTML = '<option value="">All shops</option>' + Object.keys(codes).sort().map(function(c){ return '<option>' + esc(c) + '</option>'; }).join('');
-    sel.value = cur; render();
+    sel.value = cur; if (filter !== 'usage') render();
   } catch (e) { document.getElementById('out').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
 }
 document.addEventListener('change', function(e){
@@ -157,7 +183,7 @@ document.getElementById('sendDrivers').onclick = function(){
 };
 document.addEventListener('click', async function(e){
   var t = e.target.closest && e.target.closest('.tab');
-  if (t && t.dataset.f){ document.querySelectorAll('.tab[data-f]').forEach(function(x){ x.classList.remove('on'); }); t.classList.add('on'); filter = t.dataset.f; render(); return; }
+  if (t && t.dataset.f){ document.querySelectorAll('.tab[data-f]').forEach(function(x){ x.classList.remove('on'); }); t.classList.add('on'); filter = t.dataset.f; if (filter === 'usage') usage = null; render(); return; }
   var b = e.target.closest && e.target.closest('[data-id]');
   if (!b) return;
   b.disabled = true;
