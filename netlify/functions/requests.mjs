@@ -78,6 +78,13 @@ export default async (req) => {
     const t = await shopFromToken(url.searchParams.get('token'));
     if (!t) return json({ error: 'This link is not valid. Please call or text Smart Choice Delivery for a new one.' }, 404);
     const now = calgaryParts();
+    try { // remember when the shop last opened its link (at most once every 30 minutes, so this is not a write on every refresh)
+      const last = t.last_opened ? new Date(t.last_opened).getTime() : 0;
+      if (Date.now() - last > 30 * 60 * 1000) {
+        t.last_opened = new Date().toISOString(); t.opens = (t.opens || 0) + 1;
+        await getStore('flower-request-tokens').setJSON(url.searchParams.get('token'), t);
+      }
+    } catch (e) {}
     const mine = (await readRange(addDays(now.day, -2), addDays(now.day, 30), t.code)).slice(-200); // a big shop's busy day is hundreds of rows: show the latest 200
     return json({
       shop: { name: t.shop_name, code: t.code }, today: now.day, cutoff_hour: CUTOFF_HOUR, hour_now: now.hour,
@@ -134,6 +141,32 @@ export default async (req) => {
   // ---------- office ----------
   const user = await whoIs(req);
   if (!user) return json({ error: 'Not signed in' }, 401);
+
+  if (req.method === 'GET' && url.searchParams.get('usage')) {
+    const now = calgaryParts();
+    const shopStore = getStore('flower-shops'), tokens = getStore('flower-request-tokens');
+    const { blobs: shopBlobs } = await shopStore.list();
+    const shops = (await Promise.all(shopBlobs.map(b => shopStore.get(b.key, { type: 'json' }).catch(() => null)))).filter(s => s && s.name);
+    const { blobs: tokBlobs } = await tokens.list({ prefix: 'shop_' });
+    const tokenByShop = {};
+    await Promise.all(tokBlobs.map(async b => { tokenByShop[b.key.slice(5)] = await tokens.get(b.key, { type: 'text' }).catch(() => null); }));
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const reqs = await readRange(addDays(now.day, -45), addDays(now.day, 60), '');
+    const byCode = {};
+    reqs.forEach(r => {
+      const c = byCode[r.shop_code] = byCode[r.shop_code] || { last30: 0, last: '' };
+      if ((r.submitted_at || '') >= since) c.last30++;
+      if ((r.submitted_at || '') > c.last) c.last = r.submitted_at || '';
+    });
+    const rows = await Promise.all(shops.map(async sh => {
+      const code = codeOf(sh.name), tok = tokenByShop[sh.id];
+      const rec = tok ? await tokens.get(tok, { type: 'json' }).catch(() => null) : null;
+      const c = byCode[code] || { last30: 0, last: '' };
+      return { code, name: sh.name, has_link: !!tok, last_opened: (rec && rec.last_opened) || '', requests_30d: c.last30, last_request: c.last };
+    }));
+    rows.sort((a, b) => (b.requests_30d - a.requests_30d) || (b.last_opened || '').localeCompare(a.last_opened || '') || a.code.localeCompare(b.code));
+    return json({ today: now.day, rows });
+  }
 
   if (req.method === 'GET' && url.searchParams.get('link')) {
     const shopId = url.searchParams.get('link');
