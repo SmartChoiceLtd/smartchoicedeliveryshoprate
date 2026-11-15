@@ -337,6 +337,32 @@ function buildOnboardEmail(shop,contact,shopName){
   const text=[hi,'',intro,'','Your personal link:',link,'','How it works:'].concat(steps.map((t,i)=>(i+1)+'. '+t),['',pricing,'',"A short walkthrough is here if you'd like to see it first:",ONBOARD_DECK_URL,'',closing,'','Thank you,'],ONBOARD_SIGNATURE_LINES).join('\n');
   return {html,text};
 }
+const REQUEST_SUBJECT='Your private link to request deliveries - Smart Choice Delivery';
+function buildRequestEmail(shop,contact,shopName,link){
+  const hi='Hi'+(contact?' '+contact:'')+',';
+  const intro="We've set up a simple way for "+shopName+' to send us delivery requests: a private link just for your shop. No login, no app, nothing to install.';
+  const steps=['Open your link and fill in the delivery: date, recipient name, address and a contact number. Add the unit, access code, time preference, pieces and any notes.','Need to send several? Add more deliveries on the same page and send them together, or upload a spreadsheet (the page has a blank template to download).',"We're notified right away, and the page lists your recent and upcoming requests so you can see what we have."];
+  const good=['A contact number for the recipient is required. We cannot accept deliveries without one.','Same-day cut-off is 2:00 PM. Later requests are flagged and we will do our best; for anything urgent please also text us.','You can book ahead, including funerals, weddings and events. Weddings, funerals and special events take priority, so tell us early.','We deliver 7 days a week including most holidays: 7 AM to 6 PM (evenings as needed), Sundays and holidays 10 AM to 4 PM.'];
+  const keep='Please keep the link to your shop: it identifies you, so anyone who has it can send requests as you. Bookmark it on your phone or computer.';
+  const other='Text, email and phone all still work as before, and text is still best for quotes or anything unusual. If you would like an email as soon as each delivery is completed (with a photo for doorstep drop-offs), just ask and we will switch it on.';
+  const closing='If anything is unclear or does not work on your end, text me and I will sort it out.';
+  const p='margin:0 0 12px';
+  const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">'
+    +'<p style="'+p+'">'+escHtml(hi)+'</p>'
+    +'<p style="'+p+'">'+escHtml(intro)+'</p>'
+    +'<p style="'+p+'"><b>Your request link:</b><br><a href="'+escHtml(link)+'">Send a delivery request to Smart Choice Delivery</a></p>'
+    +'<p style="'+p+'">'+escHtml(keep)+'</p>'
+    +'<p style="'+p+'"><b>How it works:</b></p>'
+    +'<ol style="margin:0 0 12px 20px;padding:0">'+steps.map(t=>'<li>'+escHtml(t)+'</li>').join('')+'</ol>'
+    +'<p style="'+p+'"><b>Good to know:</b></p>'
+    +'<ul style="margin:0 0 12px 20px;padding:0">'+good.map(t=>'<li>'+escHtml(t)+'</li>').join('')+'</ul>'
+    +'<p style="'+p+'">'+escHtml(other)+'</p>'
+    +'<p style="'+p+'">'+escHtml(closing)+'</p>'
+    +'<p style="margin:0">Thank you,<br>'+ONBOARD_SIGNATURE_LINES.map(escHtml).join('<br>')+'<br>smartchoicedelivery@yahoo.com</p>'
+    +'</div>';
+  const text=[hi,'',intro,'','Your request link:',link,'',keep,'','How it works:'].concat(steps.map((t,i)=>(i+1)+'. '+t),['','Good to know:'],good.map(t=>'- '+t),['',other,'',closing,'','Thank you,'],ONBOARD_SIGNATURE_LINES,['smartchoicedelivery@yahoo.com']).join('\n');
+  return {html,text};
+}
 function emailShopOnboarding(shopId){
   const shop=state.shops.find(s=>s.id===shopId);
   if(!shop)return;
@@ -348,7 +374,8 @@ function emailShopOnboarding(shopId){
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   const inp='style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #bbb;border-radius:6px;font-size:14px"';
   m.innerHTML='<div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)">'
-    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Onboarding email for '+escHtml(shopName)+'</b>'
+    +'<div style="padding:14px 18px;border-bottom:1px solid #ddd"><b>Email for '+escHtml(shopName)+'</b>'
+    +'<div style="display:flex;gap:6px;margin-top:8px"><button type="button" id="obKindQuote" class="btn btn-primary">Price tool</button><button type="button" id="obKindReq" class="btn">Delivery requests</button></div>'
     +'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">'
     +'<label style="flex:1;min-width:180px;font-size:12px;color:#555">Contact name (optional)<input id="obName" type="text" '+inp+'></label>'
     +'<label style="flex:1;min-width:220px;font-size:12px;color:#555">Shop email<input id="obEmail" type="email" '+inp+'></label></div>'
@@ -364,9 +391,33 @@ function emailShopOnboarding(shopId){
   document.body.appendChild(m);
   const nameEl=m.querySelector('#obName'),emailEl=m.querySelector('#obEmail'),pv=m.querySelector('#onboardPreview');
   nameEl.value=shop.contactName||'';emailEl.value=shop.contactEmail||'';
-  let mail;
-  const refresh=()=>{mail=buildOnboardEmail(shop,nameEl.value.trim(),shopName);pv.innerHTML=mail.html;};
+  let mail,kind='quote',reqLink='',subj=ONBOARD_SUBJECT;
+  const refresh=()=>{
+    if(kind==='request'){
+      subj=REQUEST_SUBJECT;
+      if(!reqLink){pv.innerHTML='<p style="color:#555">Making this shop\'s request link\u2026</p>';mail={html:'',text:''};return;}
+      mail=buildRequestEmail(shop,nameEl.value.trim(),shopName,reqLink);
+    }else{subj=ONBOARD_SUBJECT;mail=buildOnboardEmail(shop,nameEl.value.trim(),shopName);}
+    pv.innerHTML=mail.html;
+  };
   refresh();
+  const setKind=async k=>{
+    kind=k;
+    m.querySelector('#obKindQuote').classList.toggle('btn-primary',k==='quote');
+    m.querySelector('#obKindReq').classList.toggle('btn-primary',k==='request');
+    refresh();
+    if(k==='request'&&!reqLink){
+      try{
+        const r=await fetch('/api/requests?link='+encodeURIComponent(shop.id),{credentials:'same-origin'});
+        if(r.status===401){pv.innerHTML='<p style="color:#b00020">Sign in to the office first, then try again. <a href="/login.html?redirect='+encodeURIComponent(location.pathname)+'">Sign in</a></p>';return;}
+        const d=await r.json();if(!r.ok||!d.path)throw new Error(d.error||'Could not make the link');
+        reqLink=location.origin+d.path;
+        if(kind==='request')refresh();
+      }catch(err){pv.innerHTML='<p style="color:#b00020">Could not make the request link: '+escHtml(err.message)+'</p>';}
+    }
+  };
+  m.querySelector('#obKindQuote').onclick=()=>setKind('quote');
+  m.querySelector('#obKindReq').onclick=()=>setKind('request');
   nameEl.addEventListener('input',refresh);
   const saveContact=async()=>{
     const n=nameEl.value.trim(),e=emailEl.value.trim();
@@ -385,10 +436,11 @@ function emailShopOnboarding(shopId){
     if(!e){emailEl.focus();flash(this,'Enter an email first');return;}
     saveContact();copyText(e).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this address:',e));
   };
-  m.querySelector('#obSubj').onclick=function(){copyText(ONBOARD_SUBJECT).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',ONBOARD_SUBJECT));};
+  m.querySelector('#obSubj').onclick=function(){copyText(subj).then(()=>flash(this,'Copied!')).catch(()=>window.prompt('Copy this subject:',subj));};
   m.querySelector('#obCopy').onclick=async function(){
     const btn=this;
     saveContact();
+    if(!mail.html){flash(btn,'Link not ready');return;}
     try{
       await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([mail.html],{type:'text/html'}),'text/plain':new Blob([mail.text],{type:'text/plain'})})]);
       flash(btn,'Copied! Now paste');
@@ -399,7 +451,7 @@ function emailShopOnboarding(shopId){
       flash(btn,ok?'Copied! Now paste':'Select the text and copy');
     }
   };
-  m.querySelector('#obOpen').onclick=()=>{saveContact();const e=emailEl.value.trim();window.location.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(ONBOARD_SUBJECT);};
+  m.querySelector('#obOpen').onclick=()=>{saveContact();const e=emailEl.value.trim();window.location.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(subj);};
   m.querySelector('#obClose').onclick=()=>m.remove();
   m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 }
