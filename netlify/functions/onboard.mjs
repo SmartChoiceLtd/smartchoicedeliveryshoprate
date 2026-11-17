@@ -137,6 +137,7 @@ async function uniqueApplicants() {
   const apps = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)))).filter(Boolean);
   const seen = new Set(), out = [];
   apps.sort((a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0)).forEach(a => {
+    if (a.status === 'removed') return; // not interested / not a fit: never emailed
     const e = String(a.email || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || seen.has(e)) return;
     seen.add(e); out.push({ name: a.name || '', email: e });
@@ -254,6 +255,21 @@ export default async (req) => {
     await store.setJSON(id, app);
     await sendAcknowledgement(app);
     return json({ success: true, id }, 201);
+  }
+
+  // Office only: mark an applicant removed (not interested / not a fit) or bring them back. The record is kept.
+  if (req.method === 'PATCH') {
+    if (!(await whoIs(req))) return json({ error: 'Not signed in' }, 401);
+    let body;
+    try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
+    if (!/^app_\d+_[a-z0-9]+$/.test(String(body.id || ''))) return json({ error: 'Bad id' }, 400);
+    if (!['removed', 'active'].includes(body.status)) return json({ error: 'Bad status' }, 400);
+    const store = getStore('driver-applications');
+    const app = await store.get(body.id, { type: 'json' }).catch(() => null);
+    if (!app) return json({ error: 'Not found' }, 404);
+    if (body.status === 'removed') { app.status = 'removed'; app.removed_at = new Date().toISOString(); } else { delete app.status; delete app.removed_at; }
+    await store.setJSON(body.id, app);
+    return json({ success: true, id: body.id, status: body.status });
   }
 
   if (req.method === 'GET') {
