@@ -169,6 +169,25 @@ tr.inactive td{color:var(--ink-soft);}
       <div id="templateMsg" hidden style="margin-top:8px;font-size:12px;color:var(--green);">Template saved.</div>
     </div>
     <div class="section">
+      <h2>Email all applicants</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Sends one email to each person who applied, greeted by first name. Nobody sees anyone else's address, and replies come to you. Blank line = new paragraph. Send yourself a test first.</p>
+      <div class="field"><label>Subject</label><input type="text" id="bcSubject" value="Christmas delivery team - drivers needed"></div>
+      <div class="field"><label>Message</label><textarea id="bcMessage" rows="9" style="width:100%;box-sizing:border-box;padding:8px;font:inherit;border:1px solid var(--border);border-radius:8px;">It is time to build the Christmas team.
+
+I have immediate opportunity for 2 or 3 weekday drivers, 5-8 hours per day.
+
+I will also need 5-10 more part time drivers as we get closer to Christmas. In past years we have used up to 20 drivers Christmas week.
+
+If you have questions or would like to commit to some delivery service, please contact me.
+
+Looking forward to a busy holiday season.</textarea></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-sm" id="bcTestBtn">Send me a test</button>
+        <button class="btn btn-sm" id="bcSendBtn" style="background:var(--warm);color:#fff;">Send to all applicants</button>
+        <span id="bcMsg" style="font-size:13px;color:var(--ink-soft);"></span>
+      </div>
+    </div>
+    <div class="section">
       <h2>Applications</h2>
       <div id="applicationsList" class="loading">Loading...</div>
     </div>
@@ -714,6 +733,31 @@ async function hireApplicant(name, email, phone, vehicle) {
   } catch(e) { alert('Could not hire: ' + e.message); }
 }
 
+function bcSay(t, bad) { var m = document.getElementById('bcMsg'); m.textContent = t; m.style.color = bad ? 'var(--warm)' : 'var(--green)'; }
+async function bcCall(payload) {
+  var r = await fetch('/api/onboard?action=broadcast', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  var d = await r.json().catch(function(){ return {}; });
+  if (!r.ok) throw new Error(d.error || 'Failed');
+  return d;
+}
+document.getElementById('bcTestBtn').addEventListener('click', async function() {
+  var to = window.prompt('Send the test to which email?', 'smartchoicedelivery@yahoo.com'); if (!to) return;
+  this.disabled = true; bcSay('Sending test...');
+  try { await bcCall({ subject: document.getElementById('bcSubject').value, message: document.getElementById('bcMessage').value, test: to }); bcSay('Test sent to ' + to + '. Check it, then send to all.'); }
+  catch (e) { bcSay(e.message, true); } finally { this.disabled = false; }
+});
+document.getElementById('bcSendBtn').addEventListener('click', async function() {
+  var btn = this; btn.disabled = true; bcSay('Checking the list...');
+  try {
+    var info = await bcCall({ dry: true });
+    var warn = info.last ? '\n\nNote: a message ("' + info.last.subject + '") was already sent to applicants on ' + new Date(info.last.at).toLocaleString() + '.' : '';
+    if (!info.count) { bcSay('No applicants with a valid email.', true); return; }
+    if (!window.confirm('Send this email to ' + info.count + ' applicant' + (info.count === 1 ? '' : 's') + '? This cannot be undone.' + warn)) { bcSay('Cancelled.'); return; }
+    bcSay('Sending...');
+    var d = await bcCall({ subject: document.getElementById('bcSubject').value, message: document.getElementById('bcMessage').value, confirm: true });
+    bcSay('Sent to ' + d.sent + (d.failed ? ' (' + d.failed + ' failed - tell me)' : '') + '.', !!d.failed);
+  } catch (e) { bcSay(e.message, true); } finally { btn.disabled = false; }
+});
 function loadTemplate() {
   fetch('/api/onboard?type=template').then(function(res) { return res.json(); }).then(function(t) {
     document.getElementById('tSeason').value = t.season || '';
