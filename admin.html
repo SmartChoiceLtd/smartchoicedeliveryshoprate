@@ -673,16 +673,19 @@ document.getElementById('applyAllGdpiBtn').addEventListener('click', function() 
 });
 
 /* ===== APPLICATIONS ===== */
+var showRemoved = false;
 function loadApplications() {
   var el = document.getElementById('applicationsList');
   if (!el) return;
   fetch('/api/onboard').then(function(res) { return res.json(); }).then(function(apps) {
     if (!apps.length) { el.innerHTML = '<p style="color:var(--ink-soft)">No applications yet.</p>'; return; }
-    el.innerHTML = '<table><thead><tr>' +
+    var removedCount = apps.filter(function(a){ return a.status === 'removed'; }).length;
+    var shown = apps.filter(function(a){ return showRemoved || a.status !== 'removed'; });
+    el.innerHTML = (removedCount ? '<p style="font-size:13px;margin:0 0 8px;"><a href="#" id="toggleRemoved">' + (showRemoved ? 'Hide' : 'Show') + ' removed (' + removedCount + ')</a></p>' : '') + '<table><thead><tr>' +
       '<th>Date</th><th>Name</th><th>Email</th><th>Phone</th><th>Days</th><th>Times</th><th>Vehicle</th><th>Referred By</th><th>Comments</th><th>Link</th><th>Action</th>' +
       '</tr></thead><tbody>' +
-      apps.map(function(a, i) {
-        return '<tr>' +
+      shown.map(function(a, i) {
+        return '<tr' + (a.status === 'removed' ? ' class="inactive"' : '') + '>' +
           '<td>' + esc(a.date || '') + '</td>' +
           '<td><strong>' + esc(a.name || '') + '</strong></td>' +
           '<td>' + esc(a.email || '') + '</td>' +
@@ -693,15 +696,34 @@ function loadApplications() {
           '<td>' + esc(a.referred_by || '') + '</td>' +
           '<td>' + esc(a.comments || '') + '</td>' +
           '<td><button class="copy-link" onclick="copyApplicationLink(\'' + esc(a.id) + '\')">Copy link</button></td>' +
-          '<td><button class="btn-danger btn-green" data-idx="' + i + '">Hire</button></td>' +
+          '<td style="white-space:nowrap;">' + (a.status === 'removed' ? '<button class="btn-danger btn-grey" data-restore="' + esc(a.id) + '">Restore</button>' : '<button class="btn-danger btn-green" data-idx="' + i + '">Hire</button> <button class="btn-danger btn-grey" data-remove="' + i + '">Remove</button>') + '</td>' +
           '</tr>';
       }).join('') + '</tbody></table>';
     el.querySelectorAll('[data-idx]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var a = apps[parseInt(this.getAttribute('data-idx'))];
+        var a = shown[parseInt(this.getAttribute('data-idx'))];
         hireApplicant(a.name, a.email, a.phone, a.vehicle);
       });
     });
+    async function setAppStatus(id, status, btn) {
+      btn.disabled = true;
+      try {
+        var r = await fetch('/api/onboard', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id, status: status }) });
+        if (!r.ok) throw new Error('Could not update');
+        loadApplications();
+      } catch (e) { alert(e.message); btn.disabled = false; }
+    }
+    el.querySelectorAll('[data-remove]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var a = shown[parseInt(this.getAttribute('data-remove'))];
+        if (window.confirm('Remove ' + a.name + ' from the applicant list? They will no longer get applicant emails. You can restore them from "Show removed".')) setAppStatus(a.id, 'removed', this);
+      });
+    });
+    el.querySelectorAll('[data-restore]').forEach(function(btn) {
+      btn.addEventListener('click', function() { setAppStatus(this.getAttribute('data-restore'), 'active', this); });
+    });
+    var tg = document.getElementById('toggleRemoved');
+    if (tg) tg.addEventListener('click', function(ev) { ev.preventDefault(); showRemoved = !showRemoved; loadApplications(); });
   }).catch(function() {
     var el2 = document.getElementById('applicationsList');
     if (el2) el2.innerHTML = '<p style="color:var(--warm)">Could not load applications.</p>';
