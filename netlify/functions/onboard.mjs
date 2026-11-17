@@ -8,6 +8,15 @@ function json(data, status = 200) {
   });
 }
 
+async function whoIs(req) {
+  try {
+    const m = (req.headers.get('cookie') || '').match(/scd_session=([a-f0-9]+)/);
+    if (!m) return null;
+    const sess = await getStore('flower-sessions').get(m[1], { type: 'json' });
+    return (sess && new Date(sess.expires_at) > new Date()) ? sess.username : null;
+  } catch (e) { return null; }
+}
+
 function firstName(name) {
   return (name || '').split(' ')[0] || name;
 }
@@ -97,6 +106,44 @@ function buildApplicationHtml(app, t) {
       `;
 }
 
+const escH = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Plain-text message -> email: blank line = new paragraph. Each applicant is greeted by first name.
+function buildBroadcastHtml(app, message) {
+  const paras = String(message || '').replace(/\r/g, '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean)
+    .map(x => '<p style="margin:0 0 14px;font-size:15px;line-height:1.5;">' + escH(x).replace(/\n/g, '<br>') + '</p>').join('');
+  return `
+        <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#2B2620;background:#FAF7F2;">
+          <div style="background:#0C769E;padding:20px 24px;border-bottom:4px solid #B8472B;">
+            <h1 style="color:#fff;font-family:Georgia,serif;margin:0;font-size:22px;">Smart Choice Delivery</h1>
+            <p style="color:#D6EEF7;margin:4px 0 0;font-size:13px;">Your Delivery Service Partner</p>
+          </div>
+          <div style="padding:24px;background:#fff;border-left:1px solid #E6DECF;border-right:1px solid #E6DECF;">
+            <p style="font-size:16px;margin:0 0 14px;">Hi ${escH(firstName(app.name) || 'there')},</p>
+            ${paras}
+            <p style="margin-top:24px;">Cheers,<br>
+            <strong>Kevin Michaud</strong><br>
+            Owner/Operator, Smart Choice Delivery<br>
+            <a href="tel:4038809822" style="color:#0C769E;">403-880-9822</a> &nbsp;|&nbsp;
+            <a href="mailto:smartchoicedelivery@yahoo.com" style="color:#0C769E;">smartchoicedelivery@yahoo.com</a></p>
+          </div>
+          <div style="background:#0C769E;padding:12px 24px;text-align:center;">
+            <p style="color:#D6EEF7;font-size:11px;margin:0;">Smart Choice Delivery &mdash; Calgary, AB &mdash; You are receiving this because you applied to drive for us.</p>
+          </div>
+        </div>`;
+}
+async function uniqueApplicants() {
+  const store = getStore('driver-applications');
+  const { blobs } = await store.list();
+  const apps = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)))).filter(Boolean);
+  const seen = new Set(), out = [];
+  apps.sort((a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0)).forEach(a => {
+    const e = String(a.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || seen.has(e)) return;
+    seen.add(e); out.push({ name: a.name || '', email: e });
+  });
+  return out;
+}
+
 async function sendAcknowledgement(app) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const t = await getTemplate();
@@ -130,6 +177,7 @@ export default async (req) => {
       } catch(e) { return json({ season:'', dates:'', positions:'', comment:'' }); }
     }
     if (req.method === 'PUT') {
+      if (!(await whoIs(req))) return json({ error: 'Not signed in' }, 401);
       const body = await req.json();
       await store.setJSON('driver-overview', body);
       return json({ success: true });
@@ -156,6 +204,47 @@ export default async (req) => {
     return new Response(page, { status: 200, headers: { 'content-type': 'text/html', 'access-control-allow-origin': '*' } });
   }
 
+  // Office only: email every applicant (one email each, nobody sees anyone else's address).
+  //   {dry:true}                          -> how many would receive it, and when one was last sent
+  //   {subject, message, test:'a@b.c'}    -> send one test to that address only
+  //   {subject, message, confirm:true}    -> send to every applicant
+  if (req.method === 'POST' && urlObj.searchParams.get('action') === 'broadcast') {
+    const user = await whoIs(req);
+    if (!user) return json({ error: 'Not signed in' }, 401);
+    let body;
+    try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
+    const logStore = getStore('email-templates');
+    const people = await uniqueApplicants();
+    if (body.dry) {
+      const last = await logStore.get('applicant-broadcast-log', { type: 'json' }).catch(() => null);
+      return json({ count: people.length, last: last || null });
+    }
+    const subject = String(body.subject || '').trim().slice(0, 150), message = String(body.message || '').trim().slice(0, 5000);
+    if (!subject || !message) return json({ error: 'Subject and message are both needed.' }, 400);
+    if (!process.env.RESEND_API_KEY) return json({ error: 'Email is not set up (no RESEND_API_KEY).' }, 500);
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const mk = p => ({ from: 'Smart Choice Delivery <applications@smartchoicedelivery.ca>', replyTo: 'smartchoicedelivery@yahoo.com', to: p.email, subject, html: buildBroadcastHtml(p, message) });
+    if (body.test) {
+      const to = String(body.test).trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: 'That test address does not look right.' }, 400);
+      const r = await resend.emails.send(mk({ name: 'Kevin', email: to }));
+      if (r && r.error) return json({ error: 'Test failed: ' + (r.error.message || 'unknown') }, 502);
+      return json({ success: true, test: true, sent: 1 });
+    }
+    if (body.confirm !== true) return json({ error: 'Not confirmed.' }, 400);
+    if (!people.length) return json({ error: 'There are no applicants with a valid email.' }, 400);
+    let sent = 0, failed = 0;
+    for (let i = 0; i < people.length; i += 50) {
+      const chunk = people.slice(i, i + 50).map(mk);
+      try {
+        const r = await resend.batch.send(chunk);
+        if (r && r.error) failed += chunk.length; else sent += chunk.length;
+      } catch (e) { console.error('applicant broadcast chunk failed:', e.message); failed += chunk.length; }
+    }
+    await logStore.setJSON('applicant-broadcast-log', { at: new Date().toISOString(), by: user, subject, sent, failed });
+    return json({ success: true, sent, failed });
+  }
+
   if (req.method === 'POST') {
     let body;
     try { body = await req.json(); } catch(e) { return json({ error: 'Invalid JSON' }, 400); }
@@ -168,6 +257,7 @@ export default async (req) => {
   }
 
   if (req.method === 'GET') {
+    if (!(await whoIs(req))) return json({ error: 'Not signed in' }, 401);
     const store = getStore('driver-applications');
     const { blobs } = await store.list();
     const apps = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
