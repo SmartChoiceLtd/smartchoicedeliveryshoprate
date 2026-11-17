@@ -1,5 +1,14 @@
 import { getStore } from '@netlify/blobs';
 
+// Christmas greens: a per-piece upcharge for deliveries dated Nov 1 to Jan 31, while the office switch (Seasonal page) is on.
+// The server decides whether it applies and at what rate; the driver form only collects the number of green pieces.
+const XMAS_DEFAULTS = { enabled: true, driver_rate: 1.5, shop_rate: 2 };
+const inXmasSeason = iso => { const m = parseInt(String(iso || '').slice(5, 7), 10); return m === 11 || m === 12 || m === 1; };
+async function xmasSettings() {
+  try { const s = await getStore('flower-settings').get('seasonal', { type: 'json' }); return { ...XMAS_DEFAULTS, ...((s && s.xmas) || {}) }; }
+  catch (e) { return { ...XMAS_DEFAULTS }; }
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -22,7 +31,7 @@ function extractZoneCode(zoneWithGroup) {
 }
 
 // Determine if zone needs auto-calculation
-function needsZoneCalculation(zoneCode) { 
+function needsZoneCalculation(zoneCode) {
   if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
   return false;
 }
@@ -32,7 +41,7 @@ function needsZoneCalculation(zoneCode) {
 // are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
 // are tracked under their own code. None of them should ever be
 // re-suggested or overwritten by the address-based zone matcher below.
-const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO'];
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO', 'SPL', 'SPLO'];
 function isEventZoneCode(zoneCode) {
   return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
 }
@@ -84,6 +93,72 @@ async function suggestZone(address, shopLat, shopLng, key) {
   }
 }
 
+// ---- Optional delivery notice ------------------------------------------------------------------------------
+// A shop can ask to be emailed when a delivery is entered (Admin > Shops > Edit: send notices + email). Off by default.
+// Sent from here, at the moment the driver submits, so the delivery time in the email is the time the driver entered.
+const escH = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function fmtTime12(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) return '';
+  const h = parseInt(m[1], 10);
+  return ((h % 12) || 12) + ':' + m[2] + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+async function sendDeliveryNotice(order, photoDataUrl) {
+  if (!process.env.RESEND_API_KEY || !order.shop_code) return null;
+  const code = String(order.shop_code).toUpperCase();
+  const store = getStore('flower-shops');
+  const { blobs } = await store.list();
+  const shops = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+  const shop = shops.find(s => s.name && String(s.name).split(' ')[0].toUpperCase() === code);
+  if (!shop || !shop.notify_enabled || !shop.notify_email) return null;
+  const when = fmtTime12(order.delivery_time) || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(order.received_at)).replace(/\./g, '').toUpperCase();
+  const statuses = Array.isArray(order.delivery_status) ? order.delivery_status.join(', ') : (order.delivery_status || '');
+  const rows = [
+    ['Recipient', order.name], ['Address', (order.unit ? order.unit + ' - ' : '') + (order.address || '')],
+    ['Your order #', order.order_id], ['Delivered', (order.date || '') + (when ? ' at ' + when : '')],
+    ['How', statuses], ['Left with neighbour at', order.neighboured_to || ''], ['Received by', order.accepted_by || ''],
+  ].filter(r => r[1]);
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">' +
+    '<p>Your delivery to <strong>' + escH(order.name || 'your customer') + '</strong> has been completed.</p>' +
+    '<table style="border-collapse:collapse">' + rows.map(r => '<tr><td style="padding:3px 14px 3px 0;color:#666">' + escH(r[0]) + '</td><td style="padding:3px 0">' + escH(r[1]) + '</td></tr>').join('') + '</table>' +
+    (photoDataUrl ? '<p style="color:#666">Delivery photo attached.</p>' : '') +
+    '<p style="color:#666">Smart Choice Delivery &middot; 403 880 9822 &middot; text is best</p></div>';
+  const msg = { from: 'delivery@smartchoicedelivery.ca', to: shop.notify_email, reply_to: 'smartchoicedelivery@yahoo.com', subject: 'Delivered: ' + (order.name || 'delivery') + (order.address ? ' - ' + order.address : ''), html };
+  const pm = /^data:image\/(\w+);base64,(.+)$/.exec(photoDataUrl || '');
+  if (pm) msg.attachments = [{ filename: 'delivery-photo.' + (pm[1] === 'jpeg' ? 'jpg' : pm[1]), content: pm[2] }];
+  const { Resend } = await import('resend');
+  const result = await new Resend(process.env.RESEND_API_KEY).emails.send(msg);
+  if (result && result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+  return shop.notify_email;
+}
+
+// ---- Close the loop on a delivery request --------------------------------------------------------------------
+// When a driver submits a delivery, an open request from the same shop, for that date, at the same address is marked done.
+// Matching is deliberately cautious: the street number AND a street-name word must agree, and exactly one request must fit.
+// Anything unclear is left open on the request list for the office to close by hand. Never fails the order.
+const ADDR_SKIP = new Set(['street', 'avenue', 'drive', 'road', 'place', 'court', 'crescent', 'close', 'boulevard', 'trail', 'calgary', 'alberta', 'suite', 'unit', 'apt', 'north', 'south', 'east', 'west']);
+function addrKey(a) {
+  const t = String(a || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  return { nums: new Set(t.filter(x => /^\d+$/.test(x))), words: new Set(t.filter(x => /^[a-z]{4,}$/.test(x) && !ADDR_SKIP.has(x))) };
+}
+function sameAddress(a, b) {
+  const x = addrKey(a), y = addrKey(b);
+  return [...x.nums].some(n => y.nums.has(n)) && [...x.words].some(w => y.words.has(w));
+}
+async function closeRequestFor(order, orderKey) {
+  if (!order.shop_code || !order.date) return;
+  if (/undeliverable/i.test(JSON.stringify(order.delivery_status || ''))) return; // not delivered: the request stays open
+  const rs = getStore('flower-requests');
+  const code = String(order.shop_code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const { blobs } = await rs.list({ prefix: 'req_' + order.date + '_' + code + '_' });
+  const recs = (await Promise.all(blobs.map(b => rs.get(b.key, { type: 'json' }).catch(() => null)))).filter(r => r && (r.status === 'new' || r.status === 'accepted'));
+  const hits = recs.filter(r => sameAddress(order.address, r.address));
+  if (hits.length !== 1) return;
+  const rec = hits[0];
+  rec.status = 'done'; rec.done_by = 'delivery entry'; rec.done_at = new Date().toISOString(); rec.order_key = orderKey; rec.delivered_by = order.driver || '';
+  await rs.setJSON(rec.id, rec);
+}
+
 async function getShopLocation(shopCode) {
   try {
     const store = getStore('flower-shops');
@@ -116,8 +191,35 @@ export default async (req) => {
       // more than 500 orders in total).
       const weekEnd = url.searchParams.get('week_end');
       const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
-      const { blobs } = await (weekPrefix ? store.list({ prefix: weekPrefix }) : store.list());
-      const picked = weekPrefix ? blobs : blobs.slice(-Math.min(limitParam, 5000));
+      if (weekPrefix) {
+        // Orders saved before the week-in-the-key scheme (and any filed under a different week)
+        // have no matching prefix, so the prefix lookup alone misses them. Same recovery the
+        // reports use: take other keys whose embedded timestamp is near this week, fetch them,
+        // and let the order's own date decide whether it belongs.
+        const DAY = 86400000;
+        const endD = new Date(weekEnd + 'T12:00:00');
+        const startD = new Date(endD); startD.setDate(startD.getDate() - 6);
+        const startIso = startD.getFullYear() + '-' + String(startD.getMonth() + 1).padStart(2, '0') + '-' + String(startD.getDate()).padStart(2, '0');
+        const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+        const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
+        const { blobs: prefixed } = await store.list({ prefix: weekPrefix });
+        const { blobs: all } = await store.list();
+        const fallback = all.filter(b => {
+          if (b.key.startsWith(weekPrefix)) return false;
+          const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+          if (!m) return false;
+          const ts = parseInt(m[1]);
+          return ts >= startMs && ts <= endMs;
+        });
+        const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+        const inWeek = fetched.filter(o => {
+          const d = normalizeOrderDate(o.date) || (o.received_at ? String(o.received_at).slice(0, 10) : null);
+          return d && d >= startIso && d <= weekEnd;
+        });
+        return json(inWeek.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+      }
+      const { blobs } = await store.list();
+      const picked = blobs.slice(-Math.min(limitParam, 5000));
       const orders = await Promise.all(
         picked.map(b => store.get(b.key, { type: 'json' }))
       );
@@ -129,10 +231,11 @@ export default async (req) => {
   // Handle POST — receive Zoho webhook
   if
    (req.method === 'POST') {
-    const key = process.env.GOOGLE_MAPS_KEY;
+    const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
     const ratesStore = getStore('flower-rates');
     let ratesData = {};
     try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+    ratesData = { SPL: { drate: 14, dratex: 2.5, gdpi: 0, srate: 20, sratex: 5 }, SPLO: { drate: 14, dratex: 2.5, gdpi: 0, srate: 25, sratex: 5 }, ...ratesData }; // seasonal planters, until saved on the rates page
    let body;
     try {
       body = await req.json();
@@ -257,6 +360,9 @@ export default async (req) => {
       zoneSuggestion.confidence === 'high';
 
     const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
+    const xs = await xmasSettings();
+    const xmasOn = !!xs.enabled && inXmasSeason(normalizeOrderDate(raw.date));
+    const xmasPcs = (xmasOn && zoneCode !== 'SPL' && zoneCode !== 'SPLO') ? Math.max(0, Math.min(parseInt(body.xmas_pieces, 10) || 0, parseInt(raw.total_pieces || 1, 10) || 1)) : 0;
     const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const order = {
       id: orderId,
@@ -283,7 +389,7 @@ export default async (req) => {
           ? (r.drate || 0) + (r.perkm || 0) * dist
           : (r.drate || 0);
         const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
-        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium;
+        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
       })(),
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
@@ -310,11 +416,61 @@ export default async (req) => {
       accepted_by: raw.accepted_by,
       comments: raw.comments,
       has_photo: !!body.photo_base64,
+      // Christmas greens: how many of the pieces, and the rates in force when the order was entered.
+      xmas_pieces: xmasPcs || 0,
+      xmas_driver_rate: xmasPcs ? (xs.driver_rate || 0) : 0,
+      xmas_shop_rate: xmasPcs ? (xs.shop_rate || 0) : 0,
     };
+
+    // Seasonal planters: the shop is charged here, because SPLO's base is the underlying zone's rate, which reports cannot see later.
+    //   SPL  = base $20 + $5 per extra piece.   SPLO = the zone's shop rate + $5 per extra piece.   (No Christmas greens charge: planters are greens already.)
+    if (zoneCode === 'SPL' || zoneCode === 'SPLO') {
+      const pcs = Math.max(1, parseInt(raw.total_pieces || 1, 10) || 1);
+      const sr = ratesData.SPL || {}, so = ratesData.SPLO || {};
+      let baseShop;
+      if (zoneCode === 'SPL') baseShop = sr.srate != null ? sr.srate : 20;
+      else {
+        const uz = String(body.underlying_zone || '').toUpperCase();
+        const ur = uz && ratesData[uz] ? ratesData[uz] : null;
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        baseShop = ur ? (((uz === 'RURALKM' || uz === 'WRU') && dist != null) ? (ur.srate || 0) + (ur.sperkm || 0) * dist : (ur.srate || 0)) : (so.srate != null ? so.srate : 25);
+      }
+      const extraShop = zoneCode === 'SPL' ? (sr.sratex != null ? sr.sratex : 5) : (so.sratex != null ? so.sratex : 5);
+      order.shop_pay = Math.round((baseShop + (pcs - 1) * extraShop ) * 100) / 100;
+      order.shop_pay_source = 'planter';
+      order.underlying_zone = String(body.underlying_zone || '').toUpperCase() || null;
+    }
+
+    // A delivery entered against an event quote (Q-2026-0001): the quote decides who is billed, what the shop is
+    // charged for this delivery, and the driver's pay. Checked here, on the server, so a phone cannot change them.
+    let linkedQuote = null;
+    const quoteId = String(body.quote_id || '').trim().toUpperCase();
+    if (quoteId) {
+      const q = await getStore('flower-event-quotes').get(quoteId, { type: 'json', consistency: 'strong' }).catch(() => null);
+      if (!q) return json({ error: 'Quote ' + quoteId + ' was not found. Check the number.' }, 400);
+      if (!['sent', 'accepted'].includes(q.status)) return json({ error: 'Quote ' + q.id + ' is ' + q.status + ', not accepted. Ask the office.' }, 400);
+      const trips = Math.max(1, (q.event && q.event.trips) || 1);
+      if ((q.linked || []).length >= trips) return json({ error: 'Quote ' + q.id + ' already has all ' + trips + ' of its deliveries entered. If there is another, ask the office to raise the number of trips on the quote.' }, 409);
+      if (!(q.customer && q.customer.code)) return json({ error: 'Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.' }, 400);
+      linkedQuote = q;
+      order.quote_id = q.id;
+      order.shop_code = String(q.customer.code).toUpperCase();
+      order.shop_pay = Math.round((q.subtotal / trips) * 100) / 100;
+      order.xmas_pieces = 0; order.xmas_driver_rate = 0; order.xmas_shop_rate = 0; // the quote already sets the price and the pay
+      if (q.driver_pay > 0) { order.driver_pay = q.driver_pay; order.driver_pay_from_quote = true; }
+    }
 
     try {
       const store = getStore('flower-orders');
       await store.setJSON(orderId, order);
+      if (linkedQuote) { // count this delivery against the quote
+        try {
+          const qs = getStore('flower-event-quotes');
+          const fresh = (await qs.get(linkedQuote.id, { type: 'json', consistency: 'strong' })) || linkedQuote;
+          fresh.linked = (fresh.linked || []).concat([{ id: orderId, at: order.received_at, driver: order.driver || '', order_id: order.order_id || '' }]);
+          await qs.setJSON(fresh.id, fresh);
+        } catch (e) { console.error('quote link failed:', e.message); }
+      }
       // Photo is stored in a separate blob store, not embedded in the order
       // record itself - GET /api/orders loads every order's full JSON on
       // every page view, so embedding potentially-large photo data there
@@ -332,9 +488,30 @@ export default async (req) => {
           await store.setJSON(orderId, order);
         }
       }
+      // Delivery notice to the shop, only for shops that asked for it. A failure here never fails the order.
+      if (!isWholesale || isEventZoneCode(zoneCode)) { // wholesale pickups get no notice; WED/WEDO are events, not wholesale
+        try {
+          const to = await sendDeliveryNotice(order, body.photo_base64 || '');
+          if (to) { order.notice_sent_at = new Date().toISOString(); order.notice_to = to; await store.setJSON(orderId, order); }
+        } catch (e) {
+          console.error('delivery notice failed:', e.message);
+          try { order.notice_error = String(e.message || e).slice(0, 200); await store.setJSON(orderId, order); } catch (e2) {}
+        }
+      }
+      if (!isWholesale || isEventZoneCode(zoneCode)) { try { await closeRequestFor(order, orderId); } catch (e) { console.error('request close failed:', e.message); } }
       // has_photo reports whether the photo was actually stored (it is downgraded to
       // false above if the photo write failed), so the driver form can tell the driver
       // the truth instead of assuming the photo made it.
+      // If this week has been closed, list the late order against it (not blocked - just visible).
+      try {
+        const lockStore = getStore('flower-week-locks');
+        const lk = await lockStore.get(weekEnd, { type: 'json' });
+        if (lk && lk.locked) {
+          lk.changes = lk.changes || [];
+          lk.changes.push({ at: new Date().toISOString(), by: 'new entry', id: orderId, order_id: order.order_id, action: 'added', reason: 'Order entered after the week was closed' });
+          await lockStore.setJSON(weekEnd, lk);
+        }
+      } catch (e) { /* the order is saved; logging is best-effort */ }
       return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
     } catch (e) {
       return json({ error: 'Could not store order: ' + e.message }, 500);
