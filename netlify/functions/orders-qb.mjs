@@ -8,11 +8,15 @@ function csvEscape(val) {
 }
 function toCSVRow(fields) { return fields.map(csvEscape).join(','); }
 
+// City bakery flat rate: one price for up to 3 pieces, a second flat price from 4 pieces up (no per-piece extras).
+var BAKERY_TIERS = { BAKV:{ upTo:3, over:18 }, BAKS:{ upTo:3, over:18 }, BAKP:{ upTo:3, over:18 } };
 var QB_ZONE_MAP = {
   AIR:  { product:'OUT OF TOWN:AIR', desc:'AIRDRIE $29 BASE RATE +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
-  BAK1: { product:'BAKERY:BAK1', desc:'BAK1 CITY BASIC $15 1 PKG OR AS QUOTED' },
-  BAK2: { product:'BAKERY:BAK2', desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' },
-  BAKP: { product:'BAKERY:BAKP', desc:'BAKERY $15 OR AS QUOTED FOR MULTIPLE PKGS AND EVENTS' },
+  BAK1: { product:'BAKERY:BAK1', desc:'BAK1 CITY BASIC $15 1 PKG OR AS QUOTED' }, // old code, kept so earlier weeks still export
+  BAK2: { product:'BAKERY:BAK2', desc:'BAK2 CITY $20 2-3 PKG OR AS QUOTED' }, // old code, kept so earlier weeks still export
+  BAKV: { product:'BAKERY:BAKV', desc:'BAKV VERNZ BAKEHOUSE CITY FLAT $15 UP TO 3 PCS, $18 FOR 4+ PCS OR AS QUOTED' },
+  BAKS: { product:'BAKERY:BAKS', desc:'BAKS SWEET CAKES BY VERNZ CITY FLAT $15 UP TO 3 PCS, $18 FOR 4+ PCS OR AS QUOTED' },
+  BAKP: { product:'BAKERY:BAKP', desc:'BAKP PRETTY SWEET CITY FLAT $15 UP TO 3 PCS, $18 FOR 4+ PCS OR AS QUOTED' },
   BAL:  { product:'OUT OF TOWN:BAL', desc:'BALZAC$22 BASE RATE $25 +$3 EACH ADDITIONAL PCE/ OR AS QUOTED' },
   BAS:  { product:'GIFT BASKETS:BAS', desc:'GIFT BASKETS IN CITY $13/1 PIECE + $2.50 EACH EXTRA PIECE OR AS QUOTED' },
   BEI:  { product:'OUT OF TOWN:BEI', desc:'BEISEKER $50 +$3 PER EXTRA PIECE OR AS QUOTED' },
@@ -207,7 +211,7 @@ export default async (req) => {
     try { rates = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
 
     // Default rates fallback
-    var DEFAULT_SRATE = { C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:25,RWM:37,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
+    var DEFAULT_SRATE = { BAK1:15,BAK2:20,BAKV:15,BAKS:15,BAKP:15,C1:11,C2:12,C3:13,C4:14,C5:15,AIR:25,BAL:22,BEI:50,BNF:100,BPW:25,BRG:35,BTY:15,CAN:80,CAR:60,CHE:25,COC:30,CRO:45,DEW:22,DVA:50,ERV:22,EVA:22,FUN:15,FUNO:25,HOT:25,HPT:25,RWM:37,HRV:40,KAN:65,LAN:30,LYA:38,MDF:25,MIL:45,NAN:75,OKO:25,PRI:30,RVS:23,SBK:25,SC2:40,SC3:60,SPEC:25,SPL:20,SPO:25,STR:35,TSU:25,TVA:50,WAI:25,WCH:25,WCO:30,WED:25,WEDO:50,WHR:40,WLO:60,WLY:38,WPH:15,WPO:25,WPU:15,WST:38 };
     var DEFAULT_SRATEX = { HPT:3,RWM:3,C1:3,C2:3,C3:3,C4:3,C5:3,FUN:3,FUNO:3,SPEC:5,WED:5,WEDO:5,WAI:1.5,WCH:1.5,WCO:1.5,WHR:1.5,WLO:1.5,WLY:1.5,WPH:1,WPO:1.5,WPU:1.5,WST:1.5 };
 
     // Filter by week
@@ -269,7 +273,7 @@ var startStr = new Date(new Date(weekEnd + 'T12:00:00').getTime() - 6*24*60*60*1
         var r = rates[zone] || {};
         var srate = r.srate || DEFAULT_SRATE[zone] || 0;
         var sratex = r.sratex || DEFAULT_SRATEX[zone] || 0;
-        amount = srate + (pieces - 1) * sratex;
+        amount = BAKERY_TIERS[zone] ? (pieces > BAKERY_TIERS[zone].upTo ? BAKERY_TIERS[zone].over : srate) : srate + (pieces - 1) * sratex;
       }
 
       // Christmas greens upcharge (a quoted delivery's price already includes everything).
