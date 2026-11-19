@@ -1,5 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
+const BAKERY_TIERS = { BAKV:{ upTo:3, over:18 }, BAKS:{ upTo:3, over:18 }, BAKP:{ upTo:3, over:18 } };
+
 function parseDate(raw) {
   if (!raw) return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
@@ -329,7 +331,9 @@ export default async (req) => {
         const rushPremium = o.rush ? (hotR.srate || 0) : 0;
         // A delivery entered against an event quote is charged its share of the quote, not the zone rate.
         const xmasAmt = (o.xmas_pieces || 0) * (o.xmas_shop_rate || 0); // Christmas greens upcharge
-        const amount = ((o.quote_id || o.shop_pay_source) && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : base + (pieces-1)*(r.sratex||0) + rushPremium + xmasAmt;
+        const bakTier = BAKERY_TIERS[zone]; // city bakery flat rate: one price up to 3 pieces, a second flat price from 4 up
+        const pieceAmt = bakTier ? (pieces > bakTier.upTo ? bakTier.over : base) : base + (pieces-1)*(r.sratex||0);
+        const amount = ((o.quote_id || o.shop_pay_source) && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : pieceAmt + rushPremium + xmasAmt;
         return {o, zone, pieces, amount};
       });
 
