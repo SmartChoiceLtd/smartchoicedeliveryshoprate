@@ -565,6 +565,7 @@ function getEffectiveZone() {
 
 // Computes {base, extra, gdpi, total} pay for the current selection,
 // Base pay for a zone, handling RURALKM's distance formula (base + perkm x
+var BAKERY_SHOP_ZONE = { VBH:'BAKV', SCV:'BAKS', PS:'BAKP' }; // shop code -> its city flat-rate zone
 var BAKERY_DRIVER = { BAKV:{ upTo:3, low:9.5, over:12.5 }, BAKS:{ upTo:3, low:9.5, over:12.5 }, BAKP:{ upTo:3, low:9.5, over:12.5 } }; // city bakery flat driver pay
 // distance) as a special case. All other zones just use their flat drate.
 function getZoneBasePay(zoneCode) {
@@ -965,7 +966,13 @@ function lookupZone(address, placeLat, placeLng) {
     .then(function(data) {
       document.getElementById('zoneLoading').hidden = true;
       if (data.suggested) {
-        setZone(data.suggested, data.message, false, data.community, data.distance_km);
+        // City bakery shops: an in-city delivery is billed at the bakery flat rate instead of the community zone.
+        var bakCode = shop ? BAKERY_SHOP_ZONE[String(shop.name || '').split(' ')[0].toUpperCase()] : null;
+        if (bakCode && rates[bakCode] && /^C[1-5]$/.test(data.suggested)) {
+          setZone(bakCode, bakCode + ' - bakery flat rate (in city)', false, data.community, data.distance_km);
+        } else {
+          setZone(data.suggested, data.message, false, data.community, data.distance_km);
+        }
       } else {
         document.getElementById('zoneManual').hidden = false;
         buildZoneButtons(null);
