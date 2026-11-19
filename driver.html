@@ -565,6 +565,7 @@ function getEffectiveZone() {
 
 // Computes {base, extra, gdpi, total} pay for the current selection,
 // Base pay for a zone, handling RURALKM's distance formula (base + perkm x
+var BAKERY_DRIVER = { BAKV:{ upTo:3, low:9.5, over:12.5 }, BAKS:{ upTo:3, low:9.5, over:12.5 }, BAKP:{ upTo:3, low:9.5, over:12.5 } }; // city bakery flat driver pay
 // distance) as a special case. All other zones just use their flat drate.
 function getZoneBasePay(zoneCode) {
   var r = rates[zoneCode] || {};
@@ -684,6 +685,7 @@ function computePay() {
     base = getZoneBasePay(eff.code);
     extra = (pieces - 1) * (r.dratex || 0);
     gdpi = r.gdpi || 0;
+    if (BAKERY_DRIVER[eff.code]) { var bd = BAKERY_DRIVER[eff.code]; base = pieces > bd.upTo ? bd.over : bd.low; extra = 0; }
   }
   var byPremium = 0;
   if (deliveryType === 'wholesale') {
