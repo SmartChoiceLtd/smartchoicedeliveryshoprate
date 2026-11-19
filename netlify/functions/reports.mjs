@@ -1,28 +1,76 @@
 import { getStore } from '@netlify/blobs';
 
-const BAKERY_TIERS = { BAKV:{ upTo:3, over:18 }, BAKS:{ upTo:3, over:18 }, BAKP:{ upTo:3, over:18 } };
+const BAKERY_DRIVER = { BAKV:{ upTo:3, low:9.5, over:12.5 }, BAKS:{ upTo:3, low:9.5, over:12.5 }, BAKP:{ upTo:3, low:9.5, over:12.5 } }; // city bakery flat driver pay: one amount up to 3 pieces, another from 4 up
 
-function parseDate(raw) {
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
-  const mo = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-  const m = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})/);
-  if (m) return `${m[3]}-${mo[m[2]]||'01'}-${m[1].padStart(2,'0')}`;
-  const d = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (d) return `${d[3]}-${d[2].padStart(2,'0')}-${d[1].padStart(2,'0')}`;
-  return raw.slice(0,10);
+// Christmas greens: a per-piece upcharge for deliveries dated Nov 1 to Jan 31, while the office switch (Seasonal page) is on.
+// The server decides whether it applies and at what rate; the driver form only collects the number of green pieces.
+const XMAS_DEFAULTS = { enabled: true, driver_rate: 1.5, shop_rate: 2 };
+const inXmasSeason = iso => { const m = parseInt(String(iso || '').slice(5, 7), 10); return m === 11 || m === 12 || m === 1; };
+async function xmasSettings() {
+  try { const s = await getStore('flower-settings').get('seasonal', { type: 'json' }); return { ...XMAS_DEFAULTS, ...((s && s.xmas) || {}) }; }
+  catch (e) { return { ...XMAS_DEFAULTS }; }
 }
 
-function getWeekRange(weekEnd) {
-  const d = new Date(weekEnd + 'T12:00:00');
-  d.setDate(d.getDate() - 6);
-  return { start: d.toISOString().slice(0,10), end: weekEnd };
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+// Map Zoho's "Shop (with Group Name)" to shop code
+// Format from Zoho: "AC ACADIA GROWER DIRECT" — first token is the code
+function extractShopCode(shopWithGroup) {
+  if (!shopWithGroup) return null;
+  return shopWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Map Zoho's "Zone (with Group Name)" to zone code
+// Format from Zoho: "C3 City Basic" or "BAK1 Bakery SCV ML YANNS" — first token is the code
+function extractZoneCode(zoneWithGroup) {
+  if (!zoneWithGroup) return null;
+  return zoneWithGroup.trim().split(/\s+/)[0].toUpperCase();
+}
+
+// Determine if zone needs auto-calculation
+function needsZoneCalculation(zoneCode) {
+  if (!zoneCode || zoneCode === '' || zoneCode === '-SELECT-' || zoneCode === 'SELECT') return true;
+  return false;
+}
+
+// Event-type pricing codes from driver.html's Event Type overlay (Special
+// Event / Wedding / Funeral). These are never geographic zones - WED/SPEC/FUN
+// are flat in-town rates, WEDO/FUNO borrow a geographic zone's base rate but
+// are tracked under their own code. None of them should ever be
+// re-suggested or overwritten by the address-based zone matcher below.
+const EVENT_ZONE_CODES = ['SPEC', 'WED', 'WEDO', 'FUN', 'FUNO', 'SPL', 'SPLO'];
+function isEventZoneCode(zoneCode) {
+  return !!zoneCode && EVENT_ZONE_CODES.includes(zoneCode.toUpperCase());
 }
 
 // Returns the Sunday (YYYY-MM-DD) that ends the Mon-Sun week containing
-// the given date - same helper as orders.mjs/stops.mjs, kept consistent
-// so order keys can be found via prefix filtering regardless of which
-// function created them.
+// the given date. Embedded directly in each order's storage key so a
+// specific week's orders can be found via a fast, server-side prefix
+// filter on .list() instead of fetching and filtering every order ever
+// created - which became a real bottleneck once the store grew into the
+// thousands of records.
+// Normalizes the date formats an order can arrive with to YYYY-MM-DD.
+// Driver-form orders send ISO dates, but the Zoho webhook sends
+// DD-Mon-YYYY (or D/M/YYYY) - the same formats reports.mjs and orders.html
+// already parse. Without this, those orders' week key came out wrong.
+// Returns null if the format isn't recognized.
+function normalizeOrderDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const months = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+  let m = s.match(/^(\d{1,2})-([A-Za-z]{3})[A-Za-z]*-(\d{4})/);
+  if (m && months[m[2].toLowerCase()]) return m[3] + '-' + months[m[2].toLowerCase()] + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  return null;
+}
+
 function weekEndingSunday(dateStr) {
   let d = dateStr ? new Date(dateStr + 'T12:00:00') : null;
   // An unparseable date must still land on a real Sunday - previously this
@@ -36,383 +84,444 @@ function weekEndingSunday(dateStr) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-function fmt(iso) {
-  if (!iso) return '';
-  const [y,m,d] = iso.split('-');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${parseInt(d)}-${months[parseInt(m)-1]}-${y.slice(2)}`;
+async function suggestZone(address, shopLat, shopLng, key) {
+  try {
+    const params = new URLSearchParams({ address, shop_lat: shopLat, shop_lng: shopLng });
+    const res = await fetch(`https://smartchoicedeliveryshoprate.netlify.app/api/suggest-zone-v2?${params}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch (e) {
+    return null;
+  }
 }
 
-// Extract display name — remove code prefix if present
-function displayName(code, storedName) {
-  if (!storedName || storedName.trim().toUpperCase() === code.toUpperCase()) return code;
-  // Remove leading code prefix (e.g. "KF KENSINGTON FLOWERS" -> "KENSINGTON FLOWERS")
-const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const stripped = storedName.replace(new RegExp('^' + escaped + '\\s+', 'i'), '').trim();
-  return stripped || storedName;
+// ---- Optional delivery notice ------------------------------------------------------------------------------
+// A shop can ask to be emailed when a delivery is entered (Admin > Shops > Edit: send notices + email). Off by default.
+// Sent from here, at the moment the driver submits, so the delivery time in the email is the time the driver entered.
+const escH = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function fmtTime12(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) return '';
+  const h = parseInt(m[1], 10);
+  return ((h % 12) || 12) + ':' + m[2] + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+async function sendDeliveryNotice(order, photoDataUrl) {
+  if (!process.env.RESEND_API_KEY || !order.shop_code) return null;
+  const code = String(order.shop_code).toUpperCase();
+  const store = getStore('flower-shops');
+  const { blobs } = await store.list();
+  const shops = (await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+  const shop = shops.find(s => s.name && String(s.name).split(' ')[0].toUpperCase() === code);
+  if (!shop || !shop.notify_enabled || !shop.notify_email) return null;
+  const when = fmtTime12(order.delivery_time) || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Edmonton', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(order.received_at)).replace(/\./g, '').toUpperCase();
+  const statuses = Array.isArray(order.delivery_status) ? order.delivery_status.join(', ') : (order.delivery_status || '');
+  const rows = [
+    ['Recipient', order.name], ['Address', (order.unit ? order.unit + ' - ' : '') + (order.address || '')],
+    ['Your order #', order.order_id], ['Delivered', (order.date || '') + (when ? ' at ' + when : '')],
+    ['How', statuses], ['Left with neighbour at', order.neighboured_to || ''], ['Received by', order.accepted_by || ''],
+  ].filter(r => r[1]);
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">' +
+    '<p>Your delivery to <strong>' + escH(order.name || 'your customer') + '</strong> has been completed.</p>' +
+    '<table style="border-collapse:collapse">' + rows.map(r => '<tr><td style="padding:3px 14px 3px 0;color:#666">' + escH(r[0]) + '</td><td style="padding:3px 0">' + escH(r[1]) + '</td></tr>').join('') + '</table>' +
+    (photoDataUrl ? '<p style="color:#666">Delivery photo attached.</p>' : '') +
+    '<p style="color:#666">Smart Choice Delivery &middot; 403 880 9822 &middot; text is best</p></div>';
+  const msg = { from: 'delivery@smartchoicedelivery.ca', to: shop.notify_email, reply_to: 'smartchoicedelivery@yahoo.com', subject: 'Delivered: ' + (order.name || 'delivery') + (order.address ? ' - ' + order.address : ''), html };
+  const pm = /^data:image\/(\w+);base64,(.+)$/.exec(photoDataUrl || '');
+  if (pm) msg.attachments = [{ filename: 'delivery-photo.' + (pm[1] === 'jpeg' ? 'jpg' : pm[1]), content: pm[2] }];
+  const { Resend } = await import('resend');
+  const result = await new Resend(process.env.RESEND_API_KEY).emails.send(msg);
+  if (result && result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+  return shop.notify_email;
 }
 
-const CSS = `
-  body{font-family:Arial,sans-serif;font-size:9px;margin:0;color:#000;}
-  .page{width:270mm;padding:8mm;page-break-after:always;box-sizing:border-box;}
-  .page:last-child{page-break-after:auto;}
-  .header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px;}
-  .header-left .title{font-size:14px;font-weight:bold;}
-  .header-left .sub{font-size:10px;color:#444;margin-top:2px;}
-  .header-right{text-align:right;font-size:10px;font-weight:bold;}
-  .stats{display:flex;gap:10px;margin-bottom:8px;}
-  .stat{border:1px solid #ddd;padding:4px 10px;border-radius:4px;text-align:center;}
-  .stat-val{font-size:13px;font-weight:bold;color:#0C769E;}
-  .stat-lbl{font-size:8px;color:#666;}
-  .content{display:flex;gap:10px;}
-  .summary{min-width:155px;max-width:155px;}
-  .stbl{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:6px;}
-  .stbl th{background:#0C769E;color:#fff;padding:3px 5px;text-align:left;}
-  .stbl td{padding:2px 5px;border-bottom:1px solid #eee;}
-  .stbl .tot td{font-weight:bold;border-top:2px solid #000;background:#f0f0f0;}
-  .grand{font-size:11px;font-weight:bold;padding:5px 6px;background:#F4DCC9;border:1px solid #A8CFA8;border-radius:3px;margin-top:4px;}
-  .detail{flex:1;overflow:hidden;}
-  .dtbl{width:100%;border-collapse:collapse;font-size:8px;}
-  .dtbl th{background:#0C769E;color:#fff;padding:2px 4px;text-align:left;white-space:nowrap;}
-  .dtbl td{padding:2px 4px;border-bottom:1px solid #eee;white-space:nowrap;overflow:hidden;max-width:90px;text-overflow:ellipsis;}
-  .dtbl tr:nth-child(even){background:#f9f9f9;}
-  .dtbl .chk{text-align:center;}
-  .invoice-band{background:#F4DCC9;padding:5px 8px;border-radius:3px;margin-bottom:7px;font-size:9px;color:#B8472B;font-weight:600;}
-  @media print{body{margin:0;}@page{size:landscape;margin:5mm;}}
-`;
+// ---- Close the loop on a delivery request --------------------------------------------------------------------
+// When a driver submits a delivery, an open request from the same shop, for that date, at the same address is marked done.
+// Matching is deliberately cautious: the street number AND a street-name word must agree, and exactly one request must fit.
+// Anything unclear is left open on the request list for the office to close by hand. Never fails the order.
+const ADDR_SKIP = new Set(['street', 'avenue', 'drive', 'road', 'place', 'court', 'crescent', 'close', 'boulevard', 'trail', 'calgary', 'alberta', 'suite', 'unit', 'apt', 'north', 'south', 'east', 'west']);
+function addrKey(a) {
+  const t = String(a || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  return { nums: new Set(t.filter(x => /^\d+$/.test(x))), words: new Set(t.filter(x => /^[a-z]{4,}$/.test(x) && !ADDR_SKIP.has(x))) };
+}
+function sameAddress(a, b) {
+  const x = addrKey(a), y = addrKey(b);
+  return [...x.nums].some(n => y.nums.has(n)) && [...x.words].some(w => y.words.has(w));
+}
+async function closeRequestFor(order, orderKey) {
+  if (!order.shop_code || !order.date) return;
+  if (/undeliverable/i.test(JSON.stringify(order.delivery_status || ''))) return; // not delivered: the request stays open
+  const rs = getStore('flower-requests');
+  const code = String(order.shop_code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const { blobs } = await rs.list({ prefix: 'req_' + order.date + '_' + code + '_' });
+  const recs = (await Promise.all(blobs.map(b => rs.get(b.key, { type: 'json' }).catch(() => null)))).filter(r => r && (r.status === 'new' || r.status === 'accepted'));
+  const hits = recs.filter(r => sameAddress(order.address, r.address));
+  if (hits.length !== 1) return;
+  const rec = hits[0];
+  rec.status = 'done'; rec.done_by = 'delivery entry'; rec.done_at = new Date().toISOString(); rec.order_key = orderKey; rec.delivered_by = order.driver || '';
+  await rs.setJSON(rec.id, rec);
+}
 
-async function requireAuth(req) {
-  const cookieHeader = req.headers.get('cookie') || '';
-  const match = cookieHeader.match(/scd_session=([a-f0-9]+)/);
-  if (!match) return null;
-  const sessionsStore = getStore('flower-sessions');
-  const session = await sessionsStore.get(match[1], { type: 'json' });
-  if (!session || new Date(session.expires_at) < new Date()) return null;
-  return session.username;
+async function getShopLocation(shopCode) {
+  try {
+    const store = getStore('flower-shops');
+    const { blobs } = await store.list();
+    const shops = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' })));
+    const match = shops.filter(Boolean).find(s =>
+      s.name && s.name.toUpperCase().startsWith(shopCode.toUpperCase())
+    );
+    return match ? { lat: match.lat, lng: match.lng } : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 export default async (req) => {
-  const username = await requireAuth(req);
-  if (!username) {
-    return new Response('Not authenticated. Please sign in at /login.html and try again.', { status: 401, headers: { 'content-type': 'text/plain' } });
-  }
-
-  const url = new URL(req.url);
-  const weekEnd = url.searchParams.get('week_end');
-  const type = url.searchParams.get('type') || 'driver';
-  const code = url.searchParams.get('code') || 'all';
-  const period = url.searchParams.get('period') || 'week'; // 'week' or 'day'
-  const wantJson = url.searchParams.get('format') === 'json';
-  const groups = []; // structured copy of each report page, used by format=json (PDF export)
-
-  if (!weekEnd) {
-    return new Response(JSON.stringify({error:'week_end required (YYYY-MM-DD)'}), {status:400,headers:{'content-type':'application/json'}});
-  }
-
-  const store = getStore('flower-orders');
-
-  // Both 'week' and 'day' modes ultimately fall within some Mon-Sun week,
-  // whose Sunday lets us use the same fast prefix lookup either way - day
-  // mode just applies one more filter afterward to narrow to the single
-  // day. This avoids fetching every order ever created regardless of how
-  // large the store grows.
-  const targetWeekEnd = period === 'day' ? weekEndingSunday(weekEnd) : weekEnd;
-  const weekBoundsForFetch = getWeekRange(targetWeekEnd);
-  const fetchStartMs = new Date(weekBoundsForFetch.start + 'T00:00:00').getTime();
-  const fetchEndMs = new Date(weekBoundsForFetch.end + 'T23:59:59').getTime();
-
-  const { blobs: newFormatBlobs } = await store.list({ prefix: `order_${targetWeekEnd}_` });
-  const { blobs: allBlobs } = await store.list();
-  const oldFormatCandidates = allBlobs.filter(b => {
-    if (b.key.startsWith(`order_${targetWeekEnd}_`)) return false;
-    const match = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/); // also recovers new-format keys filed under a bogus week prefix
-    if (!match) return false;
-    const ts = parseInt(match[1]);
-    return ts >= fetchStartMs && ts <= fetchEndMs;
-  });
-  const relevantBlobs = newFormatBlobs.concat(oldFormatCandidates);
-  const allOrders = (await Promise.all(relevantBlobs.map(b => store.get(b.key,{type:'json'})))).filter(Boolean);
-
-  const {start, end} = period === 'day' ? {start: weekEnd, end: weekEnd} : getWeekRange(weekEnd);
-  const weekOrders = allOrders.filter(o => {
-    const d = parseDate(o.date || o.received_at || '');
-    return d && d >= start && d <= end;
-  });
-
-  const ratesStore = getStore('flower-rates');
-  let rates = {};
-  try { rates = await ratesStore.get('rates',{type:'json'}) || {}; } catch(e) {}
-
-  // Load driver names from drivers store
-  const driverNames = {};
-  try {
-    const driversStore = getStore('flower-drivers');
-    const {blobs: dBlobs} = await driversStore.list();
-    const dList = (await Promise.all(dBlobs.map(b => driversStore.get(b.key,{type:'json'})))).filter(Boolean);
-    dList.forEach(d => { if (d.code) driverNames[d.code.toUpperCase()] = d.name; });
-  } catch(e) {}
-
-  // Load shop names from shops store
-  const shopNames = {};
-  try {
-    const shopsStore = getStore('flower-shops');
-    const {blobs: sBlobs} = await shopsStore.list();
-    const sList = (await Promise.all(sBlobs.map(b => shopsStore.get(b.key,{type:'json'})))).filter(Boolean);
-    sList.forEach(s => {
-      if (s.name) {
-        const code = s.name.trim().split(/\s+/)[0].toUpperCase();
-        shopNames[code] = s.name;
+  // Handle GET — list all orders. NOT auth-gated: this is shared with
+  // driver-summary.html (driver-facing, no login system at all) in
+  // addition to orders.html's dashboard - same category as shops.mjs/
+  // rates.mjs/stops.mjs, which were deliberately left open for the same
+  // reason. Protecting the dashboard relies on its page-level login
+  // redirect instead of blocking this endpoint outright.
+  if (req.method === 'GET') {
+    try {
+      const store = getStore('flower-orders');
+      const url = new URL(req.url);
+      const limitParam = parseInt(url.searchParams.get('limit') || '500');
+      // week_end=YYYY-MM-DD returns EVERY order filed under that week. Order keys start with
+      // order_<week-ending>_, so this is a fast prefix lookup and is not affected by the
+      // 'most recent N orders' cap below (which silently hid older weeks once there were
+      // more than 500 orders in total).
+      const weekEnd = url.searchParams.get('week_end');
+      const weekPrefix = weekEnd && /^\d{4}-\d{2}-\d{2}$/.test(weekEnd) ? 'order_' + weekEnd + '_' : null;
+      if (weekPrefix) {
+        // Orders saved before the week-in-the-key scheme (and any filed under a different week)
+        // have no matching prefix, so the prefix lookup alone misses them. Same recovery the
+        // reports use: take other keys whose embedded timestamp is near this week, fetch them,
+        // and let the order's own date decide whether it belongs.
+        const DAY = 86400000;
+        const endD = new Date(weekEnd + 'T12:00:00');
+        const startD = new Date(endD); startD.setDate(startD.getDate() - 6);
+        const startIso = startD.getFullYear() + '-' + String(startD.getMonth() + 1).padStart(2, '0') + '-' + String(startD.getDate()).padStart(2, '0');
+        const startMs = new Date(startIso + 'T00:00:00').getTime() - DAY;
+        const endMs = new Date(weekEnd + 'T23:59:59').getTime() + 7 * DAY;
+        const { blobs: prefixed } = await store.list({ prefix: weekPrefix });
+        const { blobs: all } = await store.list();
+        const fallback = all.filter(b => {
+          if (b.key.startsWith(weekPrefix)) return false;
+          const m = b.key.match(/^order_(?:\d{4}-\d{2}-\d{2}_)?(\d+)_/);
+          if (!m) return false;
+          const ts = parseInt(m[1]);
+          return ts >= startMs && ts <= endMs;
+        });
+        const fetched = (await Promise.all(prefixed.concat(fallback).map(b => store.get(b.key, { type: 'json' })))).filter(Boolean);
+        const inWeek = fetched.filter(o => {
+          const d = normalizeOrderDate(o.date) || (o.received_at ? String(o.received_at).slice(0, 10) : null);
+          return d && d >= startIso && d <= weekEnd;
+        });
+        return json(inWeek.sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
       }
-    });
-  } catch(e) {}
+      const { blobs } = await store.list();
+      const picked = blobs.slice(-Math.min(limitParam, 5000));
+      const orders = await Promise.all(
+        picked.map(b => store.get(b.key, { type: 'json' }))
+      );
+      return json(orders.filter(Boolean).sort((a, b) => new Date(b.received_at) - new Date(a.received_at)));
+    } catch (e) {
+      return json({ error: 'Could not load orders: ' + e.message }, 500);
+    }
+  }  
+  // Handle POST — receive Zoho webhook
+  if
+   (req.method === 'POST') {
+    const key = (process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_KEY);
+    const ratesStore = getStore('flower-rates');
+    let ratesData = {};
+    try { ratesData = await ratesStore.get('rates', { type: 'json' }) || {}; } catch(e) {}
+    ratesData = { SPL: { drate: 14, dratex: 2.5, gdpi: 0, srate: 20, sratex: 5 }, SPLO: { drate: 14, dratex: 2.5, gdpi: 0, srate: 25, sratex: 5 }, ...ratesData }; // seasonal planters, until saved on the rates page
+   let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return json({ error: 'Invalid JSON payload' }, 400);
+    }
 
-  const weekLabel = fmt(weekEnd);
-  const periodLabel = period === 'day' ? weekLabel : `Week Ending ${weekLabel}`;
-  let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reports ${weekLabel}</title><style>${CSS}</style></head><body>`;
+      // Map Zoho field names to our internal structure
+    const raw = {
+      date:             body['Date']                     || body['date']              || null,
+      order_id:         body['Order ID']                 || body['order_id']          || null,
+      name:             body['Name']                     || body['name']              || null,
+      address: body['Address - Street Address'] || body['Address'] || body['address'] || null,
+      unit: body.unit || body['Unit'] || null,
+      time_request: body.time_request || body['Time Request'] || null,
+      rush: !!body.rush,
+      shop:             body['Shop']                     || body['shop']              || null,
+     shop_full: body['Shop (with Group Name)'] || body['Shop'] || body['shop'] || null,
+      driver:           body['Driver']                   || body['driver']            || null,
+      driver_pay: body.driver_pay || body['driver_pay'] || 0,
+     total_pieces: body['Pcs'] || body['Total Pieces'] || body['total_pieces'] || body['pcs'] || null,
+      distance_km: (body.distance_km !== undefined && body.distance_km !== null) ? parseFloat(body.distance_km) : null,
+      zone:             body['Zone']                     || body['zone']              || null,
+      zone_full:        body['Zone (with Group Name)']   || null,
+      delivery_status: body['Delivery Status'] || body['delivery_status'] || null,
+      delivery_time:    body['Delivery Time']            || body.delivery_time    || null,
+      contact_method:   body['Recipient Contact Method'] || body.contact_method   || null,
+      neighboured_to:   body['Neighboured To']           || body.neighboured_to   || null,
+      accepted_by:      body['Delivery Accepted By']     || body.accepted_by      || null,
+      comments:         body['Comments']                 || null,
+    };
 
-  if (type === 'driver') {
-    const drivers = {};
-    weekOrders.forEach(o => {
-      const dc = (o.driver || '').toUpperCase();
-      if (!dc || dc === 'SCD') return;
-      if (!drivers[dc]) drivers[dc] = {orders:[]};
-      drivers[dc].orders.push(o);
-    });
+    const shopCode = extractShopCode(raw.shop_full) || extractShopCode(raw.shop) || raw.shop_code;
+    const enteredZoneCode = extractZoneCode(raw.zone_full) || extractZoneCode(raw.zone) || raw.zone;
 
-    const targets = code !== 'all' ? [code.toUpperCase()] : Object.keys(drivers).sort();
+    // Wholesale deliveries use their own separate zone system (WPU, WAI,
+    // WCO, etc. - determined by driver.html's own wholesale zone logic, or
+    // entered directly from Zoho). Checked BEFORE zone determination below:
+    // the retail suggest-zone.mjs matcher only knows about C1-C5/TSA/RVN/
+    // etc, and re-running a wholesale order's address through it could
+    // silently overwrite a correct wholesale code with an unrelated retail
+    // one - the same category of bug we already fixed for event-type codes.
+    const isWholesale = (raw.delivery_type === 'wholesale') ||
+      (enteredZoneCode && enteredZoneCode.toUpperCase().startsWith('W'));
 
-    targets.forEach(dc => {
-      const drv = drivers[dc];
-      if (!drv) return;
-      // Get full driver name from store, fallback to order field, fallback to code
-      const driverFullName = driverNames[dc] || drv.orders[0]?.driver_name || dc;
-      const driverTitle = `${dc} ${driverFullName !== dc ? driverFullName : ''}`.trim();
+    // Auto-calculate zone if not entered or flagged as needing calculation
+    let zoneCode = enteredZoneCode;
+    let zoneSource = 'manual';
+    let zoneSuggestion = null;
 
-      const orders = drv.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
-
-      const orderPay = orders.map(o => {
-        const zone = (o.zone_code||'').toUpperCase();
-        const pieces = parseInt(o.total_pieces||1);
-        const r = o.rate_snapshot || rates[zone] || {};
-        const gdpi = parseFloat(r.gdpi) || 0;
-        let drate, total;
-        if (o.driver_pay) {
-          total = parseFloat(o.driver_pay);
-          drate = total - gdpi;
+    if (isWholesale) {
+      // Wholesale zone codes are authoritative as entered - never
+      // re-suggested against the retail address matcher. If no zone was
+      // entered at all, this needs a human to fill in rather than guessing
+      // a retail zone that doesn't apply to wholesale pricing.
+      if (enteredZoneCode) {
+        zoneCode = enteredZoneCode.toUpperCase();
+        zoneSource = 'manual';
+      } else {
+        zoneSource = 'needs_review';
+      }
+    } else if (isEventZoneCode(enteredZoneCode)) {
+      // Event-type code (SPEC/WED/WEDO/FUN/FUNO) - authoritative as entered,
+      // never re-suggested/overwritten. Still look up the address for its
+      // community name (for tracking/reports), but ignore any suggested
+      // zone code that comes back with it.
+      zoneCode = enteredZoneCode.toUpperCase();
+      zoneSource = 'manual';
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+      }
+    } else if (raw.address && key && needsZoneCalculation(enteredZoneCode)) {
+      const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+      zoneSuggestion = await suggestZone(
+        raw.address,
+        shopLoc?.lat || 51.0447,
+        shopLoc?.lng || -114.0719,
+        key
+      );
+      if (zoneSuggestion?.suggested && zoneSuggestion.confidence !== 'manual') {
+        zoneCode = zoneSuggestion.suggested;
+        zoneSource = 'auto';
+      } else {
+        zoneSource = 'needs_review';
+      }
+  } else if (enteredZoneCode) {
+      if (raw.address && key) {
+        const shopLoc = shopCode ? await getShopLocation(shopCode) : null;
+        zoneSuggestion = await suggestZone(
+          raw.address,
+          shopLoc?.lat || 51.0447,
+          shopLoc?.lng || -114.0719,
+          key
+        );
+        if (zoneSuggestion?.suggested && zoneSuggestion.confidence === 'high') {
+          zoneCode = zoneSuggestion.suggested;
+          zoneSource = 'auto';
         } else {
-          const base = ((zone === 'RURALKM' || zone === 'WRU') && o.distance_km != null)
-            ? (r.drate||0) + (r.perkm||0) * o.distance_km
-            : (r.drate||0);
-          const hotR = o.hot_rate_snapshot || rates['HOT'] || {};
-          const rushPremium = o.rush ? (hotR.drate || 0) : 0;
-          drate = base + (pieces-1)*(r.dratex||0) + rushPremium;
-          total = drate + gdpi;
+          zoneCode = enteredZoneCode;
+          zoneSource = 'manual';
         }
-        return {o, zone, pieces, drate, gdpi, total};
-      });
+      } else {
+        zoneCode = enteredZoneCode;
+        zoneSource = 'manual';
+      }
+    }
+  
+    
 
-      const zoneDrate = {}, zoneGdpi = {};
-      let sumDrate = 0, sumGdpi = 0;
-      orderPay.forEach(({zone, drate, gdpi}) => {
-        zoneDrate[zone] = (zoneDrate[zone]||0) + drate;
-        zoneGdpi[zone] = (zoneGdpi[zone]||0) + gdpi;
-        sumDrate += drate;
-        sumGdpi += gdpi;
-      });
-      const totalDue = sumDrate + sumGdpi;
-      const allZones = [...new Set(Object.keys(zoneDrate))].sort();
+    // Flag if manual zone differs from suggestion
+    const zoneConflict = !isWholesale &&
+      !isEventZoneCode(enteredZoneCode) &&
+      zoneSuggestion?.suggested &&
+      enteredZoneCode &&
+      zoneSuggestion.suggested !== enteredZoneCode &&
+      zoneSuggestion.confidence === 'high';
 
-      groups.push({
-        code: dc, name: driverFullName !== dc ? driverFullName : '', title: `${driverTitle} \u2014 ${periodLabel}`,
-        subtitle: 'SMART CHOICE DELIVERY DRIVER DETAIL', kind: 'driver',
-        stats: [['DELIVERIES', String(orders.length)], ['BASE PAY', '$' + sumDrate.toFixed(2)], ['FUEL PREMIUM', '$' + sumGdpi.toFixed(2)], ['TOTAL DUE', '$' + totalDue.toFixed(2)]],
-        total: Math.round(totalDue * 100) / 100, count: orders.length,
-        zoneTables: [
-          { head: ['DZONE', 'drate'], rows: allZones.map(z => [z, '$' + (zoneDrate[z]||0).toFixed(2)]), total: ['Grand Total', '$' + sumDrate.toFixed(2)] },
-          { head: ['DZONE', 'GDPI'], rows: allZones.filter(z => zoneGdpi[z] > 0).map(z => [z, '$' + (zoneGdpi[z]||0).toFixed(2)]), total: ['Total GDPI', '$' + sumGdpi.toFixed(2)] }
-        ],
-        footer: 'Total $ Due: $' + totalDue.toFixed(2),
-        head: ['Date','Order ID','Name','Address','Community','DSHOP','DZONE','KM','Pcs','drate','GDPI','Total'],
-        rows: orderPay.map(({o,zone,pieces,drate,gdpi,total}) => [
-          fmt(parseDate(o.date||o.received_at||'')), String(o.order_id||1), (o.name||'').slice(0,18),
-          (o.formatted_address||o.address||'').slice(0,28), (o.community||'').slice(0,18), o.shop_code||'', zone,
-          ((zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null)?o.distance_km.toFixed(1):'', String(pieces),
-          '$'+drate.toFixed(2), '$'+gdpi.toFixed(2), '$'+total.toFixed(2)])
-      });
+    const weekEnd = weekEndingSunday(normalizeOrderDate(raw.date));
+    const xs = await xmasSettings();
+    const xmasOn = !!xs.enabled && inXmasSeason(normalizeOrderDate(raw.date));
+    const xmasPcs = (xmasOn && zoneCode !== 'SPL' && zoneCode !== 'SPLO') ? Math.max(0, Math.min(parseInt(body.xmas_pieces, 10) || 0, parseInt(raw.total_pieces || 1, 10) || 1)) : 0;
+    const orderId = `order_${weekEnd}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const order = {
+      id: orderId,
+      received_at: new Date().toISOString(),
+      date: raw.date,
+      order_id: raw.order_id,
+      name: raw.name,
+      address: raw.address,
+      unit: raw.unit || null,
+      time_request: raw.time_request || null,
+      formatted_address: zoneSuggestion?.formatted_address || raw.address,
+      community: zoneSuggestion?.community || null,
+      distance_km: raw.distance_km ?? zoneSuggestion?.distance_km ?? null,
+      shop_code: shopCode,
+      shop_full: raw.shop_full || raw.shop || null,
+      driver: raw.driver,
+      driver_pay: (function() {
+        if (raw.driver_pay) return parseFloat(raw.driver_pay);
+        const r = ratesData ? ratesData[zoneCode] : null;
+        if (!r) return 0;
+        const pieces = parseInt(raw.total_pieces || 1);
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        const base = ((zoneCode === 'RURALKM' || zoneCode === 'WRU') && dist != null)
+          ? (r.drate || 0) + (r.perkm || 0) * dist
+          : (r.drate || 0);
+        const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
+        const bd = BAKERY_DRIVER[zoneCode];
+        const baseX = bd ? (pieces > bd.upTo ? bd.over : bd.low) : base, extraX = bd ? 0 : (pieces - 1) * (r.dratex || 0);
+        return baseX + extraX + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
+      })(),
+      total_pieces: raw.total_pieces,
+      zone_entered: enteredZoneCode,
+      zone_code: zoneCode,
+      zone_source: zoneSource,          // 'manual', 'auto', 'needs_review'
+      zone_conflict: zoneConflict,      // true if driver zone ≠ suggested zone
+      zone_suggestion: zoneSuggestion,  // full suggestion object for reference
+      rush: !!raw.rush,
+      // Snapshot of the rate table entry actually in effect for this zone
+      // at the moment this order was created. Reports should prefer this
+      // over a live rate-table lookup - otherwise, changing a rate later
+      // would silently rewrite what an already-invoiced order says every
+      // time a shop report gets re-run, which is a real billing-integrity
+      // problem, not just a cosmetic one.
+      rate_snapshot: (ratesData && ratesData[zoneCode]) ? ratesData[zoneCode] : null,
+      // Same historical-accuracy reasoning applies to the rush premium -
+      // if HOT's rate changes later, old rush orders shouldn't silently
+      // reflect the new amount.
+      hot_rate_snapshot: (raw.rush && ratesData && ratesData['HOT']) ? ratesData['HOT'] : null,
+      delivery_status: raw.delivery_status,
+      delivery_time: raw.delivery_time,
+      contact_method: raw.contact_method,
+      neighboured_to: raw.neighboured_to,
+      accepted_by: raw.accepted_by,
+      comments: raw.comments,
+      has_photo: !!body.photo_base64,
+      // Christmas greens: how many of the pieces, and the rates in force when the order was entered.
+      xmas_pieces: xmasPcs || 0,
+      xmas_driver_rate: xmasPcs ? (xs.driver_rate || 0) : 0,
+      xmas_shop_rate: xmasPcs ? (xs.shop_rate || 0) : 0,
+    };
 
-      html += `<div class="page">
-        <div class="header">
-          <div class="header-left">
-            <div class="title">${driverTitle} &mdash; ${periodLabel}</div>
-            <div class="sub">SMART CHOICE DELIVERY DRIVER DETAIL</div>
-          </div>
-          <div class="header-right">SMART CHOICE DELIVERY<br>Driver Weekly Detail</div>
-        </div>
-        <div class="stats">
-          <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">DELIVERIES</div></div>
-          <div class="stat"><div class="stat-val">$${sumDrate.toFixed(2)}</div><div class="stat-lbl">BASE PAY</div></div>
-          <div class="stat"><div class="stat-val">$${sumGdpi.toFixed(2)}</div><div class="stat-lbl">FUEL PREMIUM</div></div>
-          <div class="stat"><div class="stat-val">$${totalDue.toFixed(2)}</div><div class="stat-lbl">TOTAL DUE</div></div>
-        </div>
-        <div class="content">
-          <div class="summary">
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>drate</th></tr></thead>
-              <tbody>
-                ${allZones.map(z=>`<tr><td>${z}</td><td>$${(zoneDrate[z]||0).toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Grand Total</td><td>$${sumDrate.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>GDPI</th></tr></thead>
-              <tbody>
-                ${allZones.filter(z=>zoneGdpi[z]>0).map(z=>`<tr><td>${z}</td><td>$${(zoneGdpi[z]||0).toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Total GDPI</td><td>$${sumGdpi.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <div class="grand">Total $ Due: $${totalDue.toFixed(2)}</div>
-          </div>
-          <div class="detail">
-            <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>DSHOP</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>drate</th><th>GDPI</th><th>Total</th><th>&#9744;</th></tr></thead>
-              <tbody>
-                ${orderPay.map(({o,zone,pieces,drate,gdpi,total})=>`<tr>
-                  <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
-                  <td>${o.order_id||1}</td>
-                  <td>${(o.name||'').slice(0,18)}</td>
-                  <td>${(o.formatted_address||o.address||'').slice(0,28)}</td>
-                  <td>${(o.community||'').slice(0,18)}</td>
-                  <td>${o.shop_code||''}</td>
-                  <td>${zone}</td>
-                  <td>${(zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
-                  <td>${pieces}</td>
-                  <td>$${drate.toFixed(2)}</td>
-                  <td>$${gdpi.toFixed(2)}</td>
-                  <td>$${total.toFixed(2)}</td>
-                  <td class="chk">&#9744;</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>`;
-    });
+    // Seasonal planters: the shop is charged here, because SPLO's base is the underlying zone's rate, which reports cannot see later.
+    //   SPL  = base $20 + $5 per extra piece.   SPLO = the zone's shop rate + $5 per extra piece.   (No Christmas greens charge: planters are greens already.)
+    if (zoneCode === 'SPL' || zoneCode === 'SPLO') {
+      const pcs = Math.max(1, parseInt(raw.total_pieces || 1, 10) || 1);
+      const sr = ratesData.SPL || {}, so = ratesData.SPLO || {};
+      let baseShop;
+      if (zoneCode === 'SPL') baseShop = sr.srate != null ? sr.srate : 20;
+      else {
+        const uz = String(body.underlying_zone || '').toUpperCase();
+        const ur = uz && ratesData[uz] ? ratesData[uz] : null;
+        const dist = raw.distance_km ?? zoneSuggestion?.distance_km ?? null;
+        baseShop = ur ? (((uz === 'RURALKM' || uz === 'WRU') && dist != null) ? (ur.srate || 0) + (ur.sperkm || 0) * dist : (ur.srate || 0)) : (so.srate != null ? so.srate : 25);
+      }
+      const extraShop = zoneCode === 'SPL' ? (sr.sratex != null ? sr.sratex : 5) : (so.sratex != null ? so.sratex : 5);
+      order.shop_pay = Math.round((baseShop + (pcs - 1) * extraShop ) * 100) / 100;
+      order.shop_pay_source = 'planter';
+      order.underlying_zone = String(body.underlying_zone || '').toUpperCase() || null;
+    }
 
-  } else if (type === 'shop') {
-    const shops = {};
-    weekOrders.forEach(o => {
-      const sc = (o.shop_code||'').toUpperCase();
-      if (!sc || sc === 'SCD') return;
-      if (!shops[sc]) shops[sc] = {orders:[]};
-      shops[sc].orders.push(o);
-    });
+    // A delivery entered against an event quote (Q-2026-0001): the quote decides who is billed, what the shop is
+    // charged for this delivery, and the driver's pay. Checked here, on the server, so a phone cannot change them.
+    let linkedQuote = null;
+    const quoteId = String(body.quote_id || '').trim().toUpperCase();
+    if (quoteId) {
+      const q = await getStore('flower-event-quotes').get(quoteId, { type: 'json', consistency: 'strong' }).catch(() => null);
+      if (!q) return json({ error: 'Quote ' + quoteId + ' was not found. Check the number.' }, 400);
+      if (!['sent', 'accepted'].includes(q.status)) return json({ error: 'Quote ' + q.id + ' is ' + q.status + ', not accepted. Ask the office.' }, 400);
+      const trips = Math.max(1, (q.event && q.event.trips) || 1);
+      if ((q.linked || []).length >= trips) return json({ error: 'Quote ' + q.id + ' already has all ' + trips + ' of its deliveries entered. If there is another, ask the office to raise the number of trips on the quote.' }, 409);
+      if (!(q.customer && q.customer.code)) return json({ error: 'Quote ' + q.id + ' has no shop code, so it cannot be billed. Ask the office.' }, 400);
+      linkedQuote = q;
+      order.quote_id = q.id;
+      order.shop_code = String(q.customer.code).toUpperCase();
+      order.shop_pay = Math.round((q.subtotal / trips) * 100) / 100;
+      order.xmas_pieces = 0; order.xmas_driver_rate = 0; order.xmas_shop_rate = 0; // the quote already sets the price and the pay
+      if (q.driver_pay > 0) { order.driver_pay = q.driver_pay; order.driver_pay_from_quote = true; }
+    }
 
-    const targets = code !== 'all' ? [code.toUpperCase()] : Object.keys(shops).sort();
-
-    targets.forEach(sc => {
-      const shop = shops[sc];
-      if (!shop) return;
-
-      // Get full shop name — from store, or from order fields
-      const storedShopName = shopNames[sc] || shop.orders[0]?.shop_full || shop.orders[0]?.shop || sc;
-      const shopFullName = displayName(sc, storedShopName);
-      const shopTitle = `${sc} ${shopFullName}`;
-
-      const orders = shop.orders.sort((a,b) => (parseDate(a.date||a.received_at||'')||'').localeCompare(parseDate(b.date||b.received_at||'')||''));
-
-      const orderAmts = orders.map(o => {
-        const zone = (o.zone_code||'').toUpperCase();
-        const pieces = parseInt(o.total_pieces||1);
-        const r = o.rate_snapshot || rates[zone] || {};
-        const base = ((zone === 'RURALKM' || zone === 'WRU') && o.distance_km != null)
-          ? (r.srate||0) + (r.sperkm||0) * o.distance_km
-          : (r.srate||0);
-        const hotR = o.hot_rate_snapshot || rates['HOT'] || {};
-        const rushPremium = o.rush ? (hotR.srate || 0) : 0;
-        // A delivery entered against an event quote is charged its share of the quote, not the zone rate.
-        const xmasAmt = (o.xmas_pieces || 0) * (o.xmas_shop_rate || 0); // Christmas greens upcharge
-        const bakTier = BAKERY_TIERS[zone]; // city bakery flat rate: one price up to 3 pieces, a second flat price from 4 up
-        const pieceAmt = bakTier ? (pieces > bakTier.upTo ? bakTier.over : base) : base + (pieces-1)*(r.sratex||0);
-        const amount = ((o.quote_id || o.shop_pay_source) && o.shop_pay != null) ? (parseFloat(o.shop_pay) || 0) : pieceAmt + rushPremium + xmasAmt;
-        return {o, zone, pieces, amount};
-      });
-
-      const zoneSums = {};
-      let grandTotal = 0;
-      orderAmts.forEach(({zone,amount}) => {
-        zoneSums[zone] = (zoneSums[zone]||0) + amount;
-        grandTotal += amount;
-      });
-
-      groups.push({
-        code: sc, name: shopFullName, title: `${shopTitle} \u2014 ${periodLabel}`,
-        subtitle: 'SMART CHOICE DELIVERY SHOP DETAIL \u2022 INVOICE PERIOD ' + weekEnd, kind: 'shop',
-        band: `${period === 'day' ? 'DATE' : 'WEEK ENDING'} ${weekEnd}  \u2022  DSHOP ${sc}  \u2022  Invoice Total: $${grandTotal.toFixed(2)}`,
-        total: Math.round(grandTotal * 100) / 100, count: orders.length,
-        zoneTables: [
-          { head: ['DZONE', 'Srate'], rows: Object.keys(zoneSums).sort().map(z => [z, '$' + zoneSums[z].toFixed(2)]), total: ['Grand Total', '$' + grandTotal.toFixed(2)] }
-        ],
-        footer: 'Invoice Total: $' + grandTotal.toFixed(2),
-        head: ['Date','Order ID','Name','Address','Community','Driver','DZONE','KM','Pcs','Srate'],
-        rows: orderAmts.map(({o,zone,pieces,amount}) => [
-          fmt(parseDate(o.date||o.received_at||'')), String(o.order_id||1), (o.name||'').slice(0,20),
-          (o.formatted_address||o.address||'').slice(0,30), (o.community||'').slice(0,20), o.driver||'', zone,
-          ((zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null)?o.distance_km.toFixed(1):'', String(pieces), '$'+amount.toFixed(2)])
-      });
-
-      html += `<div class="page">
-        <div class="header">
-          <div class="header-left">
-            <div class="title">${shopTitle} &mdash; ${periodLabel}</div>
-            <div class="sub">SMART CHOICE DELIVERY SHOP DETAIL &bull; INVOICE PERIOD ${weekEnd}</div>
-          </div>
-          <div class="header-right">SMART CHOICE DELIVERY<br>Shop Weekly Detail</div>
-        </div>
-        <div class="invoice-band">${period === 'day' ? 'DATE' : 'WEEK ENDING'} ${weekEnd} &nbsp;&bull;&nbsp; DSHOP ${sc} &nbsp;&bull;&nbsp; Invoice Total: $${grandTotal.toFixed(2)}</div>
-        <div class="content">
-          <div class="summary">
-            <table class="stbl">
-              <thead><tr><th>DZONE</th><th>Srate</th></tr></thead>
-              <tbody>
-                ${Object.keys(zoneSums).sort().map(z=>`<tr><td>${z}</td><td>$${zoneSums[z].toFixed(2)}</td></tr>`).join('')}
-                <tr class="tot"><td>Grand Total</td><td>$${grandTotal.toFixed(2)}</td></tr>
-              </tbody>
-            </table>
-            <div class="grand">Invoice Total: $${grandTotal.toFixed(2)}</div>
-          </div>
-          <div class="detail">
-            <table class="dtbl">
-              <thead><tr><th>Date</th><th>Order ID</th><th>Name</th><th>Address</th><th>Community</th><th>Driver</th><th>DZONE</th><th>KM</th><th>Pcs</th><th>Srate</th><th>&#9744;</th></tr></thead>
-              <tbody>
-                ${orderAmts.map(({o,zone,pieces,amount})=>`<tr>
-                  <td>${fmt(parseDate(o.date||o.received_at||''))}</td>
-                  <td>${o.order_id||1}</td>
-                  <td>${(o.name||'').slice(0,20)}</td>
-                  <td>${(o.formatted_address||o.address||'').slice(0,30)}</td>
-                  <td>${(o.community||'').slice(0,20)}</td>
-                  <td>${o.driver||''}</td>
-                  <td>${zone}</td>
-                  <td>${(zone==='RURALKM'||zone==='WRU')&&o.distance_km!=null?o.distance_km.toFixed(1):''}</td>
-                  <td>${pieces}</td>
-                  <td>$${amount.toFixed(2)}</td>
-                  <td class="chk">&#9744;</td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>`;
-    });
+    try {
+      const store = getStore('flower-orders');
+      await store.setJSON(orderId, order);
+      if (linkedQuote) { // count this delivery against the quote
+        try {
+          const qs = getStore('flower-event-quotes');
+          const fresh = (await qs.get(linkedQuote.id, { type: 'json', consistency: 'strong' })) || linkedQuote;
+          fresh.linked = (fresh.linked || []).concat([{ id: orderId, at: order.received_at, driver: order.driver || '', order_id: order.order_id || '' }]);
+          await qs.setJSON(fresh.id, fresh);
+        } catch (e) { console.error('quote link failed:', e.message); }
+      }
+      // Photo is stored in a separate blob store, not embedded in the order
+      // record itself - GET /api/orders loads every order's full JSON on
+      // every page view, so embedding potentially-large photo data there
+      // would slow that down for every order, viewed or not. The photo is
+      // only fetched on-demand when someone actually wants to view it.
+      if (body.photo_base64) {
+        try {
+          const photoStore = getStore('flower-order-photos');
+          await photoStore.set(orderId, body.photo_base64);
+        } catch (e) {
+          // Order itself already saved successfully - don't fail the whole
+          // submission just because the photo couldn't be stored, but the
+          // has_photo flag above would then be misleading. Downgrade it.
+          order.has_photo = false;
+          await store.setJSON(orderId, order);
+        }
+      }
+      // Delivery notice to the shop, only for shops that asked for it. A failure here never fails the order.
+      if (!isWholesale || isEventZoneCode(zoneCode)) { // wholesale pickups get no notice; WED/WEDO are events, not wholesale
+        try {
+          const to = await sendDeliveryNotice(order, body.photo_base64 || '');
+          if (to) { order.notice_sent_at = new Date().toISOString(); order.notice_to = to; await store.setJSON(orderId, order); }
+        } catch (e) {
+          console.error('delivery notice failed:', e.message);
+          try { order.notice_error = String(e.message || e).slice(0, 200); await store.setJSON(orderId, order); } catch (e2) {}
+        }
+      }
+      if (!isWholesale || isEventZoneCode(zoneCode)) { try { await closeRequestFor(order, orderId); } catch (e) { console.error('request close failed:', e.message); } }
+      // has_photo reports whether the photo was actually stored (it is downgraded to
+      // false above if the photo write failed), so the driver form can tell the driver
+      // the truth instead of assuming the photo made it.
+      // If this week has been closed, list the late order against it (not blocked - just visible).
+      try {
+        const lockStore = getStore('flower-week-locks');
+        const lk = await lockStore.get(weekEnd, { type: 'json' });
+        if (lk && lk.locked) {
+          lk.changes = lk.changes || [];
+          lk.changes.push({ at: new Date().toISOString(), by: 'new entry', id: orderId, order_id: order.order_id, action: 'added', reason: 'Order entered after the week was closed' });
+          await lockStore.setJSON(weekEnd, lk);
+        }
+      } catch (e) { /* the order is saved; logging is best-effort */ }
+      return json({ success: true, order_id: orderId, zone_code: zoneCode, zone_source: zoneSource, has_photo: !!order.has_photo }, 201);
+    } catch (e) {
+      return json({ error: 'Could not store order: ' + e.message }, 500);
+   }
   }
-
-  if (wantJson) {
-    return new Response(JSON.stringify({ week_end: weekEnd, period, type, period_label: periodLabel, groups }), {
-      status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
-    });
-  }
-
-  html += '</body></html>';
-  return new Response(html, {status:200, headers:{'content-type':'text/html; charset=utf-8'}});
+  return json({ error: 'Method not allowed' }, 405);
 };
 
-export const config = { path: '/api/reports' };
+export const config = { path: '/api/orders' };
