@@ -1,5 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
+const BAKERY_DRIVER = { BAKV:{ upTo:3, low:9.5, over:12.5 }, BAKS:{ upTo:3, low:9.5, over:12.5 }, BAKP:{ upTo:3, low:9.5, over:12.5 } }; // city bakery flat driver pay: one amount up to 3 pieces, another from 4 up
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 }
@@ -197,7 +199,9 @@ export default async (req) => {
           : (r.drate || 0);
         const hotR = updated.hot_rate_snapshot || {};
         const rushPremium = updated.rush ? (hotR.drate || 0) : 0;
-        updated.driver_pay = base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium;
+        const bd = BAKERY_DRIVER[updated.zone_code];
+        const baseX = bd ? (pieces > bd.upTo ? bd.over : bd.low) : base, extraX = bd ? 0 : (pieces - 1) * (r.dratex || 0);
+        updated.driver_pay = baseX + extraX + (r.gdpi || 0) + rushPremium;
       } catch (e) { /* keep existing driver_pay if rates lookup fails */ }
     }
 
