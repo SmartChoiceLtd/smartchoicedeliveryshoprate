@@ -1,5 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
+const BAKERY_DRIVER = { BAKV:{ upTo:3, low:9.5, over:12.5 }, BAKS:{ upTo:3, low:9.5, over:12.5 }, BAKP:{ upTo:3, low:9.5, over:12.5 } }; // city bakery flat driver pay: one amount up to 3 pieces, another from 4 up
+
 // Christmas greens: a per-piece upcharge for deliveries dated Nov 1 to Jan 31, while the office switch (Seasonal page) is on.
 // The server decides whether it applies and at what rate; the driver form only collects the number of green pieces.
 const XMAS_DEFAULTS = { enabled: true, driver_rate: 1.5, shop_rate: 2 };
@@ -389,7 +391,9 @@ export default async (req) => {
           ? (r.drate || 0) + (r.perkm || 0) * dist
           : (r.drate || 0);
         const rushPremium = raw.rush ? ((ratesData && ratesData['HOT']) ? (ratesData['HOT'].drate || 0) : 0) : 0;
-        return base + (pieces - 1) * (r.dratex || 0) + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
+        const bd = BAKERY_DRIVER[zoneCode];
+        const baseX = bd ? (pieces > bd.upTo ? bd.over : bd.low) : base, extraX = bd ? 0 : (pieces - 1) * (r.dratex || 0);
+        return baseX + extraX + (r.gdpi || 0) + rushPremium + xmasPcs * (xs.driver_rate || 0);
       })(),
       total_pieces: raw.total_pieces,
       zone_entered: enteredZoneCode,
