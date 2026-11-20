@@ -164,7 +164,29 @@ export default async (req) => {
     // here would silently ignore a corrected piece count or zone.
     const piecesChanged = body.total_pieces !== undefined && body.total_pieces !== existing.total_pieces;
     const zoneChanged = body.zone_code !== undefined && body.zone_code !== existing.zone_code;
-    if (piecesChanged || zoneChanged) {
+
+    // Christmas greens: set or correct how many pieces are greens. The per-piece rates are taken from the seasonal
+    // settings the first time greens are added to an order, then kept with the order, so later rate changes never
+    // alter an order already priced. Not for planters or an order tied to an event quote (their price is already set).
+    let xmasChanged = false;
+    {
+      const totalPcs = Math.max(1, parseInt(updated.total_pieces || 1, 10) || 1);
+      const noGreens = updated.zone_code === 'SPL' || updated.zone_code === 'SPLO' || !!updated.quote_id || !!updated.shop_pay_source;
+      let want = body.xmas_pieces !== undefined ? (parseInt(body.xmas_pieces, 10) || 0) : (parseInt(existing.xmas_pieces, 10) || 0);
+      want = noGreens ? 0 : Math.max(0, Math.min(want, totalPcs));
+      updated.xmas_pieces = want;
+      if (want !== (parseInt(existing.xmas_pieces, 10) || 0)) {
+        xmasChanged = true;
+        if (want > 0 && !(existing.xmas_driver_rate || existing.xmas_shop_rate)) {
+          let xs = { driver_rate: 1.5, shop_rate: 2 };
+          try { const st = await getStore('flower-settings').get('seasonal', { type: 'json' }); if (st && st.xmas) xs = { ...xs, ...st.xmas }; } catch (e) {}
+          updated.xmas_driver_rate = xs.driver_rate || 0;
+          updated.xmas_shop_rate = xs.shop_rate || 0;
+        }
+        if (want === 0) { updated.xmas_driver_rate = 0; updated.xmas_shop_rate = 0; }
+      }
+    }
+    if (piecesChanged || zoneChanged || xmasChanged) {
       try {
         let r;
         if (zoneChanged) {
@@ -201,7 +223,7 @@ export default async (req) => {
         const rushPremium = updated.rush ? (hotR.drate || 0) : 0;
         const bd = BAKERY_DRIVER[updated.zone_code];
         const baseX = bd ? (pieces > bd.upTo ? bd.over : bd.low) : base, extraX = bd ? 0 : (pieces - 1) * (r.dratex || 0);
-        updated.driver_pay = baseX + extraX + (r.gdpi || 0) + rushPremium;
+        updated.driver_pay = baseX + extraX + (r.gdpi || 0) + rushPremium + (updated.xmas_pieces || 0) * (updated.xmas_driver_rate || 0);
       } catch (e) { /* keep existing driver_pay if rates lookup fails */ }
     }
 
