@@ -6,7 +6,6 @@
   "scope": "/",
   "id": "/dashboard.html",
   "display": "standalone",
-  "orientation": "landscape",
   "background_color": "#FAF7F2",
   "theme_color": "#0C769E",
   "icons": [
