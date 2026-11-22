@@ -169,6 +169,8 @@ document.addEventListener('visibilitychange',function(){
 
 try{ sections=JSON.parse(store('scd_dash_cache')||'[]'); if(sections.length) render(); }catch(e){ sections=[]; }
 loadHub().then(loadBadge); setInterval(loadBadge,300000);
+// Lets the dashboard install as a real app and open with no signal
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('/dash-sw.js',{scope:'/dashboard.html'}).catch(function(e){ console.log('dash sw:',e&&e.message); }); }); }
 </script>
 </body>
 </html>
