@@ -124,6 +124,17 @@ export default async (req) => {
         driverChange = { from: oldDriver || null, to: body.driver };
       }
     }
+    // Date and Order ID can be corrected from the Edit screen. The date must be a real calendar day (YYYY-MM-DD); the order ID cannot be blank.
+    if (body.date !== undefined) {
+      const dd = String(body.date || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dd) || isNaN(new Date(dd + 'T12:00:00Z')) || new Date(dd + 'T12:00:00Z').toISOString().slice(0, 10) !== dd) return json({ error: 'Date must be a real day in the form YYYY-MM-DD' }, 400);
+      body.date = dd;
+    }
+    if (body.order_id !== undefined) {
+      const oid = String(body.order_id == null ? '' : body.order_id).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 60);
+      if (!oid) return json({ error: 'Order ID cannot be blank' }, 400);
+      body.order_id = oid;
+    }
     let updated = { ...existing, ...body, id };
     if (driverChange) updated.driver_history = (existing.driver_history || []).concat([{ ...driverChange, at: new Date().toISOString(), by: username }]);
     const lc = await lockCheck([weekEndOf(existing), weekEndOf(updated)], lockReason);
